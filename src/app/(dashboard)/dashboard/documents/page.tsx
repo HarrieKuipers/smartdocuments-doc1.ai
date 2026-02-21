@@ -1,0 +1,225 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+
+interface Document {
+  _id: string;
+  title: string;
+  authors: string[];
+  status: string;
+  createdAt: string;
+  analytics: { totalViews: number };
+  shortId: string;
+}
+
+const statusColors: Record<string, string> = {
+  ready: "bg-green-100 text-green-700",
+  processing: "bg-blue-100 text-blue-700",
+  uploading: "bg-yellow-100 text-yellow-700",
+  error: "bg-red-100 text-red-700",
+};
+
+const statusLabels: Record<string, string> = {
+  ready: "Gepubliceerd",
+  processing: "Verwerking",
+  uploading: "Uploaden",
+  error: "Fout",
+};
+
+export default function DocumentsPage() {
+  const [docs, setDocs] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  async function fetchDocs() {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+
+      const res = await fetch(`/api/documents?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocs(data.data || []);
+      }
+    } catch {
+      toast.error("Kon documenten niet laden.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchDocs();
+  }, [statusFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(fetchDocs, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Weet je zeker dat je dit document wilt verwijderen?")) return;
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDocs(docs.filter((d) => d._id !== id));
+        toast.success("Document verwijderd.");
+      }
+    } catch {
+      toast.error("Verwijderen mislukt.");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Documenten</h1>
+          <p className="text-muted-foreground">
+            Beheer al je documenten
+          </p>
+        </div>
+        <Link href="/dashboard/upload">
+          <Button className="bg-[#00BCD4] hover:bg-[#00838F]">
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Document
+          </Button>
+        </Link>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Zoeken op titel..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle statussen</SelectItem>
+            <SelectItem value="ready">Gepubliceerd</SelectItem>
+            <SelectItem value="processing">Verwerking</SelectItem>
+            <SelectItem value="uploading">Uploaden</SelectItem>
+            <SelectItem value="error">Fout</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : docs.length === 0 ? (
+        <div className="rounded-lg border bg-white p-12 text-center">
+          <p className="text-muted-foreground">Geen documenten gevonden.</p>
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-white">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Titel</TableHead>
+                <TableHead>Auteur</TableHead>
+                <TableHead>Datum</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Views</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {docs.map((doc) => (
+                <TableRow key={doc._id}>
+                  <TableCell className="font-medium">{doc.title}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {doc.authors?.[0] || "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={statusColors[doc.status] || ""}>
+                      {statusLabels[doc.status] || doc.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{doc.analytics?.totalViews || 0}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/documents/${doc._id}/edit`}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Bewerken
+                          </Link>
+                        </DropdownMenuItem>
+                        {doc.status === "ready" && (
+                          <DropdownMenuItem asChild>
+                            <Link href={`/d/${doc.shortId}`} target="_blank">
+                              <Eye className="mr-2 h-4 w-4" />
+                              Bekijken
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(doc._id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Verwijderen
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}

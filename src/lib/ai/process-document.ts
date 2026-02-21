@@ -1,0 +1,99 @@
+import connectDB from "@/lib/db";
+import DocumentModel from "@/models/Document";
+import { extractText } from "./extract-text";
+import { analyzeContent } from "./analyze-content";
+import { generateLanguageLevelSummaries } from "./generate-summary";
+import { extractTerms } from "./extract-terms";
+
+type ProgressCallback = (step: string, percentage: number) => Promise<void>;
+
+export async function processDocument(
+  documentId: string,
+  onProgress?: ProgressCallback
+) {
+  await connectDB();
+
+  const doc = await DocumentModel.findById(documentId);
+  if (!doc) throw new Error("Document not found");
+
+  try {
+    // Update status
+    doc.status = "processing";
+    await doc.save();
+
+    // Step 1: Text extraction
+    await onProgress?.("text-extraction", 10);
+    doc.processingProgress = { step: "text-extraction", percentage: 10 };
+    await doc.save();
+
+    const fileResponse = await fetch(doc.sourceFile.url);
+    const buffer = Buffer.from(await fileResponse.arrayBuffer());
+    const { text, pageCount } = await extractText(buffer, doc.sourceFile.mimeType);
+
+    doc.content.originalText = text;
+    if (pageCount) doc.pageCount = pageCount;
+    await doc.save();
+
+    // Step 2: Content analysis
+    await onProgress?.("content-analysis", 30);
+    doc.processingProgress = { step: "content-analysis", percentage: 30 };
+    await doc.save();
+
+    const analysis = await analyzeContent(text);
+    doc.content.summary = {
+      original: analysis.summary,
+      B1: "",
+      B2: "",
+      C1: "",
+    };
+    doc.content.keyPoints = analysis.keyPoints;
+    doc.content.findings = analysis.findings;
+    await doc.save();
+
+    // Step 3: Summary generation (already done in analysis)
+    await onProgress?.("summary-generation", 50);
+    doc.processingProgress = { step: "summary-generation", percentage: 50 };
+    await doc.save();
+
+    // Step 4: Language level rewriting
+    await onProgress?.("language-levels", 65);
+    doc.processingProgress = { step: "language-levels", percentage: 65 };
+    await doc.save();
+
+    const levelSummaries = await generateLanguageLevelSummaries(
+      analysis.summary
+    );
+    doc.content.summary.B1 = levelSummaries.B1;
+    doc.content.summary.B2 = levelSummaries.B2;
+    doc.content.summary.C1 = levelSummaries.C1;
+    await doc.save();
+
+    // Step 5: Term extraction
+    await onProgress?.("term-extraction", 80);
+    doc.processingProgress = { step: "term-extraction", percentage: 80 };
+    await doc.save();
+
+    const terms = await extractTerms(text);
+    doc.content.terms = terms;
+    await doc.save();
+
+    // Step 6: Finalize
+    await onProgress?.("finalizing", 95);
+    doc.processingProgress = { step: "finalizing", percentage: 95 };
+    await doc.save();
+
+    doc.status = "ready";
+    doc.processingProgress = { step: "finalizing", percentage: 100 };
+    doc.publishedAt = new Date();
+    await doc.save();
+
+    await onProgress?.("finalizing", 100);
+
+    return doc;
+  } catch (error) {
+    console.error("Document processing error:", error);
+    doc.status = "error";
+    await doc.save();
+    throw error;
+  }
+}

@@ -1,65 +1,340 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  FileText,
+  Brain,
+  Languages,
+  MessageSquare,
+  ArrowRight,
+  CheckCircle,
+  Shield,
+  Zap,
+  Users,
+} from "lucide-react";
 
-export default function Home() {
+const features = [
+  {
+    icon: Brain,
+    title: "AI-verrijkte documenten",
+    description:
+      "Automatische samenvattingen, hoofdpunten en bevindingen gegenereerd door AI.",
+  },
+  {
+    icon: Languages,
+    title: "Meerdere taalniveaus",
+    description:
+      "Herschrijf content op B1, B2 of C1 niveau voor maximale toegankelijkheid.",
+  },
+  {
+    icon: MessageSquare,
+    title: "AI Chat per document",
+    description:
+      "Lezers kunnen direct vragen stellen over het document en krijgen instant antwoord.",
+  },
+  {
+    icon: Shield,
+    title: "Veilig & Beheerbaar",
+    description:
+      "Wachtwoordbeveiliging, toegangsbeheer en volledige controle over je documenten.",
+  },
+  {
+    icon: Zap,
+    title: "Snel & Mooi",
+    description:
+      "Professionele reader views die snel laden en er prachtig uitzien op elk apparaat.",
+  },
+  {
+    icon: Users,
+    title: "Team & Huisstijl",
+    description:
+      "Werk samen met je team en pas de huisstijl aan per organisatie of document.",
+  },
+];
+
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "€0",
+    period: "voor altijd",
+    features: ["1 document", "AI Chat", "B1 taalniveau", "Standaard huisstijl"],
+    cta: "Gratis starten",
+    popular: false,
+  },
+  {
+    name: "Pro",
+    price: "€49",
+    period: "per maand",
+    features: [
+      "25 documenten",
+      "AI Chat",
+      "B1, B2, C1 taalniveaus",
+      "Alle huisstijlen + custom",
+      "Collecties",
+      "Volledige analytics",
+      "Wachtwoordbeveiliging",
+      "5 teamleden",
+    ],
+    cta: "Start met Pro",
+    popular: true,
+  },
+  {
+    name: "Enterprise",
+    price: "Op maat",
+    period: "",
+    features: [
+      "Onbeperkt documenten",
+      "Alles in Pro",
+      "Custom domein",
+      "Onbeperkt teamleden",
+      "Prioriteit support",
+      "API toegang",
+    ],
+    cta: "Neem contact op",
+    popular: false,
+  },
+];
+
+export default function LandingPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="border-b">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00BCD4]">
+              <FileText className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xl font-bold">
+              doc1<span className="text-[#00BCD4]">.ai</span>
+            </span>
+          </Link>
+          <nav className="hidden items-center gap-6 md:flex">
+            <a href="#features" className="text-sm text-muted-foreground hover:text-gray-900">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-gray-900">
+              Prijzen
+            </a>
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link href="/login">
+              <Button variant="ghost" size="sm">
+                Inloggen
+              </Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm" className="bg-[#00BCD4] hover:bg-[#00838F]">
+                Gratis starten
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="mx-auto max-w-6xl px-6 py-20 text-center">
+        <Badge className="mb-6 bg-[#00BCD4]/10 text-[#00BCD4]">
+          AI-powered document platform
+        </Badge>
+        <h1 className="mx-auto mb-6 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+          Maak elk document{" "}
+          <span className="text-[#00BCD4]">slim, toegankelijk</span> en{" "}
+          <span className="text-[#00BCD4]">interactief</span>
+        </h1>
+        <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
+          Transformeer PDF en DOCX bestanden in interactieve webdocumenten met
+          AI-samenvattingen, meerdere taalniveaus en een ingebouwde chat-assistent.
+          Ideaal voor overheden en organisaties.
+        </p>
+        <div className="flex items-center justify-center gap-4">
+          <Link href="/register">
+            <Button size="lg" className="bg-[#00BCD4] hover:bg-[#00838F]">
+              Gratis starten
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+          <Link href="#features">
+            <Button size="lg" variant="outline">
+              Meer weten
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="bg-gray-50 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">
+              Alles wat je nodig hebt
+            </h2>
+            <p className="text-muted-foreground">
+              Van upload tot interactief webdocument in een paar klikken
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature) => (
+              <Card key={feature.title} className="border-0 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
+                    <feature.icon className="h-5 w-5 text-[#00BCD4]" />
+                  </div>
+                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {feature.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">Hoe het werkt</h2>
+            <p className="text-muted-foreground">
+              In drie stappen van statisch document naar interactieve ervaring
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-3">
+            {[
+              {
+                step: "1",
+                title: "Upload",
+                description:
+                  "Sleep je PDF of DOCX bestand in de upload zone. We accepteren bestanden tot 25MB.",
+              },
+              {
+                step: "2",
+                title: "AI Verwerking",
+                description:
+                  "Onze AI analyseert het document, genereert samenvattingen, identificeert hoofdpunten en herschrijft op verschillende taalniveaus.",
+              },
+              {
+                step: "3",
+                title: "Publiceer & Deel",
+                description:
+                  "Publiceer het interactieve document en deel de link. Lezers kunnen de samenvatting lezen, van taalniveau wisselen en vragen stellen aan de AI.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#00BCD4] text-xl font-bold text-white">
+                  {item.step}
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="bg-gray-50 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">Eenvoudige Prijzen</h2>
+            <p className="text-muted-foreground">
+              Begin gratis, upgrade wanneer je wilt
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-3">
+            {pricingPlans.map((plan) => (
+              <Card
+                key={plan.name}
+                className={`relative ${
+                  plan.popular ? "border-[#00BCD4] border-2 shadow-lg" : ""
+                }`}
+              >
+                {plan.popular && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00BCD4]">
+                    Meest gekozen
+                  </Badge>
+                )}
+                <CardContent className="p-6">
+                  <h3 className="mb-2 text-xl font-bold">{plan.name}</h3>
+                  <div className="mb-6">
+                    <span className="text-3xl font-bold">{plan.price}</span>
+                    {plan.period && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        {plan.period}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="mb-6 space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-[#00BCD4]" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/register">
+                    <Button
+                      className={`w-full ${
+                        plan.popular
+                          ? "bg-[#00BCD4] hover:bg-[#00838F]"
+                          : ""
+                      }`}
+                      variant={plan.popular ? "default" : "outline"}
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="mb-4 text-3xl font-bold">
+            Klaar om je documenten te transformeren?
+          </h2>
+          <p className="mb-8 text-muted-foreground">
+            Begin vandaag nog gratis. Geen creditcard nodig.
           </p>
+          <Link href="/register">
+            <Button size="lg" className="bg-[#00BCD4] hover:bg-[#00838F]">
+              Gratis starten
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-[#00BCD4]">
+                <FileText className="h-3 w-3 text-white" />
+              </div>
+              <span className="font-bold">
+                doc1<span className="text-[#00BCD4]">.ai</span>
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Een product van{" "}
+              <a href="https://espire.agency" className="hover:underline">
+                Espire Agency
+              </a>
+            </p>
+          </div>
         </div>
-      </main>
+      </footer>
     </div>
   );
 }
