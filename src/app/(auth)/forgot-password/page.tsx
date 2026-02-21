@@ -12,7 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FileText, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
+import Image from "next/image";
+import { Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -49,8 +50,8 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-            <FileText className="h-6 w-6 text-[#00BCD4]" />
+          <div className="mx-auto mb-4">
+            <Image src="/logo_DOC1_dark.svg" alt="DOC1" width={120} height={45} priority />
           </div>
           <CardTitle className="text-2xl">Wachtwoord vergeten</CardTitle>
           <CardDescription>
@@ -92,7 +93,7 @@ export default function ForgotPasswordPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-[#00BCD4] hover:bg-[#00838F]"
+                className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
                 disabled={loading}
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -102,7 +103,7 @@ export default function ForgotPasswordPage() {
               <div className="text-center">
                 <Link
                   href="/login"
-                  className="text-sm text-[#00BCD4] hover:underline"
+                  className="text-sm text-[#0062EB] hover:underline"
                 >
                   <ArrowLeft className="mr-1 inline h-3 w-3" />
                   Terug naar inloggen

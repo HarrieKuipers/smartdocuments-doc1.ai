@@ -27,8 +27,8 @@ const OrganizationSchema = new Schema<IOrganization>(
     slug: { type: String, required: true, unique: true, index: true },
     logo: { type: String },
     brandColors: {
-      primary: { type: String, default: "#00BCD4" },
-      secondary: { type: String, default: "#00838F" },
+      primary: { type: String, default: "#0062EB" },
+      secondary: { type: String, default: "#0050C0" },
       accent: { type: String, default: "#E0F7FA" },
     },
     defaultLanguageLevel: {

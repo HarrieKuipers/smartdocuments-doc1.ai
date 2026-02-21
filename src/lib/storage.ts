@@ -31,6 +31,38 @@ export async function getPresignedUploadUrl(
   return getSignedUrl(s3Client, command, { expiresIn: 3600 });
 }
 
+export async function uploadFile(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+    ACL: "private",
+  });
+  await s3Client.send(command);
+}
+
+export async function uploadPublicFile(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+    ACL: "public-read",
+    CacheControl: "public, max-age=31536000, immutable",
+  });
+  await s3Client.send(command);
+  return getFileUrl(key);
+}
+
 export async function getPresignedDownloadUrl(key: string): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET,

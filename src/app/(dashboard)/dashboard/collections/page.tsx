@@ -87,7 +87,7 @@ export default function CollectionsPage() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[#00BCD4] hover:bg-[#00838F]">
+            <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
               <Plus className="mr-2 h-4 w-4" />
               Nieuwe Collectie
             </Button>
@@ -115,7 +115,7 @@ export default function CollectionsPage() {
               </div>
               <Button
                 onClick={handleCreate}
-                className="w-full bg-[#00BCD4] hover:bg-[#00838F]"
+                className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
                 disabled={creating || !name.trim()}
               >
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -148,8 +148,8 @@ export default function CollectionsPage() {
             <Link key={col._id} href={`/dashboard/collections/${col._id}`}>
               <Card className="cursor-pointer transition-shadow hover:shadow-md">
                 <CardContent className="p-6">
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                    <FolderOpen className="h-5 w-5 text-[#00BCD4]" />
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                    <FolderOpen className="h-5 w-5 text-[#0062EB]" />
                   </div>
                   <h3 className="mb-1 font-semibold">{col.name}</h3>
                   {col.description && (

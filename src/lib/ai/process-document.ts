@@ -1,5 +1,6 @@
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
+import { getPresignedDownloadUrl, BUCKET } from "@/lib/storage";
 import { extractText } from "./extract-text";
 import { analyzeContent } from "./analyze-content";
 import { generateLanguageLevelSummaries } from "./generate-summary";
@@ -26,7 +27,13 @@ export async function processDocument(
     doc.processingProgress = { step: "text-extraction", percentage: 10 };
     await doc.save();
 
-    const fileResponse = await fetch(doc.sourceFile.url);
+    // Extract storage key from URL and use presigned download
+    const urlPath = new URL(doc.sourceFile.url).pathname;
+    const storageKey = urlPath.startsWith(`/${BUCKET}/`)
+      ? urlPath.slice(`/${BUCKET}/`.length)
+      : urlPath.slice(1);
+    const downloadUrl = await getPresignedDownloadUrl(storageKey);
+    const fileResponse = await fetch(downloadUrl);
     const buffer = Buffer.from(await fileResponse.arrayBuffer());
     const { text, pageCount } = await extractText(buffer, doc.sourceFile.mimeType);
 

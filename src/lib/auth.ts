@@ -80,15 +80,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, trigger }) {
+      if (user || trigger === "update") {
         await connectDB();
-        const dbUser = await User.findOne({ email: user.email });
+        const dbUser = await User.findOne({
+          ...(user?.email ? { email: user.email } : { _id: token.userId }),
+        });
         if (dbUser) {
           token.userId = dbUser._id.toString();
           token.organizationId = dbUser.organizationId?.toString();
           token.role = dbUser.role;
           token.plan = dbUser.plan;
+          token.picture = dbUser.image || null;
         }
       }
       return token;
@@ -99,6 +102,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.organizationId = token.organizationId as string;
         session.user.role = token.role as string;
         session.user.plan = token.plan as string;
+        session.user.image = token.picture as string | null;
       }
       return session;
     },

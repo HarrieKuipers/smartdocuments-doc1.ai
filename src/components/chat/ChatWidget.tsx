@@ -18,7 +18,7 @@ interface ChatWidgetProps {
 
 export default function ChatWidget({
   documentId,
-  brandPrimary = "#00BCD4",
+  brandPrimary = "#0062EB",
 }: ChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);

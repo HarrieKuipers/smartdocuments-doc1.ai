@@ -15,7 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,8 +48,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-            <FileText className="h-6 w-6 text-[#00BCD4]" />
+          <div className="mx-auto mb-4">
+            <Image src="/logo_DOC1_dark.svg" alt="DOC1" width={120} height={45} priority />
           </div>
           <CardTitle className="text-2xl">Welkom terug</CardTitle>
           <CardDescription>
@@ -73,7 +74,7 @@ export default function LoginPage() {
                 <Label htmlFor="password">Wachtwoord</Label>
                 <Link
                   href="/forgot-password"
-                  className="text-sm text-[#00BCD4] hover:underline"
+                  className="text-sm text-[#0062EB] hover:underline"
                 >
                   Wachtwoord vergeten?
                 </Link>
@@ -94,7 +95,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#00BCD4] hover:bg-[#00838F]"
+              className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -137,7 +138,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Nog geen account?{" "}
-            <Link href="/register" className="text-[#00BCD4] hover:underline">
+            <Link href="/register" className="text-[#0062EB] hover:underline">
               Registreren
             </Link>
           </p>

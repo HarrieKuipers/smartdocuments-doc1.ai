@@ -15,7 +15,7 @@ export default function TermTooltip({ term, definition }: TermTooltipProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="cursor-help border-b border-dotted border-[var(--brand-primary,#00BCD4)] text-[var(--brand-primary,#00BCD4)]">
+        <span className="cursor-help border-b border-dotted border-[var(--brand-primary,#0062EB)] text-[var(--brand-primary,#0062EB)]">
           {term}
         </span>
       </TooltipTrigger>

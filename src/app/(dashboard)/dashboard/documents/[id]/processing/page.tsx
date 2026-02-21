@@ -138,7 +138,7 @@ export default function ProcessingPage() {
                   {isCompleted ? (
                     <CheckCircle className="h-6 w-6 text-green-500" />
                   ) : isCurrent ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-[#00BCD4]" />
+                    <Loader2 className="h-6 w-6 animate-spin text-[#0062EB]" />
                   ) : (
                     <div className="h-6 w-6 rounded-full border-2 border-gray-200" />
                   )}
@@ -149,7 +149,7 @@ export default function ProcessingPage() {
                       isCompleted
                         ? "text-green-700"
                         : isCurrent
-                        ? "text-[#00BCD4]"
+                        ? "text-[#0062EB]"
                         : "text-gray-400"
                     }`}
                   >
@@ -200,7 +200,7 @@ export default function ProcessingPage() {
         <div className="text-center">
           <Button
             size="lg"
-            className="bg-[#00BCD4] hover:bg-[#00838F]"
+            className="bg-[#0062EB] hover:bg-[#0050C0]"
             onClick={() =>
               router.push(`/dashboard/documents/${params.id}/edit`)
             }

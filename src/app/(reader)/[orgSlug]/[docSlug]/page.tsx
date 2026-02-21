@@ -29,7 +29,7 @@ export default function SEOReaderPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="animate-spin h-8 w-8 border-2 border-[#00BCD4] border-t-transparent rounded-full" />
+      <div className="animate-spin h-8 w-8 border-2 border-[#0062EB] border-t-transparent rounded-full" />
     </div>
   );
 }

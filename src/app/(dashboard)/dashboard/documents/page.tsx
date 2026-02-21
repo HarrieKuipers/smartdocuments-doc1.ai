@@ -110,7 +110,7 @@ export default function DocumentsPage() {
           </p>
         </div>
         <Link href="/dashboard/upload">
-          <Button className="bg-[#00BCD4] hover:bg-[#00838F]">
+          <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
             <Upload className="mr-2 h-4 w-4" />
             Upload Document
           </Button>

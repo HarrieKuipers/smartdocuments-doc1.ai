@@ -292,7 +292,7 @@ export default function MetadataPage() {
           Terug
         </Button>
         <Button
-          className="bg-[#00BCD4] hover:bg-[#00838F]"
+          className="bg-[#0062EB] hover:bg-[#0050C0]"
           onClick={handleSaveAndContinue}
           disabled={saving}
         >

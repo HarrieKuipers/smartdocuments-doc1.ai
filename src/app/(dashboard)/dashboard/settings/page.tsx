@@ -1,16 +1,85 @@
 "use client";
 
+import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { User, Building2, CreditCard } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { User, Building2, CreditCard, Camera, Loader2, Trash2 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentImage = avatarUrl ?? session?.user?.image;
+
+  const initials = session?.user?.name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/user/avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Upload mislukt.");
+        return;
+      }
+
+      setAvatarUrl(data.image);
+      await update();
+    } catch {
+      setError("Upload mislukt. Probeer het opnieuw.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleAvatarDelete() {
+    setError(null);
+    setUploading(true);
+
+    try {
+      const res = await fetch("/api/user/avatar", { method: "DELETE" });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Verwijderen mislukt.");
+        return;
+      }
+
+      setAvatarUrl(null);
+      await update();
+    } catch {
+      setError("Verwijderen mislukt. Probeer het opnieuw.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -29,7 +98,77 @@ export default function SettingsPage() {
             Profiel
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Avatar upload */}
+          <div className="space-y-2">
+            <Label>Profielfoto</Label>
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={currentImage || undefined} />
+                  <AvatarFallback className="bg-[#0062EB] text-white text-xl">
+                    {initials || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        Uploaden...
+                      </>
+                    ) : (
+                      "Foto uploaden"
+                    )}
+                  </Button>
+                  {currentImage && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleAvatarDelete}
+                      disabled={uploading}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  JPG, PNG of WebP. Max 5MB.
+                </p>
+              </div>
+            </div>
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label>Naam</Label>
             <Input defaultValue={session?.user?.name || ""} disabled />

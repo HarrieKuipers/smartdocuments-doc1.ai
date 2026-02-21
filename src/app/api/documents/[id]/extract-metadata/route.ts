@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { extractText } from "@/lib/ai/extract-text";
 import { extractMetadata } from "@/lib/ai/extract-metadata";
+import { getPresignedDownloadUrl, BUCKET } from "@/lib/storage";
 
 export async function POST(
   req: NextRequest,
@@ -30,7 +31,12 @@ export async function POST(
     // Extract text if not already done
     let text = doc.content?.originalText;
     if (!text) {
-      const fileResponse = await fetch(doc.sourceFile.url);
+      const urlPath = new URL(doc.sourceFile.url).pathname;
+      const storageKey = urlPath.startsWith(`/${BUCKET}/`)
+        ? urlPath.slice(`/${BUCKET}/`.length)
+        : urlPath.slice(1);
+      const downloadUrl = await getPresignedDownloadUrl(storageKey);
+      const fileResponse = await fetch(downloadUrl);
       const buffer = Buffer.from(await fileResponse.arrayBuffer());
       const extracted = await extractText(buffer, doc.sourceFile.mimeType);
       text = extracted.text;

@@ -103,11 +103,11 @@ export default function LandingPage() {
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00BCD4]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0062EB]">
               <FileText className="h-4 w-4 text-white" />
             </div>
             <span className="text-xl font-bold">
-              doc1<span className="text-[#00BCD4]">.ai</span>
+              doc1<span className="text-[#0062EB]">.ai</span>
             </span>
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
@@ -125,7 +125,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link href="/register">
-              <Button size="sm" className="bg-[#00BCD4] hover:bg-[#00838F]">
+              <Button size="sm" className="bg-[#0062EB] hover:bg-[#0050C0]">
                 Gratis starten
               </Button>
             </Link>
@@ -135,13 +135,13 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 py-20 text-center">
-        <Badge className="mb-6 bg-[#00BCD4]/10 text-[#00BCD4]">
+        <Badge className="mb-6 bg-[#0062EB]/10 text-[#0062EB]">
           AI-powered document platform
         </Badge>
         <h1 className="mx-auto mb-6 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
           Maak elk document{" "}
-          <span className="text-[#00BCD4]">slim, toegankelijk</span> en{" "}
-          <span className="text-[#00BCD4]">interactief</span>
+          <span className="text-[#0062EB]">slim, toegankelijk</span> en{" "}
+          <span className="text-[#0062EB]">interactief</span>
         </h1>
         <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
           Transformeer PDF en DOCX bestanden in interactieve webdocumenten met
@@ -150,7 +150,7 @@ export default function LandingPage() {
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link href="/register">
-            <Button size="lg" className="bg-[#00BCD4] hover:bg-[#00838F]">
+            <Button size="lg" className="bg-[#0062EB] hover:bg-[#0050C0]">
               Gratis starten
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -178,8 +178,8 @@ export default function LandingPage() {
             {features.map((feature) => (
               <Card key={feature.title} className="border-0 shadow-sm">
                 <CardContent className="p-6">
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                    <feature.icon className="h-5 w-5 text-[#00BCD4]" />
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                    <feature.icon className="h-5 w-5 text-[#0062EB]" />
                   </div>
                   <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">
@@ -223,7 +223,7 @@ export default function LandingPage() {
               },
             ].map((item) => (
               <div key={item.step} className="text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#00BCD4] text-xl font-bold text-white">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0062EB] text-xl font-bold text-white">
                   {item.step}
                 </div>
                 <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
@@ -250,11 +250,11 @@ export default function LandingPage() {
               <Card
                 key={plan.name}
                 className={`relative ${
-                  plan.popular ? "border-[#00BCD4] border-2 shadow-lg" : ""
+                  plan.popular ? "border-[#0062EB] border-2 shadow-lg" : ""
                 }`}
               >
                 {plan.popular && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00BCD4]">
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0062EB]">
                     Meest gekozen
                   </Badge>
                 )}
@@ -272,7 +272,7 @@ export default function LandingPage() {
                   <ul className="mb-6 space-y-2">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-[#00BCD4]" />
+                        <CheckCircle className="h-4 w-4 text-[#0062EB]" />
                         {f}
                       </li>
                     ))}
@@ -281,7 +281,7 @@ export default function LandingPage() {
                     <Button
                       className={`w-full ${
                         plan.popular
-                          ? "bg-[#00BCD4] hover:bg-[#00838F]"
+                          ? "bg-[#0062EB] hover:bg-[#0050C0]"
                           : ""
                       }`}
                       variant={plan.popular ? "default" : "outline"}
@@ -306,7 +306,7 @@ export default function LandingPage() {
             Begin vandaag nog gratis. Geen creditcard nodig.
           </p>
           <Link href="/register">
-            <Button size="lg" className="bg-[#00BCD4] hover:bg-[#00838F]">
+            <Button size="lg" className="bg-[#0062EB] hover:bg-[#0050C0]">
               Gratis starten
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -319,11 +319,11 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-[#00BCD4]">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-[#0062EB]">
                 <FileText className="h-3 w-3 text-white" />
               </div>
               <span className="font-bold">
-                doc1<span className="text-[#00BCD4]">.ai</span>
+                doc1<span className="text-[#0062EB]">.ai</span>
               </span>
             </div>
             <p className="text-sm text-muted-foreground">

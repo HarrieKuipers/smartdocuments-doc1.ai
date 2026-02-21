@@ -129,7 +129,7 @@ export default function ReaderPage() {
   const brandPrimary =
     doc.brandOverride?.primary ||
     doc.organization?.brandColors?.primary ||
-    "#00BCD4";
+    "#0062EB";
 
   const currentSummary =
     languageLevel === "original"

@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     const title = filename.replace(/\.[^.]+$/, "");
     const shortId = generateShortId();
-    const slug = generateSlug(title);
+    const slug = `${generateSlug(title)}-${shortId}`;
 
     const doc = await DocumentModel.create({
       shortId,

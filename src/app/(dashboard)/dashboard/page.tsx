@@ -167,8 +167,8 @@ export default function DashboardPage() {
         <Link href="/dashboard/upload">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                <Upload className="h-5 w-5 text-[#00BCD4]" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                <Upload className="h-5 w-5 text-[#0062EB]" />
               </div>
               <div>
                 <p className="font-medium">Upload Document</p>
@@ -182,8 +182,8 @@ export default function DashboardPage() {
         <Link href="/dashboard/collections">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                <FolderOpen className="h-5 w-5 text-[#00BCD4]" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                <FolderOpen className="h-5 w-5 text-[#0062EB]" />
               </div>
               <div>
                 <p className="font-medium">Bekijk Collecties</p>
@@ -197,8 +197,8 @@ export default function DashboardPage() {
         <Link href="/dashboard/analytics">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                <BarChart3 className="h-5 w-5 text-[#00BCD4]" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                <BarChart3 className="h-5 w-5 text-[#0062EB]" />
               </div>
               <div>
                 <p className="font-medium">Analytics</p>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                 Upload je eerste document om te beginnen
               </p>
               <Link href="/dashboard/upload">
-                <Button className="bg-[#00BCD4] hover:bg-[#00838F]">
+                <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Document
                 </Button>

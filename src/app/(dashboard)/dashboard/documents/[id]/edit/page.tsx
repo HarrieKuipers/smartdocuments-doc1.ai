@@ -50,7 +50,7 @@ interface DocumentData {
 }
 
 const BRAND_PRESETS = [
-  { name: "Smart", primary: "#00BCD4" },
+  { name: "Smart", primary: "#0062EB" },
   { name: "Rijksoverheid", primary: "#154273" },
   { name: "Amsterdam", primary: "#EC0000" },
   { name: "Aangepast", primary: "" },
@@ -70,7 +70,7 @@ export default function DocumentEditPage() {
   const [description, setDescription] = useState("");
   const [accessType, setAccessType] = useState("public");
   const [summary, setSummary] = useState("");
-  const [brandPrimary, setBrandPrimary] = useState("#00BCD4");
+  const [brandPrimary, setBrandPrimary] = useState("#0062EB");
 
   useEffect(() => {
     async function fetchDoc() {
@@ -83,7 +83,7 @@ export default function DocumentEditPage() {
         setDescription(data.description || "");
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
-        setBrandPrimary(data.brandOverride?.primary || "#00BCD4");
+        setBrandPrimary(data.brandOverride?.primary || "#0062EB");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -191,7 +191,7 @@ export default function DocumentEditPage() {
           </Button>
           <Button
             size="sm"
-            className="bg-[#00BCD4] hover:bg-[#00838F]"
+            className="bg-[#0062EB] hover:bg-[#0050C0]"
             onClick={handlePublish}
             disabled={publishing}
           >
@@ -287,7 +287,7 @@ export default function DocumentEditPage() {
                       }
                       className={`rounded-lg border p-2 text-xs transition-all ${
                         brandPrimary === preset.primary
-                          ? "border-[#00BCD4] ring-2 ring-[#00BCD4]/20"
+                          ? "border-[#0062EB] ring-2 ring-[#0062EB]/20"
                           : "hover:border-gray-400"
                       }`}
                     >
@@ -331,7 +331,7 @@ export default function DocumentEditPage() {
               <ul className="space-y-2">
                 {doc.content?.keyPoints?.map((kp, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#00BCD4]" />
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#0062EB]" />
                     <span className="text-sm">{kp.text}</span>
                   </li>
                 ))}
@@ -386,7 +386,7 @@ export default function DocumentEditPage() {
                 {doc.content?.terms?.map((t, i) => (
                   <div key={i} className="rounded-lg bg-gray-50 p-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#00BCD4]">
+                      <span className="text-sm font-medium text-[#0062EB]">
                         {t.term}
                       </span>
                       <Badge variant="secondary" className="text-xs">

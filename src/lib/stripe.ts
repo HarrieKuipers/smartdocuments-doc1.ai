@@ -32,7 +32,7 @@ export const stripe = {
 export const PLANS = {
   free: {
     name: "Free",
-    maxDocuments: 1,
+    maxDocuments: Infinity,
     maxTeamMembers: 1,
     features: ["1 document", "AI Chat", "B1 taalniveau"],
   },

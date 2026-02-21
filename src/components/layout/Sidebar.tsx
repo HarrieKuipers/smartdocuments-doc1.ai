@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -55,12 +56,13 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00BCD4]">
-            <FileText className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-xl font-bold">
-            doc1<span className="text-[#00BCD4]">.ai</span>
-          </span>
+          <Image
+            src="/logo_DOC1_dark.svg"
+            alt="DOC1"
+            width={120}
+            height={45}
+            priority
+          />
         </Link>
       </div>
 
@@ -77,7 +79,7 @@ export default function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-[#00BCD4]/10 text-[#00BCD4]"
+                  ? "bg-[#0062EB]/10 text-[#0062EB]"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               )}
             >

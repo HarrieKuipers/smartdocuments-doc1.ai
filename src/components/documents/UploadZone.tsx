@@ -49,22 +49,19 @@ export default function UploadZone() {
     setProgress(10);
 
     try {
-      // 1. Get presigned URL
-      const presignRes = await fetch(
-        `/api/upload/presign?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}`
-      );
-      if (!presignRes.ok) throw new Error("Kon upload URL niet ophalen.");
-      const { uploadUrl, key } = await presignRes.json();
+      // 1. Upload file via server
+      const formData = new FormData();
+      formData.append("file", file);
 
-      setProgress(30);
-
-      // 2. Upload to DO Spaces
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
-      if (!uploadRes.ok) throw new Error("Upload mislukt.");
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json();
+        throw new Error(err.error || "Upload mislukt.");
+      }
+      const { key } = await uploadRes.json();
 
       setProgress(60);
 
@@ -111,8 +108,8 @@ export default function UploadZone() {
         onDrop={handleDrop}
         className={`relative flex min-h-[300px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors ${
           dragActive
-            ? "border-[#00BCD4] bg-[#00BCD4]/5"
-            : "border-gray-300 bg-white hover:border-[#00BCD4]/50"
+            ? "border-[#0062EB] bg-[#0062EB]/5"
+            : "border-gray-300 bg-white hover:border-[#0062EB]/50"
         }`}
         onClick={() => {
           if (!uploading) {
@@ -144,8 +141,8 @@ export default function UploadZone() {
         <div className="rounded-lg border bg-white p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-                <FileText className="h-5 w-5 text-[#00BCD4]" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
+                <FileText className="h-5 w-5 text-[#0062EB]" />
               </div>
               <div>
                 <p className="font-medium">{file.name}</p>
@@ -185,7 +182,7 @@ export default function UploadZone() {
 
           {!uploading && (
             <Button
-              className="mt-4 w-full bg-[#00BCD4] hover:bg-[#00838F]"
+              className="mt-4 w-full bg-[#0062EB] hover:bg-[#0050C0]"
               onClick={(e) => {
                 e.stopPropagation();
                 handleUpload();

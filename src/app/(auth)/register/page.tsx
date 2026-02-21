@@ -15,7 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -69,8 +70,8 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#00BCD4]/10">
-            <FileText className="h-6 w-6 text-[#00BCD4]" />
+          <div className="mx-auto mb-4">
+            <Image src="/logo_DOC1_dark.svg" alt="DOC1" width={120} height={45} priority />
           </div>
           <CardTitle className="text-2xl">Account aanmaken</CardTitle>
           <CardDescription>
@@ -129,7 +130,7 @@ export default function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#00BCD4] hover:bg-[#00838F]"
+              className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -172,7 +173,7 @@ export default function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Al een account?{" "}
-            <Link href="/login" className="text-[#00BCD4] hover:underline">
+            <Link href="/login" className="text-[#0062EB] hover:underline">
               Inloggen
             </Link>
           </p>

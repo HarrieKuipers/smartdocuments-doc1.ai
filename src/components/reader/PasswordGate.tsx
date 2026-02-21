@@ -51,7 +51,7 @@ export default function PasswordGate({ onUnlock }: PasswordGateProps) {
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button
               type="submit"
-              className="w-full bg-[#00BCD4] hover:bg-[#00838F]"
+              className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

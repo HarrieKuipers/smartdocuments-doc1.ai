@@ -31,7 +31,7 @@ export default function TopBar() {
       <div className="flex items-center gap-4">
         <Badge
           variant="secondary"
-          className="bg-[#00BCD4]/10 text-[#00BCD4] capitalize"
+          className="bg-[#0062EB]/10 text-[#0062EB] capitalize"
         >
           {session?.user?.plan || "free"} plan
         </Badge>
@@ -40,7 +40,7 @@ export default function TopBar() {
           <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
             <Avatar className="h-8 w-8">
               <AvatarImage src={session?.user?.image || undefined} />
-              <AvatarFallback className="bg-[#00BCD4] text-white text-xs">
+              <AvatarFallback className="bg-[#0062EB] text-white text-xs">
                 {initials || "U"}
               </AvatarFallback>
             </Avatar>

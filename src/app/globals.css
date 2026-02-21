@@ -127,10 +127,10 @@
 
 /* doc1.ai brand variables */
 :root {
-  --brand-primary: #00BCD4;
-  --brand-primary-dark: #00838F;
-  --brand-primary-light: #E0F7FA;
-  --brand-accent: #00838F;
+  --brand-primary: #0062EB;
+  --brand-primary-dark: #0050C0;
+  --brand-primary-light: #E0EDFF;
+  --brand-accent: #0050C0;
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-error: #EF4444;
@@ -138,6 +138,6 @@
 
 /* Dynamic brand theming for reader view */
 .brand-themed {
-  --brand-primary: var(--doc-brand-primary, #00BCD4);
-  --brand-accent: var(--doc-brand-accent, #00838F);
+  --brand-primary: var(--doc-brand-primary, #0062EB);
+  --brand-accent: var(--doc-brand-accent, #0050C0);
 }

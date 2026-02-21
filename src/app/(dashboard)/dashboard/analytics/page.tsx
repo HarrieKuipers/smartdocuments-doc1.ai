@@ -158,7 +158,7 @@ export default function AnalyticsPage() {
                   className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#00BCD4]/10 text-xs font-medium text-[#00BCD4]">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0062EB]/10 text-xs font-medium text-[#0062EB]">
                       {i + 1}
                     </span>
                     <span className="text-sm font-medium">{doc.title}</span>
