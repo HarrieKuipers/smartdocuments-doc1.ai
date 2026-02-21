@@ -12,6 +12,8 @@ export interface IUser extends Document {
   stripeCustomerId?: string;
   plan: "free" | "pro" | "enterprise";
   documentsUsed: number;
+  resetToken?: string;
+  resetTokenExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +42,8 @@ const UserSchema = new Schema<IUser>(
       default: "free",
     },
     documentsUsed: { type: Number, default: 0 },
+    resetToken: { type: String },
+    resetTokenExpiry: { type: Date },
   },
   { timestamps: true }
 );
