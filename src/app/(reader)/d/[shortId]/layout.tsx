@@ -3,6 +3,8 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ shortId: string }>;
   children: React.ReactNode;

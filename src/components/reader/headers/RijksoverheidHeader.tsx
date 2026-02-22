@@ -8,11 +8,11 @@ export default function RijksoverheidHeader({ title, brandPrimary, logo }: Rijks
   return (
     <header>
       {/* White bar with centered logo */}
-      <div className="border-b border-gray-200 bg-white px-4 pb-6 pt-4 text-center">
+      <div className="border-b border-gray-200 bg-white px-3 pb-6 text-center">
         <img
           src={logo}
           alt="Rijksoverheid"
-          className="mx-auto h-[100px]"
+          className="mx-auto h-[60px] md:h-[100px]"
         />
       </div>
       {/* Colored bar with centered title */}

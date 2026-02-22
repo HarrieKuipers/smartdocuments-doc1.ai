@@ -5,14 +5,7 @@ import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  TooltipProvider,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   FileText,
   Download,
@@ -21,13 +14,11 @@ import {
   BookOpen,
   CheckCircle,
   BarChart3,
-  MessageSquare,
-  Settings,
+  Hash,
 } from "lucide-react";
-import Link from "next/link";
 import PasswordGate from "@/components/reader/PasswordGate";
 import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
-import { getTemplate, type TemplateId } from "@/lib/templates";
+import { getTemplate } from "@/lib/templates";
 import DefaultHeader from "@/components/reader/headers/DefaultHeader";
 import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader";
 import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
@@ -73,10 +64,8 @@ export default function ReaderPage() {
   const [languageLevel, setLanguageLevel] = useState<LanguageLevel>("original");
   const [error, setError] = useState("");
   const [isOwner, setIsOwner] = useState(false);
-  const [documentId, setDocumentId] = useState<string | null>(null);
   const chatRef = useRef<ChatWidgetRef>(null);
 
-  // Handle clicks on highlighted terms in the content
   const handleTermClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.hasAttribute("data-term")) {
@@ -93,7 +82,10 @@ export default function ReaderPage() {
       const headers: Record<string, string> = {};
       if (password) headers["x-document-password"] = password;
 
-      const res = await fetch(`/api/reader/${params.shortId}`, { headers });
+      const res = await fetch(`/api/reader/${params.shortId}?v=${Date.now()}`, {
+        headers,
+        cache: "no-store",
+      });
 
       if (res.status === 401) {
         const data = await res.json();
@@ -112,10 +104,8 @@ export default function ReaderPage() {
 
       const { data } = await res.json();
       setDoc(data);
-      setDocumentId(data._id);
       setNeedsPassword(false);
 
-      // Check if current user owns this document
       try {
         const sessionRes = await fetch("/api/auth/session");
         if (sessionRes.ok) {
@@ -125,7 +115,7 @@ export default function ReaderPage() {
           }
         }
       } catch {
-        // Not logged in or session fetch failed — ignore
+        // Not logged in — ignore
       }
     } catch {
       setError("Kon document niet laden.");
@@ -140,8 +130,8 @@ export default function ReaderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl p-8">
+      <div className="min-h-screen bg-[#F5F7FA]">
+        <div className="mx-auto max-w-[1400px] p-8">
           <Skeleton className="mb-6 h-16 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
@@ -155,7 +145,7 @@ export default function ReaderPage() {
 
   if (error || !doc) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F7FA]">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
             <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
@@ -167,24 +157,17 @@ export default function ReaderPage() {
   }
 
   const template = getTemplate(doc.template);
-  const brandPrimary =
-    doc.brandOverride?.primary ||
-    template.primary;
+  const brandPrimary = doc.brandOverride?.primary || template.primary;
+  const primaryLight = template.primaryLight;
 
   const currentSummary =
     languageLevel === "original"
       ? doc.content.summary.original
       : doc.content.summary[languageLevel] || doc.content.summary.original;
 
-  const estimatedReadTime = Math.max(
-    1,
-    Math.round((currentSummary?.length || 0) / 1000)
-  );
-
   function highlightTerms(text: string) {
     if (!doc?.content.terms?.length) return text;
     let result = text;
-    // Highlight terms - clickable to ask AI for definition
     doc.content.terms.forEach((t) => {
       const escaped = t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const escapedDef = t.definition.replace(/"/g, '&quot;');
@@ -199,12 +182,8 @@ export default function ReaderPage() {
 
   return (
     <div
-      className="brand-themed min-h-screen bg-gray-50"
-      style={
-        {
-          "--doc-brand-primary": brandPrimary,
-        } as React.CSSProperties
-      }
+      className="brand-themed min-h-screen bg-[#F5F7FA]"
+      style={{ "--doc-brand-primary": brandPrimary } as React.CSSProperties}
     >
       {/* Header */}
       {template.headerStyle === "split-bar" && template.logo ? (
@@ -212,129 +191,82 @@ export default function ReaderPage() {
       ) : template.headerStyle === "inline-logo" && template.logo ? (
         <AmsterdamHeader title={doc.title} brandPrimary={brandPrimary} logo={template.logo} />
       ) : (
-        <DefaultHeader organization={doc.organization} brandPrimary={brandPrimary} />
+        <DefaultHeader title={doc.title} organization={doc.organization} brandPrimary={brandPrimary} />
       )}
 
-      {/* Hero */}
-      <div className="bg-white border-b">
-        <div className="mx-auto max-w-5xl px-6 py-12">
-          <div className="flex gap-8">
-            <div className="flex-1">
-              {doc.tags?.[0] && (
-                <Badge
-                  className="mb-4"
-                  style={{ backgroundColor: brandPrimary, color: "white" }}
+      {/* Main layout: sidebar + content (matching reference HTML) */}
+      <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+          {/* Sidebar */}
+          <aside className="order-2 lg:order-1">
+            <div className="sticky top-[80px] rounded-xl bg-white p-6 shadow-sm">
+              {/* Cover Image (A4 aspect ratio like reference) */}
+              {doc.coverImageUrl && (
+                <div
+                  className="mb-5 overflow-hidden rounded-lg shadow-md"
+                  style={{ aspectRatio: "210/297" }}
                 >
-                  {doc.tags[0]}
-                </Badge>
-              )}
-              <h1 className="mb-4 text-3xl font-bold text-gray-900">
-                {doc.title}
-              </h1>
-              {doc.description && (
-                <p className="mb-6 text-lg text-muted-foreground">
-                  {doc.description}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                {doc.authors?.[0] && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-4 w-4" />
-                    {doc.authors.join(", ")}
-                  </span>
-                )}
-                {doc.publicationDate && (
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {new Date(doc.publicationDate).toLocaleDateString("nl-NL")}
-                  </span>
-                )}
-                {doc.pageCount && (
-                  <span className="flex items-center gap-1">
-                    <BookOpen className="h-4 w-4" />
-                    {doc.pageCount} pagina&apos;s
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <FileText className="h-4 w-4" />~{estimatedReadTime} min. leestijd
-                </span>
-              </div>
-            </div>
-            {doc.coverImageUrl && (
-              <div className="hidden md:block w-64 flex-shrink-0">
-                <div className="overflow-hidden rounded-lg shadow-lg">
                   <img
                     src={doc.coverImageUrl}
                     alt={doc.title}
-                    className="w-full"
+                    className="h-full w-full object-cover"
                   />
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+              )}
 
-      {/* Content */}
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="flex gap-8">
-          {/* Left sidebar */}
-          <aside className="hidden w-64 flex-shrink-0 lg:block">
-            <div className="sticky top-8 space-y-6">
-              <div className="space-y-3">
+              {/* Metadata */}
+              <div className="space-y-2 text-sm text-gray-600">
                 {doc.authors?.[0] && (
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Auteur
-                    </p>
-                    <p className="text-sm">{doc.authors.join(", ")}</p>
+                    <strong className="inline-flex items-center gap-1 text-xs">
+                      <User className="h-3.5 w-3.5" /> Auteur:
+                    </strong>{" "}
+                    {doc.authors.join(", ")}
                   </div>
                 )}
                 {doc.publicationDate && (
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Datum
-                    </p>
-                    <p className="text-sm">
-                      {new Date(doc.publicationDate).toLocaleDateString("nl-NL", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
+                    <strong className="inline-flex items-center gap-1 text-xs">
+                      <Calendar className="h-3.5 w-3.5" /> Datum:
+                    </strong>{" "}
+                    {new Date(doc.publicationDate).toLocaleDateString("nl-NL")}
                   </div>
                 )}
                 {doc.version && (
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Versie
-                    </p>
-                    <p className="text-sm">{doc.version}</p>
+                    <strong className="inline-flex items-center gap-1 text-xs">
+                      <Hash className="h-3.5 w-3.5" /> Versie:
+                    </strong>{" "}
+                    {doc.version}
                   </div>
                 )}
                 {doc.pageCount && (
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Pagina&apos;s
-                    </p>
-                    <p className="text-sm">{doc.pageCount}</p>
+                    <strong className="inline-flex items-center gap-1 text-xs">
+                      <FileText className="h-3.5 w-3.5" /> Pagina&apos;s:
+                    </strong>{" "}
+                    {doc.pageCount}
+                  </div>
+                )}
+                {doc.tags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    {doc.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-block rounded-full px-3 py-1 text-xs font-medium"
+                        style={{ backgroundColor: primaryLight, color: brandPrimary }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <Separator />
-
-              <div className="flex flex-wrap gap-1">
-                {doc.tags?.map((tag, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-
+              {/* Download Button */}
               <Button
                 variant="outline"
-                className="w-full"
+                className="mt-4 w-full"
                 onClick={() => window.open(doc.sourceFile.url, "_blank")}
               >
                 <Download className="mr-2 h-4 w-4" />
@@ -345,10 +277,10 @@ export default function ReaderPage() {
               {template.showB1Button && (
                 <button
                   onClick={() => setLanguageLevel("B1")}
-                  className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition-colors ${
+                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all ${
                     languageLevel === "B1"
                       ? "bg-emerald-600"
-                      : "bg-emerald-500 hover:bg-emerald-600"
+                      : "bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5"
                   }`}
                 >
                   <BookOpen className="h-4 w-4" />
@@ -357,8 +289,8 @@ export default function ReaderPage() {
               )}
 
               {/* Language level switcher */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase text-muted-foreground">
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium uppercase text-gray-500">
                   Taalniveau
                 </p>
                 <div className="grid grid-cols-2 gap-1">
@@ -366,7 +298,7 @@ export default function ReaderPage() {
                     <button
                       key={level}
                       onClick={() => setLanguageLevel(level)}
-                      className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
                         languageLevel === level
                           ? "text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -382,126 +314,88 @@ export default function ReaderPage() {
                   ))}
                 </div>
               </div>
-
-              {/* Table of contents */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase text-muted-foreground">
-                  Inhoud
-                </p>
-                <nav className="space-y-1">
-                  <a
-                    href="#samenvatting"
-                    className="block text-sm text-muted-foreground hover:text-gray-900"
-                  >
-                    Samenvatting
-                  </a>
-                  <a
-                    href="#hoofdpunten"
-                    className="block text-sm text-muted-foreground hover:text-gray-900"
-                  >
-                    Hoofdpunten
-                  </a>
-                  <a
-                    href="#bevindingen"
-                    className="block text-sm text-muted-foreground hover:text-gray-900"
-                  >
-                    Belangrijke Bevindingen
-                  </a>
-                </nav>
-              </div>
             </div>
           </aside>
 
           {/* Main content */}
-          <main className="min-w-0 flex-1 space-y-8">
+          <main className="order-1 space-y-6 lg:order-2">
             {/* Summary */}
-            <section id="samenvatting">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText
-                  className="h-5 w-5"
-                  style={{ color: brandPrimary }}
-                />
-                <h2 className="text-xl font-bold">Samenvatting</h2>
+            <section id="samenvatting" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
+                Samenvatting
                 {languageLevel !== "original" && (
-                  <Badge
-                    style={{ backgroundColor: brandPrimary, color: "white" }}
-                  >
+                  <Badge style={{ backgroundColor: brandPrimary, color: "white" }}>
                     {languageLevel} Taalniveau
                   </Badge>
                 )}
-              </div>
-              <div className="rounded-lg border bg-white p-6" onClick={handleTermClick}>
+              </h2>
+              <div onClick={handleTermClick}>
                 <div
-                  className="prose prose-sm max-w-none leading-relaxed"
-                  dangerouslySetInnerHTML={{
-                    __html: highlightTerms(currentSummary),
-                  }}
+                  className="prose max-w-none text-gray-700"
+                  style={{ fontSize: "1.05rem", lineHeight: "1.8" }}
+                  dangerouslySetInnerHTML={{ __html: highlightTerms(currentSummary) }}
                 />
               </div>
             </section>
 
             {/* Key Points */}
             {doc.content.keyPoints?.length > 0 && (
-              <section id="hoofdpunten">
-                <div className="flex items-center gap-2 mb-4">
-                  <CheckCircle
-                    className="h-5 w-5"
-                    style={{ color: brandPrimary }}
-                  />
-                  <h2 className="text-xl font-bold">Hoofdpunten</h2>
-                </div>
-                <div className="rounded-lg border bg-white p-6" onClick={handleTermClick}>
-                  <ul className="space-y-3">
-                    {doc.content.keyPoints.map((kp, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <div
-                          className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-white"
-                          style={{ backgroundColor: brandPrimary }}
-                        >
-                          <CheckCircle className="h-3 w-3" />
-                        </div>
-                        <span
-                          className="text-sm leading-relaxed"
-                          dangerouslySetInnerHTML={{
-                            __html: highlightTerms(kp.text),
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <section id="hoofdpunten" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                  <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
+                  Hoofdpunten
+                </h2>
+                <ul className="space-y-3" onClick={handleTermClick}>
+                  {doc.content.keyPoints.map((kp, i) => (
+                    <li
+                      key={i}
+                      className="relative rounded-lg bg-gray-50 py-3 pl-14 pr-4"
+                    >
+                      <span
+                        className="absolute left-5 top-1/2 -translate-y-1/2 text-lg font-bold"
+                        style={{ color: brandPrimary }}
+                      >
+                        ✓
+                      </span>
+                      <span
+                        className="text-sm leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: highlightTerms(kp.text) }}
+                      />
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 
             {/* Findings */}
             {doc.content.findings?.length > 0 && (
-              <section id="bevindingen">
-                <div className="flex items-center gap-2 mb-4">
-                  <BarChart3
-                    className="h-5 w-5"
-                    style={{ color: brandPrimary }}
-                  />
-                  <h2 className="text-xl font-bold">
-                    Belangrijke Bevindingen
-                  </h2>
-                </div>
+              <section id="bevindingen" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                  <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
+                  Belangrijke Bevindingen
+                </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {doc.content.findings.map((f, i) => (
-                    <Card key={i}>
-                      <CardContent className="p-5">
-                        <Badge
-                          variant="outline"
-                          className="mb-3"
-                          style={{ borderColor: brandPrimary, color: brandPrimary }}
-                        >
-                          {f.category}
-                        </Badge>
-                        <h3 className="mb-2 font-semibold">{f.title}</h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {f.content}
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <div
+                      key={i}
+                      className="rounded-xl p-5"
+                      style={{
+                        background: `linear-gradient(135deg, ${primaryLight}, white)`,
+                        borderLeft: `4px solid ${brandPrimary}`,
+                      }}
+                    >
+                      <h4
+                        className="mb-2 text-sm font-semibold"
+                        style={{ color: brandPrimary }}
+                      >
+                        {f.category}
+                      </h4>
+                      <h3 className="mb-1 font-medium text-gray-900">{f.title}</h3>
+                      <p className="text-sm leading-relaxed text-gray-600">
+                        {f.content}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -511,7 +405,7 @@ export default function ReaderPage() {
             {template.showInfoBox && (
               <TemplateInfoBox
                 brandPrimary={brandPrimary}
-                primaryLight={template.primaryLight}
+                primaryLight={primaryLight}
                 label={template.infoBoxLabel}
               />
             )}

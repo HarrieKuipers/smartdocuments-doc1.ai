@@ -333,14 +333,14 @@ export default function DocumentEditPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/d/${doc.shortId}`, "_blank")}
+            onClick={() => window.open(`/d/${doc.shortId}?v=${Date.now()}`, "_blank")}
           >
             <Eye className="mr-1 h-4 w-4" />
             Voorbeeld
           </Button>
           <Button
             size="sm"
-            className="bg-[#0062EB] hover:bg-[#0050C0]"
+            className="bg-primary hover:bg-primary/90"
             onClick={handlePublish}
             disabled={publishing}
           >
@@ -436,7 +436,7 @@ export default function DocumentEditPage() {
                         onClick={() => setTemplateId(id)}
                         className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
                           templateId === id
-                            ? "border-[#0062EB] ring-2 ring-[#0062EB]/20"
+                            ? "border-primary ring-2 ring-primary/20"
                             : "hover:border-gray-400"
                         }`}
                       >
@@ -508,7 +508,7 @@ export default function DocumentEditPage() {
               <ul className="space-y-2">
                 {keyPoints.map((kp, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-[#0062EB]" />
+                    <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-primary" />
                     <Input
                       value={kp.text}
                       onChange={(e) => updateKeyPoint(i, e.target.value)}
@@ -633,7 +633,7 @@ export default function DocumentEditPage() {
                         value={t.term}
                         onChange={(e) => updateTerm(i, "term", e.target.value)}
                         placeholder="Begrip"
-                        className="flex-1 text-sm font-medium text-[#0062EB] h-8"
+                        className="flex-1 text-sm font-medium text-primary h-8"
                       />
                       <Input
                         type="number"

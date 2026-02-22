@@ -9,7 +9,7 @@ export default function DashboardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" suppressHydrationWarning>
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />

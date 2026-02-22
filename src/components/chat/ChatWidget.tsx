@@ -98,14 +98,23 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button with chat agent avatar */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95"
-          style={{ backgroundColor: brandPrimary }}
+          className="fixed bottom-8 right-8 z-50 h-[70px] w-[70px] rounded-full shadow-xl transition-transform hover:scale-110 active:scale-95 animate-[pulse-ring_2s_infinite]"
+          style={{
+            background: `linear-gradient(135deg, ${brandPrimary}, ${brandPrimary}dd)`,
+          }}
         >
-          <MessageSquare className="h-6 w-6 text-white" />
+          <img
+            src="/chat_agent.png"
+            alt="AI Chat"
+            className="h-full w-full rounded-full object-cover"
+          />
+          <span className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[0.7rem] font-bold text-white shadow-sm">
+            AI
+          </span>
         </button>
       )}
 
@@ -115,11 +124,20 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 text-white"
-            style={{ backgroundColor: brandPrimary }}
+            style={{ background: `linear-gradient(135deg, ${brandPrimary}, ${brandPrimary}cc)` }}
           >
-            <div>
-              <p className="font-medium">AI Assistent</p>
-              <p className="text-xs opacity-80">Altijd beschikbaar</p>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 overflow-hidden rounded-full shadow-sm">
+                <img
+                  src="/chat_agent.png"
+                  alt="AI Assistent"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div>
+                <p className="font-medium">AI Assistent</p>
+                <p className="text-xs opacity-80">Altijd beschikbaar</p>
+              </div>
             </div>
             <button
               onClick={() => setOpen(false)}

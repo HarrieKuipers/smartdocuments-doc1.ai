@@ -126,7 +126,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link href="/register">
-              <Button size="sm" className="bg-[#0062EB] hover:bg-[#0050C0]">
+              <Button size="sm">
                 Gratis starten
               </Button>
             </Link>
@@ -136,13 +136,13 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 py-20 text-center">
-        <Badge className="mb-6 bg-[#0062EB]/10 text-[#0062EB]">
+        <Badge className="mb-6 bg-primary/10 text-primary">
           AI-powered document platform
         </Badge>
         <h1 className="mx-auto mb-6 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
           Maak elk document{" "}
-          <span className="text-[#0062EB]">slim, toegankelijk</span> en{" "}
-          <span className="text-[#0062EB]">interactief</span>
+          <span className="text-primary">slim, toegankelijk</span> en{" "}
+          <span className="text-primary">interactief</span>
         </h1>
         <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
           Transformeer PDF en DOCX bestanden in interactieve webdocumenten met
@@ -151,7 +151,7 @@ export default function LandingPage() {
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link href="/register">
-            <Button size="lg" className="bg-[#0062EB] hover:bg-[#0050C0]">
+            <Button size="lg">
               Gratis starten
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -179,8 +179,8 @@ export default function LandingPage() {
             {features.map((feature) => (
               <Card key={feature.title} className="border-0 shadow-sm">
                 <CardContent className="p-6">
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
-                    <feature.icon className="h-5 w-5 text-[#0062EB]" />
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <feature.icon className="h-5 w-5 text-primary" />
                   </div>
                   <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">
@@ -224,7 +224,7 @@ export default function LandingPage() {
               },
             ].map((item) => (
               <div key={item.step} className="text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0062EB] text-xl font-bold text-white">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-xl font-bold text-white">
                   {item.step}
                 </div>
                 <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
@@ -251,11 +251,11 @@ export default function LandingPage() {
               <Card
                 key={plan.name}
                 className={`relative ${
-                  plan.popular ? "border-[#0062EB] border-2 shadow-lg" : ""
+                  plan.popular ? "border-primary border-2 shadow-lg" : ""
                 }`}
               >
                 {plan.popular && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0062EB]">
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
                     Meest gekozen
                   </Badge>
                 )}
@@ -273,18 +273,14 @@ export default function LandingPage() {
                   <ul className="mb-6 space-y-2">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-[#0062EB]" />
+                        <CheckCircle className="h-4 w-4 text-primary" />
                         {f}
                       </li>
                     ))}
                   </ul>
                   <Link href="/register">
                     <Button
-                      className={`w-full ${
-                        plan.popular
-                          ? "bg-[#0062EB] hover:bg-[#0050C0]"
-                          : ""
-                      }`}
+                      className="w-full"
                       variant={plan.popular ? "default" : "outline"}
                     >
                       {plan.cta}
@@ -307,7 +303,7 @@ export default function LandingPage() {
             Begin vandaag nog gratis. Geen creditcard nodig.
           </p>
           <Link href="/register">
-            <Button size="lg" className="bg-[#0062EB] hover:bg-[#0050C0]">
+            <Button size="lg">
               Gratis starten
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>

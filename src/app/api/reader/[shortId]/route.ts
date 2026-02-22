@@ -54,13 +54,20 @@ export async function GET(
       terms: content.terms,
     };
 
-    return NextResponse.json({
-      data: {
-        ...docData,
-        content: publicContent,
-        organization: org,
+    return NextResponse.json(
+      {
+        data: {
+          ...docData,
+          content: publicContent,
+          organization: org,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error("Reader GET error:", error);
     return NextResponse.json(
