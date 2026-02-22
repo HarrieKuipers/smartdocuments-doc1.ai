@@ -37,6 +37,7 @@ export interface IDocument extends MongoDocument {
     password?: string;
   };
   template?: "doc1" | "rijksoverheid" | "amsterdam";
+  chatMode?: "full" | "terms-only";
   brandOverride?: {
     primary?: string;
     logo?: string;
@@ -130,6 +131,11 @@ const DocumentSchema = new Schema<IDocument>(
       type: String,
       enum: ["doc1", "rijksoverheid", "amsterdam"],
       default: "doc1",
+    },
+    chatMode: {
+      type: String,
+      enum: ["full", "terms-only"],
+      default: "full",
     },
     brandOverride: {
       primary: { type: String },

@@ -12,6 +12,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  // Protect admin routes — must be logged in AND superadmin
+  if (pathname.startsWith("/admin")) {
+    if (!isLoggedIn) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    if (!token?.isSuperAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+  }
+
   // Redirect logged-in users from auth pages to dashboard
   if ((pathname === "/login" || pathname === "/register") && isLoggedIn) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
@@ -21,5 +31,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/register"],
 };

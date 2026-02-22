@@ -11,6 +11,7 @@ export interface IUser extends Document {
   role: "owner" | "admin" | "editor" | "viewer";
   stripeCustomerId?: string;
   plan: "free" | "pro" | "enterprise";
+  isSuperAdmin: boolean;
   documentsUsed: number;
   resetToken?: string;
   resetTokenExpiry?: Date;
@@ -41,6 +42,7 @@ const UserSchema = new Schema<IUser>(
       enum: ["free", "pro", "enterprise"],
       default: "free",
     },
+    isSuperAdmin: { type: Boolean, default: false },
     documentsUsed: { type: Number, default: 0 },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },

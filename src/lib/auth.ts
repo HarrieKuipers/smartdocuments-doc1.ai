@@ -91,6 +91,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.organizationId = dbUser.organizationId?.toString();
           token.role = dbUser.role;
           token.plan = dbUser.plan;
+          token.isSuperAdmin = dbUser.isSuperAdmin || false;
           token.picture = dbUser.image || null;
         }
       }
@@ -102,6 +103,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.organizationId = token.organizationId as string;
         session.user.role = token.role as string;
         session.user.plan = token.plan as string;
+        session.user.isSuperAdmin = (token.isSuperAdmin as boolean) || false;
         session.user.image = token.picture as string | null;
       }
       return session;

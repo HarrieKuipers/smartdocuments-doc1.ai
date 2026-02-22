@@ -15,11 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
   Bold,
+  BookOpen,
   Check,
   Eye,
   Globe,
@@ -29,8 +31,10 @@ import {
   Loader2,
   Lock,
   Link as LinkIcon,
+  MessageSquare,
   Pencil,
   Plus,
+  Settings,
   Trash2,
   X,
 } from "lucide-react";
@@ -55,6 +59,7 @@ interface DocumentData {
     terms: { term: string; definition: string; occurrences: number }[];
   };
   template?: string;
+  chatMode?: "full" | "terms-only";
   brandOverride?: { primary?: string };
 }
 
@@ -153,6 +158,7 @@ export default function DocumentEditPage() {
   const [accessType, setAccessType] = useState("public");
   const [summary, setSummary] = useState("");
   const [templateId, setTemplateId] = useState<TemplateId>("doc1");
+  const [chatMode, setChatMode] = useState<"full" | "terms-only">("full");
   const [keyPoints, setKeyPoints] = useState<{ text: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
@@ -175,6 +181,7 @@ export default function DocumentEditPage() {
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
         setTemplateId((data.template as TemplateId) || "doc1");
+        setChatMode(data.chatMode || "full");
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
         setTerms(data.content?.terms || []);
@@ -204,6 +211,7 @@ export default function DocumentEditPage() {
           "content.findings": findings,
           "content.terms": terms,
           template: templateId,
+          chatMode,
           brandOverride: { primary: getTemplate(templateId).primary },
         }),
       });
@@ -213,14 +221,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, description, accessType, summary, templateId, keyPoints, findings, terms]);
+  }, [params.id, doc, title, description, accessType, summary, templateId, chatMode, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, description, accessType, summary, templateId, contentVersion, saveChanges, doc]);
+  }, [title, description, accessType, summary, templateId, chatMode, contentVersion, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -294,11 +302,8 @@ export default function DocumentEditPage() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-full" />
-        <div className="grid grid-cols-12 gap-6">
-          <Skeleton className="col-span-3 h-96" />
-          <Skeleton className="col-span-6 h-96" />
-          <Skeleton className="col-span-3 h-96" />
-        </div>
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
@@ -350,346 +355,395 @@ export default function DocumentEditPage() {
         </div>
       </div>
 
-      {/* 3-column layout */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left: Settings */}
-        <div className="col-span-3 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Instellingen</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Titel</Label>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Beschrijving</Label>
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Auteur(s)</Label>
-                <div className="flex flex-wrap gap-1">
-                  {doc.authors?.map((a, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">
-                      {a}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Tags</Label>
-                <div className="flex flex-wrap gap-1">
-                  {doc.tags?.map((t, i) => (
-                    <Badge key={i} variant="outline" className="text-xs">
-                      {t}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+      {/* Tab-based layout */}
+      <Tabs defaultValue="samenvatting" className="w-full">
+        <TabsList variant="line" className="w-full justify-start border-b px-0">
+          <TabsTrigger value="intelligentie" className="gap-1.5">
+            <Settings className="h-3.5 w-3.5" />
+            Intelligentie
+          </TabsTrigger>
+          <TabsTrigger value="samenvatting" className="gap-1.5">
+            <Pencil className="h-3.5 w-3.5" />
+            Samenvatting
+          </TabsTrigger>
+          <TabsTrigger value="definities" className="gap-1.5">
+            <BookOpen className="h-3.5 w-3.5" />
+            Begrippen & Definities
+          </TabsTrigger>
+        </TabsList>
 
-              <Separator />
-
-              <div className="space-y-2">
-                <Label>Toegang</Label>
-                <Select value={accessType} onValueChange={setAccessType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-3 w-3" /> Openbaar
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="link-only">
-                      <div className="flex items-center gap-2">
-                        <LinkIcon className="h-3 w-3" /> Alleen via link
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="password">
-                      <div className="flex items-center gap-2">
-                        <Lock className="h-3 w-3" /> Wachtwoord
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label>Sjabloon</Label>
-                <div className="grid grid-cols-1 gap-2">
-                  {TEMPLATE_IDS.map((id) => {
-                    const tmpl = TEMPLATES[id];
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setTemplateId(id)}
-                        className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
-                          templateId === id
-                            ? "border-primary ring-2 ring-primary/20"
-                            : "hover:border-gray-400"
-                        }`}
-                      >
-                        <div
-                          className="h-8 w-8 flex-shrink-0 rounded"
-                          style={{ backgroundColor: tmpl.primary }}
-                        />
-                        <div>
-                          <div className="font-medium">{tmpl.name}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {tmpl.headerStyle === "split-bar"
-                              ? "Logo + titelbalk"
-                              : tmpl.headerStyle === "inline-logo"
-                              ? "Logo + titel inline"
-                              : "Standaard header"}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Center: Content - editable */}
-        <div className="col-span-6 space-y-4">
-          {/* Samenvatting */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                Samenvatting
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RichTextToolbar textareaRef={summaryRef} />
-              <Textarea
-                ref={summaryRef}
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                rows={8}
-                className="resize-none rounded-t-none"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Hoofdpunten */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                  Hoofdpunten
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addKeyPoint}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Toevoegen
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {keyPoints.map((kp, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <Input
-                      value={kp.text}
-                      onChange={(e) => updateKeyPoint(i, e.target.value)}
-                      placeholder="Hoofdpunt..."
-                      className="flex-1 text-sm"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-red-500"
-                      onClick={() => removeKeyPoint(i)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
-                ))}
-                {keyPoints.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Geen hoofdpunten. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
-                  </p>
-                )}
-              </ul>
-            </CardContent>
-          </Card>
-
-          {/* Belangrijke Bevindingen */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                  Belangrijke Bevindingen
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addFinding}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Toevoegen
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                {findings.map((f, i) => (
-                  <div key={i} className="rounded-lg border p-3 space-y-2 relative group">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
-                      onClick={() => removeFinding(i)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                    <Input
-                      value={f.category}
-                      onChange={(e) => updateFinding(i, "category", e.target.value)}
-                      placeholder="Categorie"
-                      className="h-7 text-xs"
-                    />
-                    <Input
-                      value={f.title}
-                      onChange={(e) => updateFinding(i, "title", e.target.value)}
-                      placeholder="Titel"
-                      className="text-sm font-medium"
-                    />
-                    <Textarea
-                      value={f.content}
-                      onChange={(e) => updateFinding(i, "content", e.target.value)}
-                      placeholder="Inhoud..."
-                      rows={2}
-                      className="resize-none text-xs"
-                    />
-                  </div>
-                ))}
-                {findings.length === 0 && (
-                  <p className="col-span-2 text-sm text-muted-foreground">
-                    Geen bevindingen. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right: Terms - editable */}
-        <div className="col-span-3 space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                  Begrippen & Definities
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addTerm}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Nieuw
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {terms.map((t, i) => (
-                  <div key={i} className="rounded-lg bg-gray-50 p-3 space-y-2 relative group">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
-                      onClick={() => removeTerm(i)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                    <div className="flex items-center gap-2">
+        {/* Intelligentie Tab */}
+        <TabsContent value="intelligentie">
+          <div className="mx-auto max-w-4xl space-y-6 py-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Instellingen</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Titel</Label>
                       <Input
-                        value={t.term}
-                        onChange={(e) => updateTerm(i, "term", e.target.value)}
-                        placeholder="Begrip"
-                        className="flex-1 text-sm font-medium text-primary h-8"
-                      />
-                      <Input
-                        type="number"
-                        value={t.occurrences}
-                        onChange={(e) => updateTermOccurrences(i, parseInt(e.target.value) || 0)}
-                        className="w-14 text-xs text-center h-8"
-                        title="Voorkomens"
-                        min={0}
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
                       />
                     </div>
-                    <Textarea
-                      value={t.definition}
-                      onChange={(e) => updateTerm(i, "definition", e.target.value)}
-                      placeholder="Definitie..."
-                      rows={2}
-                      className="resize-none text-xs"
-                    />
+                    <div className="space-y-2">
+                      <Label>Beschrijving</Label>
+                      <Textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Auteur(s)</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {doc.authors?.map((a, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {a}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tags</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {doc.tags?.map((t, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                ))}
-                {terms.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Geen begrippen. Klik op &quot;Nieuw&quot; om er een toe te voegen.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Deellink</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Input
-                  readOnly
-                  value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/d/${doc.shortId}`}
-                  className="text-xs"
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Toegang</Label>
+                      <Select value={accessType} onValueChange={setAccessType}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-3 w-3" /> Openbaar
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="link-only">
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-3 w-3" /> Alleen via link
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="password">
+                            <div className="flex items-center gap-2">
+                              <Lock className="h-3 w-3" /> Wachtwoord
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Sjabloon</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {TEMPLATE_IDS.map((id) => {
+                          const tmpl = TEMPLATES[id];
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => setTemplateId(id)}
+                              className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
+                                templateId === id
+                                  ? "border-primary ring-2 ring-primary/20"
+                                  : "hover:border-gray-400"
+                              }`}
+                            >
+                              <div
+                                className="h-8 w-8 flex-shrink-0 rounded"
+                                style={{ backgroundColor: tmpl.primary }}
+                              />
+                              <div>
+                                <div className="font-medium">{tmpl.name}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {tmpl.headerStyle === "split-bar"
+                                    ? "Logo + titelbalk"
+                                    : tmpl.headerStyle === "inline-logo"
+                                    ? "Logo + titel inline"
+                                    : "Standaard header"}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>AI Assistent modus</Label>
+                      <Select value={chatMode} onValueChange={(v: "full" | "terms-only") => setChatMode(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" /> Volledig (vragen + begrippen)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="terms-only">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-3 w-3" /> Alleen begrippen
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        {chatMode === "full"
+                          ? "Gebruikers kunnen vragen stellen en op begrippen klikken"
+                          : "Gebruikers zien alleen voorgedefinieerde begrippen, geen vrije vragen"}
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>Deellink</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          readOnly
+                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/d/${doc.shortId}`}
+                          className="text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/d/${doc.shortId}`
+                            );
+                            toast.success("Link gekopieerd!");
+                          }}
+                        >
+                          Kopieer
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Samenvatting Tab */}
+        <TabsContent value="samenvatting">
+          <div className="mx-auto max-w-4xl space-y-4 py-6">
+            {/* Samenvatting */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  Samenvatting
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RichTextToolbar textareaRef={summaryRef} />
+                <Textarea
+                  ref={summaryRef}
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  rows={8}
+                  className="resize-none rounded-t-none"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${window.location.origin}/d/${doc.shortId}`
-                    );
-                    toast.success("Link gekopieerd!");
-                  }}
-                >
-                  Kopieer
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              </CardContent>
+            </Card>
+
+            {/* Hoofdpunten */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    Hoofdpunten
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addKeyPoint}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Toevoegen
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {keyPoints.map((kp, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <Input
+                        value={kp.text}
+                        onChange={(e) => updateKeyPoint(i, e.target.value)}
+                        placeholder="Hoofdpunt..."
+                        className="flex-1 text-sm"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-red-500"
+                        onClick={() => removeKeyPoint(i)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                  {keyPoints.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Geen hoofdpunten. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
+                    </p>
+                  )}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Belangrijke Bevindingen */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    Belangrijke Bevindingen
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addFinding}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Toevoegen
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  {findings.map((f, i) => (
+                    <div key={i} className="rounded-lg border p-3 space-y-2 relative group">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                        onClick={() => removeFinding(i)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      <Input
+                        value={f.category}
+                        onChange={(e) => updateFinding(i, "category", e.target.value)}
+                        placeholder="Categorie"
+                        className="h-7 text-xs"
+                      />
+                      <Input
+                        value={f.title}
+                        onChange={(e) => updateFinding(i, "title", e.target.value)}
+                        placeholder="Titel"
+                        className="text-sm font-medium"
+                      />
+                      <Textarea
+                        value={f.content}
+                        onChange={(e) => updateFinding(i, "content", e.target.value)}
+                        placeholder="Inhoud..."
+                        rows={2}
+                        className="resize-none text-xs"
+                      />
+                    </div>
+                  ))}
+                  {findings.length === 0 && (
+                    <p className="col-span-2 text-sm text-muted-foreground">
+                      Geen bevindingen. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Begrippen & Definities Tab */}
+        <TabsContent value="definities">
+          <div className="mx-auto max-w-5xl py-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                    Begrippen & Definities
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addTerm}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Nieuw
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {terms.map((t, i) => (
+                    <div key={i} className="rounded-lg bg-gray-50 p-4 space-y-2 relative group">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                        onClick={() => removeTerm(i)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={t.term}
+                          onChange={(e) => updateTerm(i, "term", e.target.value)}
+                          placeholder="Begrip"
+                          className="flex-1 text-sm font-medium text-primary h-8"
+                        />
+                        <Input
+                          type="number"
+                          value={t.occurrences}
+                          onChange={(e) => updateTermOccurrences(i, parseInt(e.target.value) || 0)}
+                          className="w-14 text-xs text-center h-8"
+                          title="Voorkomens"
+                          min={0}
+                        />
+                      </div>
+                      <Textarea
+                        value={t.definition}
+                        onChange={(e) => updateTerm(i, "definition", e.target.value)}
+                        placeholder="Definitie..."
+                        rows={2}
+                        className="resize-none text-xs"
+                      />
+                    </div>
+                  ))}
+                  {terms.length === 0 && (
+                    <p className="col-span-full text-sm text-muted-foreground">
+                      Geen begrippen. Klik op &quot;Nieuw&quot; om er een toe te voegen.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

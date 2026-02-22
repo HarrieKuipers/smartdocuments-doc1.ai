@@ -104,7 +104,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/logo_DOC1_dark.svg"
+              src="/logo_doc1_v2.svg"
               alt="doc1.ai"
               width={120}
               height={45}
@@ -317,7 +317,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
               <Image
-                src="/logo_DOC1_dark.svg"
+                src="/logo_doc1_v2.svg"
                 alt="doc1.ai"
                 width={90}
                 height={34}

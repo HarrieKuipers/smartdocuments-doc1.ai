@@ -2,7 +2,8 @@ import { ImageResponse } from "next/og";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
-import { uploadPublicFile } from "@/lib/storage";
+import { uploadPublicFile, getPresignedDownloadUrl, BUCKET } from "@/lib/storage";
+import { renderPdfFirstPageAsPng } from "@/lib/pdf-to-image";
 
 interface CoverImageData {
   title: string;
@@ -121,27 +122,48 @@ export async function generateAndUploadCover(
   await connectDB();
 
   const doc = await DocumentModel.findById(documentId)
-    .select("title tags brandOverride organizationId shortId")
+    .select("title tags brandOverride organizationId shortId sourceFile")
     .lean();
 
   if (!doc) throw new Error("Document not found");
 
-  const org = await Organization.findById(doc.organizationId)
-    .select("name logo brandColors")
-    .lean();
+  let imageBuffer: Buffer | null = null;
 
-  const brandPrimary =
-    doc.brandOverride?.primary ||
-    (org as { brandColors?: { primary?: string } })?.brandColors?.primary ||
-    "#0062EB";
+  // Try rendering PDF first page
+  if (doc.sourceFile?.mimeType === "application/pdf" && doc.sourceFile?.url) {
+    try {
+      const urlPath = new URL(doc.sourceFile.url).pathname;
+      const storageKey = urlPath.startsWith(`/${BUCKET}/`)
+        ? urlPath.slice(`/${BUCKET}/`.length)
+        : urlPath.slice(1);
+      const downloadUrl = await getPresignedDownloadUrl(storageKey);
+      const fileResponse = await fetch(downloadUrl);
+      const pdfBuffer = Buffer.from(await fileResponse.arrayBuffer());
+      imageBuffer = renderPdfFirstPageAsPng(pdfBuffer);
+    } catch (error) {
+      console.error("PDF cover rendering failed, falling back to text cover:", error);
+    }
+  }
 
-  const imageBuffer = await renderCoverImage({
-    title: doc.title || "Untitled Document",
-    organizationName: (org as { name?: string })?.name || "Organisatie",
-    organizationLogo: (org as { logo?: string })?.logo,
-    tags: doc.tags || [],
-    brandPrimary,
-  });
+  // Fallback to text-based cover
+  if (!imageBuffer) {
+    const org = await Organization.findById(doc.organizationId)
+      .select("name logo brandColors")
+      .lean();
+
+    const brandPrimary =
+      doc.brandOverride?.primary ||
+      (org as { brandColors?: { primary?: string } })?.brandColors?.primary ||
+      "#0062EB";
+
+    imageBuffer = await renderCoverImage({
+      title: doc.title || "Untitled Document",
+      organizationName: (org as { name?: string })?.name || "Organisatie",
+      organizationLogo: (org as { logo?: string })?.logo,
+      tags: doc.tags || [],
+      brandPrimary,
+    });
+  }
 
   const storageKey = `covers/${doc.shortId}.png`;
   const coverUrl = await uploadPublicFile(storageKey, imageBuffer, "image/png");

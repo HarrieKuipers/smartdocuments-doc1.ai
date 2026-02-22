@@ -11,18 +11,18 @@ export async function extractTerms(text: string): Promise<ExtractedTerm[]> {
 
   const response = await anthropic.messages.create({
     model: MODELS.processing,
-    max_tokens: 2048,
+    max_tokens: 4096,
     messages: [
       {
         role: "user",
-        content: `Identificeer de belangrijkste vakbegrippen en termen in de volgende tekst. Geef voor elk begrip een duidelijke, korte definitie geschikt voor een tooltip. Tel ook hoe vaak de term voorkomt. Alle output in het Nederlands.
+        content: `Identificeer de belangrijkste vakbegrippen en termen in de volgende tekst. Geef voor elk begrip een uitgebreide, duidelijke definitie van 2-4 zinnen die het begrip volledig uitlegt in de context van dit document. De definitie moet begrijpelijk zijn voor iemand zonder vakkennis en moet uitleggen waarom het begrip relevant is in dit document. Tel ook hoe vaak de term voorkomt. Alle output in het Nederlands.
 
 Tekst:
 ${textToAnalyze}
 
 Geef de 10-20 belangrijkste termen als JSON array (geen markdown, alleen JSON):
 [
-  {"term": "begrip", "definition": "korte definitie van het begrip", "occurrences": 5}
+  {"term": "begrip", "definition": "Uitgebreide definitie van 2-4 zinnen die het begrip uitlegt in de context van het document.", "occurrences": 5}
 ]`,
       },
     ],

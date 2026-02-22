@@ -57,7 +57,7 @@ export default function Sidebar() {
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
-            src="/logo_DOC1_dark.svg"
+            src="/logo_doc1_v2.svg"
             alt="DOC1"
             width={120}
             height={45}

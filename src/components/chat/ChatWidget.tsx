@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, X, Send, Loader2 } from "lucide-react";
+import { BookOpen, MessageSquare, X, Send, Loader2 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -13,14 +13,17 @@ interface Message {
 interface ChatWidgetProps {
   documentId: string;
   brandPrimary?: string;
+  chatMode?: "full" | "terms-only";
+  terms?: { term: string; definition: string; occurrences: number }[];
 }
 
 export interface ChatWidgetRef {
   askQuestion: (question: string) => void;
+  showTermDefinition: (term: string, definition: string) => void;
 }
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB" },
+  { documentId, brandPrimary = "#0062EB", chatMode = "full", terms = [] },
   ref
 ) {
   const [open, setOpen] = useState(false);
@@ -71,14 +74,22 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
     }
   }, [documentId, loading, messages]);
 
-  // Expose askQuestion to parent
+  // Expose askQuestion and showTermDefinition to parent
   useImperativeHandle(ref, () => ({
     askQuestion(question: string) {
       setOpen(true);
-      // Small delay to ensure panel is visible before sending
       setTimeout(() => {
         sendMessageText(question);
       }, 100);
+    },
+    showTermDefinition(term: string, definition: string) {
+      setOpen(true);
+      // Show the term as a user "click" and the definition as a predefined assistant response
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: `Wat betekent "${term}"?` },
+        { role: "assistant", content: definition },
+      ]);
     },
   }), [sendMessageText]);
 
@@ -135,8 +146,12 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 />
               </div>
               <div>
-                <p className="font-medium">AI Assistent</p>
-                <p className="text-xs opacity-80">Altijd beschikbaar</p>
+                <p className="font-medium">
+                  {chatMode === "terms-only" ? "Begrippen" : "AI Assistent"}
+                </p>
+                <p className="text-xs opacity-80">
+                  {chatMode === "terms-only" ? "Klik op een begrip in de tekst" : "Altijd beschikbaar"}
+                </p>
               </div>
             </div>
             <button
@@ -149,7 +164,35 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.length === 0 && (
+            {messages.length === 0 && chatMode === "terms-only" && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground text-center">
+                  Klik op een gemarkeerd begrip in de tekst om de definitie te zien
+                </p>
+                {terms.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Begrippen in dit document</p>
+                    {terms.map((t, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setMessages((prev) => [
+                            ...prev,
+                            { role: "user", content: `Wat betekent "${t.term}"?` },
+                            { role: "assistant", content: t.definition },
+                          ]);
+                        }}
+                        className="flex items-center gap-2 w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                        <span className="font-medium" style={{ color: brandPrimary }}>{t.term}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {messages.length === 0 && chatMode !== "terms-only" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
                   Stel een vraag over het document
@@ -202,26 +245,34 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             )}
           </div>
 
-          {/* Input */}
-          <form onSubmit={sendMessage} className="border-t p-3">
-            <div className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Stel een vraag over het document..."
-                className="flex-1"
-                disabled={loading}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={loading || !input.trim()}
-                style={{ backgroundColor: brandPrimary }}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+          {/* Input - hidden in terms-only mode */}
+          {chatMode === "full" ? (
+            <form onSubmit={sendMessage} className="border-t p-3">
+              <div className="flex gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Stel een vraag over het document..."
+                  className="flex-1"
+                  disabled={loading}
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={loading || !input.trim()}
+                  style={{ backgroundColor: brandPrimary }}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="border-t px-4 py-2.5">
+              <p className="text-xs text-center text-muted-foreground">
+                Klik op een gemarkeerd woord in de tekst
+              </p>
             </div>
-          </form>
+          )}
         </div>
       )}
     </>

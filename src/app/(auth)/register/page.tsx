@@ -71,7 +71,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <Image src="/logo_DOC1_dark.svg" alt="DOC1" width={120} height={45} priority />
+            <Image src="/logo_doc1_v2.svg" alt="DOC1" width={120} height={45} priority />
           </div>
           <CardTitle className="text-2xl">Account aanmaken</CardTitle>
           <CardDescription>

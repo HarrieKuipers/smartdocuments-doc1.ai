@@ -45,6 +45,7 @@ interface ReaderDocument {
     terms: { term: string; definition: string; occurrences: number }[];
   };
   template?: string;
+  chatMode?: "full" | "terms-only";
   coverImageUrl?: string;
   brandOverride?: { primary?: string };
   organization: {
@@ -72,14 +73,21 @@ export default function ReaderPage() {
     const target = e.target as HTMLElement;
     if (target.hasAttribute("data-term")) {
       e.preventDefault();
-      const term = target.getAttribute("data-term") || target.textContent;
+      const term = target.getAttribute("data-term") || target.textContent || "";
       const definition = target.getAttribute("title") || "";
-      analytics.trackTermClick(term || "", definition);
-      chatRef.current?.askQuestion(
-        `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
-      );
+      analytics.trackTermClick(term, definition);
+
+      if (doc?.chatMode === "terms-only") {
+        // Show predefined definition directly - no AI call
+        chatRef.current?.showTermDefinition(term, definition);
+      } else {
+        // Full mode: ask AI for contextual explanation
+        chatRef.current?.askQuestion(
+          `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
+        );
+      }
     }
-  }, [analytics]);
+  }, [analytics, doc?.chatMode]);
 
   async function fetchDocument(password?: string) {
     try {
@@ -494,7 +502,13 @@ export default function ReaderPage() {
       <DocFooter brandPrimary={brandPrimary} />
 
       {/* Chat Widget */}
-      <ChatWidget ref={chatRef} documentId={doc._id} brandPrimary={brandPrimary} />
+      <ChatWidget
+        ref={chatRef}
+        documentId={doc._id}
+        brandPrimary={brandPrimary}
+        chatMode={doc.chatMode || "full"}
+        terms={doc.content.terms}
+      />
     </div>
   );
 }

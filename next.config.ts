@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["pdf-parse", "mammoth"],
+  serverExternalPackages: ["pdf-parse", "mammoth", "mupdf"],
 };
 
 export default nextConfig;
