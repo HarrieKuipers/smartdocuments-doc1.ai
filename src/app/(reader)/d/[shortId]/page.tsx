@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,13 +22,22 @@ import {
   CheckCircle,
   BarChart3,
   MessageSquare,
+  Settings,
 } from "lucide-react";
+import Link from "next/link";
 import PasswordGate from "@/components/reader/PasswordGate";
-import ChatWidget from "@/components/chat/ChatWidget";
+import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
+import { getTemplate, type TemplateId } from "@/lib/templates";
+import DefaultHeader from "@/components/reader/headers/DefaultHeader";
+import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader";
+import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
+import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
+import DocFooter from "@/components/reader/DocFooter";
 
 interface ReaderDocument {
   _id: string;
   shortId: string;
+  organizationId: string;
   title: string;
   authors: string[];
   description?: string;
@@ -43,6 +52,8 @@ interface ReaderDocument {
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
   };
+  template?: string;
+  coverImageUrl?: string;
   brandOverride?: { primary?: string };
   organization: {
     name: string;
@@ -61,6 +72,21 @@ export default function ReaderPage() {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [languageLevel, setLanguageLevel] = useState<LanguageLevel>("original");
   const [error, setError] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const chatRef = useRef<ChatWidgetRef>(null);
+
+  // Handle clicks on highlighted terms in the content
+  const handleTermClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.hasAttribute("data-term")) {
+      e.preventDefault();
+      const term = target.getAttribute("data-term") || target.textContent;
+      chatRef.current?.askQuestion(
+        `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
+      );
+    }
+  }, []);
 
   async function fetchDocument(password?: string) {
     try {
@@ -86,7 +112,21 @@ export default function ReaderPage() {
 
       const { data } = await res.json();
       setDoc(data);
+      setDocumentId(data._id);
       setNeedsPassword(false);
+
+      // Check if current user owns this document
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        if (sessionRes.ok) {
+          const session = await sessionRes.json();
+          if (session?.user?.organizationId && session.user.organizationId === data.organizationId) {
+            setIsOwner(true);
+          }
+        }
+      } catch {
+        // Not logged in or session fetch failed — ignore
+      }
     } catch {
       setError("Kon document niet laden.");
     } finally {
@@ -126,10 +166,10 @@ export default function ReaderPage() {
     );
   }
 
+  const template = getTemplate(doc.template);
   const brandPrimary =
     doc.brandOverride?.primary ||
-    doc.organization?.brandColors?.primary ||
-    "#0062EB";
+    template.primary;
 
   const currentSummary =
     languageLevel === "original"
@@ -144,12 +184,14 @@ export default function ReaderPage() {
   function highlightTerms(text: string) {
     if (!doc?.content.terms?.length) return text;
     let result = text;
-    // Simple highlight - replace terms with styled spans
+    // Highlight terms - clickable to ask AI for definition
     doc.content.terms.forEach((t) => {
-      const regex = new RegExp(`\\b(${t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, "gi");
+      const escaped = t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedDef = t.definition.replace(/"/g, '&quot;');
+      const regex = new RegExp(`\\b(${escaped})\\b`, "gi");
       result = result.replace(
         regex,
-        `<span class="cursor-help border-b border-dotted" style="border-color: ${brandPrimary}; color: ${brandPrimary}" title="${t.definition}">$1</span>`
+        `<span class="cursor-pointer border-b border-dotted hover:opacity-80 transition-opacity" style="border-color: ${brandPrimary}; color: ${brandPrimary}" data-term="${escaped}" title="${escapedDef}">$1</span>`
       );
     });
     return result;
@@ -165,32 +207,13 @@ export default function ReaderPage() {
       }
     >
       {/* Header */}
-      <header
-        className="border-b bg-white"
-        style={{ borderBottomColor: brandPrimary }}
-      >
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            {doc.organization?.logo ? (
-              <img
-                src={doc.organization.logo}
-                alt={doc.organization.name}
-                className="h-8"
-              />
-            ) : (
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-white text-sm font-bold"
-                style={{ backgroundColor: brandPrimary }}
-              >
-                {doc.organization?.name?.[0] || "D"}
-              </div>
-            )}
-            <span className="font-medium text-gray-700">
-              {doc.organization?.name}
-            </span>
-          </div>
-        </div>
-      </header>
+      {template.headerStyle === "split-bar" && template.logo ? (
+        <RijksoverheidHeader title={doc.title} brandPrimary={brandPrimary} logo={template.logo} />
+      ) : template.headerStyle === "inline-logo" && template.logo ? (
+        <AmsterdamHeader title={doc.title} brandPrimary={brandPrimary} logo={template.logo} />
+      ) : (
+        <DefaultHeader organization={doc.organization} brandPrimary={brandPrimary} />
+      )}
 
       {/* Hero */}
       <div className="bg-white border-b">
@@ -237,6 +260,17 @@ export default function ReaderPage() {
                 </span>
               </div>
             </div>
+            {doc.coverImageUrl && (
+              <div className="hidden md:block w-64 flex-shrink-0">
+                <div className="overflow-hidden rounded-lg shadow-lg">
+                  <img
+                    src={doc.coverImageUrl}
+                    alt={doc.title}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -306,6 +340,21 @@ export default function ReaderPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Download PDF
               </Button>
+
+              {/* B1 language button (template-specific) */}
+              {template.showB1Button && (
+                <button
+                  onClick={() => setLanguageLevel("B1")}
+                  className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition-colors ${
+                    languageLevel === "B1"
+                      ? "bg-emerald-600"
+                      : "bg-emerald-500 hover:bg-emerald-600"
+                  }`}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  B1 Taalniveau
+                </button>
+              )}
 
               {/* Language level switcher */}
               <div className="space-y-2">
@@ -381,7 +430,7 @@ export default function ReaderPage() {
                   </Badge>
                 )}
               </div>
-              <div className="rounded-lg border bg-white p-6">
+              <div className="rounded-lg border bg-white p-6" onClick={handleTermClick}>
                 <div
                   className="prose prose-sm max-w-none leading-relaxed"
                   dangerouslySetInnerHTML={{
@@ -401,7 +450,7 @@ export default function ReaderPage() {
                   />
                   <h2 className="text-xl font-bold">Hoofdpunten</h2>
                 </div>
-                <div className="rounded-lg border bg-white p-6">
+                <div className="rounded-lg border bg-white p-6" onClick={handleTermClick}>
                   <ul className="space-y-3">
                     {doc.content.keyPoints.map((kp, i) => (
                       <li key={i} className="flex items-start gap-3">
@@ -457,33 +506,24 @@ export default function ReaderPage() {
                 </div>
               </section>
             )}
+
+            {/* Template info box */}
+            {template.showInfoBox && (
+              <TemplateInfoBox
+                brandPrimary={brandPrimary}
+                primaryLight={template.primaryLight}
+                label={template.infoBoxLabel}
+              />
+            )}
           </main>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-6">
-        <div className="mx-auto max-w-5xl px-6 text-center text-sm text-muted-foreground">
-          Mogelijk gemaakt door{" "}
-          <a
-            href="https://doc1.ai"
-            className="font-medium"
-            style={{ color: brandPrimary }}
-          >
-            doc1.ai
-          </a>{" "}
-          — Een product van{" "}
-          <a
-            href="https://espire.agency"
-            className="font-medium hover:underline"
-          >
-            Espire Agency
-          </a>
-        </div>
-      </footer>
+      <DocFooter brandPrimary={brandPrimary} />
 
       {/* Chat Widget */}
-      <ChatWidget documentId={doc._id} brandPrimary={brandPrimary} />
+      <ChatWidget ref={chatRef} documentId={doc._id} brandPrimary={brandPrimary} />
     </div>
   );
 }

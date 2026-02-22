@@ -40,6 +40,11 @@ const STEPS = [
     description: "Belangrijke termen en definities identificeren",
   },
   {
+    key: "cover-generation",
+    label: "Coverafbeelding",
+    description: "Visuele cover genereren voor het document",
+  },
+  {
     key: "finalizing",
     label: "Afronding",
     description: "Smart Document wordt klaargemaakt",

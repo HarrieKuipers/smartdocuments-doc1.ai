@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, X, Send, Loader2 } from "lucide-react";
 
 interface Message {
@@ -16,10 +15,14 @@ interface ChatWidgetProps {
   brandPrimary?: string;
 }
 
-export default function ChatWidget({
-  documentId,
-  brandPrimary = "#0062EB",
-}: ChatWidgetProps) {
+export interface ChatWidgetRef {
+  askQuestion: (question: string) => void;
+}
+
+const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
+  { documentId, brandPrimary = "#0062EB" },
+  ref
+) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -32,13 +35,10 @@ export default function ChatWidget({
     }
   }, [messages]);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const sendMessageText = useCallback(async (messageText: string) => {
+    if (!messageText.trim() || loading) return;
 
-    const userMessage = input.trim();
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setMessages((prev) => [...prev, { role: "user", content: messageText }]);
     setLoading(true);
 
     try {
@@ -46,8 +46,8 @@ export default function ChatWidget({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage,
-          history: messages.slice(-10), // Last 10 messages for context
+          message: messageText,
+          history: messages.slice(-10),
         }),
       });
 
@@ -69,6 +69,25 @@ export default function ChatWidget({
     } finally {
       setLoading(false);
     }
+  }, [documentId, loading, messages]);
+
+  // Expose askQuestion to parent
+  useImperativeHandle(ref, () => ({
+    askQuestion(question: string) {
+      setOpen(true);
+      // Small delay to ensure panel is visible before sending
+      setTimeout(() => {
+        sendMessageText(question);
+      }, 100);
+    },
+  }), [sendMessageText]);
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+    const messageText = input.trim();
+    setInput("");
+    await sendMessageText(messageText);
   }
 
   const suggestedQuestions = [
@@ -189,4 +208,6 @@ export default function ChatWidget({
       )}
     </>
   );
-}
+});
+
+export default ChatWidget;

@@ -5,6 +5,7 @@ import { extractText } from "./extract-text";
 import { analyzeContent } from "./analyze-content";
 import { generateLanguageLevelSummaries } from "./generate-summary";
 import { extractTerms } from "./extract-terms";
+import { generateAndUploadCover } from "./generate-cover";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
 
@@ -84,7 +85,20 @@ export async function processDocument(
     doc.content.terms = terms;
     await doc.save();
 
-    // Step 6: Finalize
+    // Step 6: Cover image generation (non-blocking)
+    try {
+      await onProgress?.("cover-generation", 90);
+      doc.processingProgress = { step: "cover-generation", percentage: 90 };
+      await doc.save();
+
+      const coverUrl = await generateAndUploadCover(documentId);
+      doc.coverImageUrl = coverUrl;
+      await doc.save();
+    } catch (coverError) {
+      console.error("Cover generation failed (non-blocking):", coverError);
+    }
+
+    // Step 7: Finalize
     await onProgress?.("finalizing", 95);
     doc.processingProgress = { step: "finalizing", percentage: 95 };
     await doc.save();

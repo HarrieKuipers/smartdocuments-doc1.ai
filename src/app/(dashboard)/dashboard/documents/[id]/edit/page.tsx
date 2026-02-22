@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,15 +19,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
+  Bold,
   Check,
   Eye,
   Globe,
+  Italic,
+  Link2,
+  List,
   Loader2,
   Lock,
   Link as LinkIcon,
+  Pencil,
+  Plus,
+  Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TEMPLATES, TEMPLATE_IDS, getTemplate, type TemplateId } from "@/lib/templates";
 
 interface DocumentData {
   _id: string;
@@ -46,15 +54,89 @@ interface DocumentData {
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
   };
+  template?: string;
   brandOverride?: { primary?: string };
 }
 
-const BRAND_PRESETS = [
-  { name: "Smart", primary: "#0062EB" },
-  { name: "Rijksoverheid", primary: "#154273" },
-  { name: "Amsterdam", primary: "#EC0000" },
-  { name: "Aangepast", primary: "" },
-];
+// -- Rich Text Toolbar --
+function RichTextToolbar({ textareaRef }: { textareaRef: React.RefObject<HTMLTextAreaElement | null> }) {
+  function wrapSelection(before: string, after: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const text = el.value;
+    const selected = text.substring(start, end);
+    const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+    // Trigger React onChange
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, "value"
+    )?.set;
+    nativeInputValueSetter?.call(el, newText);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    // Restore cursor
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, end + before.length);
+    }, 0);
+  }
+
+  function insertLink() {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = el.value.substring(start, end);
+    const url = prompt("Voer de URL in:");
+    if (!url) return;
+    const linkText = selected || "linktekst";
+    const markdown = `[${linkText}](${url})`;
+    const text = el.value;
+    const newText = text.substring(0, start) + markdown + text.substring(end);
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, "value"
+    )?.set;
+    nativeInputValueSetter?.call(el, newText);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  return (
+    <div className="flex items-center gap-1 rounded-t-md border border-b-0 bg-gray-50 px-2 py-1">
+      <button
+        type="button"
+        onClick={() => wrapSelection("**", "**")}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+        title="Vet"
+      >
+        <Bold className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => wrapSelection("*", "*")}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+        title="Cursief"
+      >
+        <Italic className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={insertLink}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+        title="Link invoegen"
+      >
+        <Link2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => wrapSelection("\n- ", "")}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+        title="Lijst"
+      >
+        <List className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 export default function DocumentEditPage() {
   const params = useParams();
@@ -70,7 +152,16 @@ export default function DocumentEditPage() {
   const [description, setDescription] = useState("");
   const [accessType, setAccessType] = useState("public");
   const [summary, setSummary] = useState("");
-  const [brandPrimary, setBrandPrimary] = useState("#0062EB");
+  const [templateId, setTemplateId] = useState<TemplateId>("doc1");
+  const [keyPoints, setKeyPoints] = useState<{ text: string; linkedTerms: string[] }[]>([]);
+  const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
+  const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
+
+  // Textarea refs for rich text toolbar
+  const summaryRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Track content version for auto-save triggering
+  const [contentVersion, setContentVersion] = useState(0);
 
   useEffect(() => {
     async function fetchDoc() {
@@ -83,7 +174,10 @@ export default function DocumentEditPage() {
         setDescription(data.description || "");
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
-        setBrandPrimary(data.brandOverride?.primary || "#0062EB");
+        setTemplateId((data.template as TemplateId) || "doc1");
+        setKeyPoints(data.content?.keyPoints || []);
+        setFindings(data.content?.findings || []);
+        setTerms(data.content?.terms || []);
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -106,7 +200,11 @@ export default function DocumentEditPage() {
           description,
           access: { type: accessType },
           "content.summary.original": summary,
-          brandOverride: { primary: brandPrimary },
+          "content.keyPoints": keyPoints,
+          "content.findings": findings,
+          "content.terms": terms,
+          template: templateId,
+          brandOverride: { primary: getTemplate(templateId).primary },
         }),
       });
       setSaved(true);
@@ -115,14 +213,19 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, description, accessType, summary, brandPrimary]);
+  }, [params.id, doc, title, description, accessType, summary, templateId, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, description, accessType, summary, brandPrimary, saveChanges, doc]);
+  }, [title, description, accessType, summary, templateId, contentVersion, saveChanges, doc]);
+
+  // Helper to mark content as changed (triggers auto-save for array fields)
+  function markChanged() {
+    setContentVersion((v) => v + 1);
+  }
 
   async function handlePublish() {
     setPublishing(true);
@@ -139,6 +242,52 @@ export default function DocumentEditPage() {
     } finally {
       setPublishing(false);
     }
+  }
+
+  // -- Key Points CRUD --
+  function updateKeyPoint(index: number, text: string) {
+    setKeyPoints((prev) => prev.map((kp, i) => (i === index ? { ...kp, text } : kp)));
+    markChanged();
+  }
+  function removeKeyPoint(index: number) {
+    setKeyPoints((prev) => prev.filter((_, i) => i !== index));
+    markChanged();
+  }
+  function addKeyPoint() {
+    setKeyPoints((prev) => [...prev, { text: "", linkedTerms: [] }]);
+    markChanged();
+  }
+
+  // -- Findings CRUD --
+  function updateFinding(index: number, field: "category" | "title" | "content", value: string) {
+    setFindings((prev) => prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)));
+    markChanged();
+  }
+  function removeFinding(index: number) {
+    setFindings((prev) => prev.filter((_, i) => i !== index));
+    markChanged();
+  }
+  function addFinding() {
+    setFindings((prev) => [...prev, { category: "", title: "", content: "" }]);
+    markChanged();
+  }
+
+  // -- Terms CRUD --
+  function updateTerm(index: number, field: "term" | "definition", value: string) {
+    setTerms((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+    markChanged();
+  }
+  function updateTermOccurrences(index: number, value: number) {
+    setTerms((prev) => prev.map((t, i) => (i === index ? { ...t, occurrences: value } : t)));
+    markChanged();
+  }
+  function removeTerm(index: number) {
+    setTerms((prev) => prev.filter((_, i) => i !== index));
+    markChanged();
+  }
+  function addTerm() {
+    setTerms((prev) => [...prev, { term: "", definition: "", occurrences: 0 }]);
+    markChanged();
   }
 
   if (loading) {
@@ -277,95 +426,169 @@ export default function DocumentEditPage() {
               <Separator />
 
               <div className="space-y-2">
-                <Label>Huisstijl</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {BRAND_PRESETS.map((preset) => (
-                    <button
-                      key={preset.name}
-                      onClick={() =>
-                        preset.primary && setBrandPrimary(preset.primary)
-                      }
-                      className={`rounded-lg border p-2 text-xs transition-all ${
-                        brandPrimary === preset.primary
-                          ? "border-[#0062EB] ring-2 ring-[#0062EB]/20"
-                          : "hover:border-gray-400"
-                      }`}
-                    >
-                      <div
-                        className="mb-1 h-6 rounded"
-                        style={{
-                          backgroundColor:
-                            preset.primary || brandPrimary,
-                        }}
-                      />
-                      {preset.name}
-                    </button>
-                  ))}
+                <Label>Sjabloon</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {TEMPLATE_IDS.map((id) => {
+                    const tmpl = TEMPLATES[id];
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setTemplateId(id)}
+                        className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
+                          templateId === id
+                            ? "border-[#0062EB] ring-2 ring-[#0062EB]/20"
+                            : "hover:border-gray-400"
+                        }`}
+                      >
+                        <div
+                          className="h-8 w-8 flex-shrink-0 rounded"
+                          style={{ backgroundColor: tmpl.primary }}
+                        />
+                        <div>
+                          <div className="font-medium">{tmpl.name}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {tmpl.headerStyle === "split-bar"
+                              ? "Logo + titelbalk"
+                              : tmpl.headerStyle === "inline-logo"
+                              ? "Logo + titel inline"
+                              : "Standaard header"}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Center: Content preview */}
+        {/* Center: Content - editable */}
         <div className="col-span-6 space-y-4">
+          {/* Samenvatting */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Samenvatting</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                Samenvatting
+              </CardTitle>
             </CardHeader>
             <CardContent>
+              <RichTextToolbar textareaRef={summaryRef} />
               <Textarea
+                ref={summaryRef}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 rows={8}
-                className="resize-none"
+                className="resize-none rounded-t-none"
               />
             </CardContent>
           </Card>
 
+          {/* Hoofdpunten */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Hoofdpunten</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  Hoofdpunten
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addKeyPoint}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Toevoegen
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {doc.content?.keyPoints?.map((kp, i) => (
+                {keyPoints.map((kp, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#0062EB]" />
-                    <span className="text-sm">{kp.text}</span>
+                    <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-[#0062EB]" />
+                    <Input
+                      value={kp.text}
+                      onChange={(e) => updateKeyPoint(i, e.target.value)}
+                      placeholder="Hoofdpunt..."
+                      className="flex-1 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-red-500"
+                      onClick={() => removeKeyPoint(i)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </li>
                 ))}
-                {(!doc.content?.keyPoints ||
-                  doc.content.keyPoints.length === 0) && (
+                {keyPoints.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    Geen hoofdpunten gegenereerd.
+                    Geen hoofdpunten. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
                   </p>
                 )}
               </ul>
             </CardContent>
           </Card>
 
+          {/* Belangrijke Bevindingen */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Belangrijke Bevindingen</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  Belangrijke Bevindingen
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addFinding}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Toevoegen
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                {doc.content?.findings?.map((f, i) => (
-                  <div key={i} className="rounded-lg border p-3">
-                    <Badge variant="outline" className="mb-2 text-xs">
-                      {f.category}
-                    </Badge>
-                    <h4 className="mb-1 text-sm font-medium">{f.title}</h4>
-                    <p className="text-xs text-muted-foreground">
-                      {f.content}
-                    </p>
+                {findings.map((f, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-2 relative group">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                      onClick={() => removeFinding(i)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                    <Input
+                      value={f.category}
+                      onChange={(e) => updateFinding(i, "category", e.target.value)}
+                      placeholder="Categorie"
+                      className="h-7 text-xs"
+                    />
+                    <Input
+                      value={f.title}
+                      onChange={(e) => updateFinding(i, "title", e.target.value)}
+                      placeholder="Titel"
+                      className="text-sm font-medium"
+                    />
+                    <Textarea
+                      value={f.content}
+                      onChange={(e) => updateFinding(i, "content", e.target.value)}
+                      placeholder="Inhoud..."
+                      rows={2}
+                      className="resize-none text-xs"
+                    />
                   </div>
                 ))}
-                {(!doc.content?.findings ||
-                  doc.content.findings.length === 0) && (
+                {findings.length === 0 && (
                   <p className="col-span-2 text-sm text-muted-foreground">
-                    Geen bevindingen gegenereerd.
+                    Geen bevindingen. Klik op &quot;Toevoegen&quot; om er een toe te voegen.
                   </p>
                 )}
               </div>
@@ -373,35 +596,66 @@ export default function DocumentEditPage() {
           </Card>
         </div>
 
-        {/* Right: Terms */}
+        {/* Right: Terms - editable */}
         <div className="col-span-3 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">
-                Begrippen & Definities
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  Begrippen & Definities
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addTerm}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Nieuw
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {doc.content?.terms?.map((t, i) => (
-                  <div key={i} className="rounded-lg bg-gray-50 p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#0062EB]">
-                        {t.term}
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
-                        {t.occurrences}x
-                      </Badge>
+                {terms.map((t, i) => (
+                  <div key={i} className="rounded-lg bg-gray-50 p-3 space-y-2 relative group">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                      onClick={() => removeTerm(i)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={t.term}
+                        onChange={(e) => updateTerm(i, "term", e.target.value)}
+                        placeholder="Begrip"
+                        className="flex-1 text-sm font-medium text-[#0062EB] h-8"
+                      />
+                      <Input
+                        type="number"
+                        value={t.occurrences}
+                        onChange={(e) => updateTermOccurrences(i, parseInt(e.target.value) || 0)}
+                        className="w-14 text-xs text-center h-8"
+                        title="Voorkomens"
+                        min={0}
+                      />
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t.definition}
-                    </p>
+                    <Textarea
+                      value={t.definition}
+                      onChange={(e) => updateTerm(i, "definition", e.target.value)}
+                      placeholder="Definitie..."
+                      rows={2}
+                      className="resize-none text-xs"
+                    />
                   </div>
                 ))}
-                {(!doc.content?.terms ||
-                  doc.content.terms.length === 0) && (
+                {terms.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    Geen begrippen geëxtraheerd.
+                    Geen begrippen. Klik op &quot;Nieuw&quot; om er een toe te voegen.
                   </p>
                 )}
               </div>

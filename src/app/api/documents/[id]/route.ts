@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
+import { generateAndUploadCover } from "@/lib/ai/generate-cover";
 
 export async function GET(
   req: NextRequest,
@@ -62,6 +63,15 @@ export async function PUT(
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
+    }
+
+    // Regenerate cover if cover-affecting fields changed
+    const coverFields = ["title", "tags", "brandOverride"];
+    const shouldRegenerateCover = coverFields.some((field) => field in updates);
+    if (shouldRegenerateCover && doc.status === "ready") {
+      generateAndUploadCover(id).catch((err) =>
+        console.error("Cover regeneration failed:", err)
+      );
     }
 
     return NextResponse.json({ data: doc });

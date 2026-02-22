@@ -74,7 +74,7 @@ export default function LoginPage() {
                 <Label htmlFor="password">Wachtwoord</Label>
                 <Link
                   href="/forgot-password"
-                  className="text-sm text-[#0062EB] hover:underline"
+                  className="text-sm text-[var(--brand-primary)] hover:underline"
                 >
                   Wachtwoord vergeten?
                 </Link>
@@ -95,7 +95,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
+              className="w-full bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-dark)]"
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -138,7 +138,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Nog geen account?{" "}
-            <Link href="/register" className="text-[#0062EB] hover:underline">
+            <Link href="/register" className="text-[var(--brand-primary)] hover:underline">
               Registreren
             </Link>
           </p>

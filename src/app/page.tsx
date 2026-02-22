@@ -1,9 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  FileText,
   Brain,
   Languages,
   MessageSquare,
@@ -103,12 +103,13 @@ export default function LandingPage() {
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0062EB]">
-              <FileText className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-xl font-bold">
-              doc1<span className="text-[#0062EB]">.ai</span>
-            </span>
+            <Image
+              src="/logo_DOC1_dark.svg"
+              alt="doc1.ai"
+              width={120}
+              height={45}
+              priority
+            />
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
             <a href="#features" className="text-sm text-muted-foreground hover:text-gray-900">
@@ -319,12 +320,12 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-[#0062EB]">
-                <FileText className="h-3 w-3 text-white" />
-              </div>
-              <span className="font-bold">
-                doc1<span className="text-[#0062EB]">.ai</span>
-              </span>
+              <Image
+                src="/logo_DOC1_dark.svg"
+                alt="doc1.ai"
+                width={90}
+                height={34}
+              />
             </div>
             <p className="text-sm text-muted-foreground">
               Een product van{" "}

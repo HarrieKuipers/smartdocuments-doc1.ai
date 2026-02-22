@@ -30,6 +30,7 @@ interface RecentDocument {
   status: string;
   createdAt: string;
   analytics: { totalViews: number };
+  coverImageUrl?: string;
 }
 
 export default function DashboardPage() {
@@ -255,8 +256,21 @@ export default function DashboardPage() {
                 key={doc._id}
                 href={`/dashboard/documents/${doc._id}/edit`}
               >
-                <Card className="cursor-pointer transition-shadow hover:shadow-md">
-                  <CardContent className="p-6">
+                <Card className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md">
+                  {doc.coverImageUrl ? (
+                    <div className="aspect-[1200/630] w-full overflow-hidden bg-gray-100">
+                      <img
+                        src={doc.coverImageUrl}
+                        alt={doc.title}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex aspect-[1200/630] w-full items-center justify-center bg-gray-50">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  )}
+                  <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between">
                       <h3 className="font-medium line-clamp-1">
                         {doc.title}

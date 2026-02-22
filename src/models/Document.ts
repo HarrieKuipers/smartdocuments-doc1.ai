@@ -36,6 +36,7 @@ export interface IDocument extends MongoDocument {
     type: "public" | "link-only" | "password";
     password?: string;
   };
+  template?: "doc1" | "rijksoverheid" | "amsterdam";
   brandOverride?: {
     primary?: string;
     logo?: string;
@@ -53,6 +54,7 @@ export interface IDocument extends MongoDocument {
     averageReadTime: number;
     chatInteractions: number;
   };
+  coverImageUrl?: string;
   publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -124,6 +126,11 @@ const DocumentSchema = new Schema<IDocument>(
       },
       password: { type: String },
     },
+    template: {
+      type: String,
+      enum: ["doc1", "rijksoverheid", "amsterdam"],
+      default: "doc1",
+    },
     brandOverride: {
       primary: { type: String },
       logo: { type: String },
@@ -145,6 +152,7 @@ const DocumentSchema = new Schema<IDocument>(
       averageReadTime: { type: Number, default: 0 },
       chatInteractions: { type: Number, default: 0 },
     },
+    coverImageUrl: { type: String },
     publishedAt: { type: Date },
   },
   { timestamps: true }

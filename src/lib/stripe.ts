@@ -46,10 +46,11 @@ export const PLANS = {
       "25 documenten",
       "AI Chat",
       "B1, B2, C1 taalniveaus",
-      "Alle huisstijlen + custom",
+      "Alle sjablonen + custom huisstijl",
       "Collecties",
       "Volledige analytics",
       "Wachtwoordbeveiliging",
+      "Content bewerken",
     ],
   },
   enterprise: {

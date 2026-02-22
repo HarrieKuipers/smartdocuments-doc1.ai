@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +38,7 @@ interface Document {
   createdAt: string;
   analytics: { totalViews: number };
   shortId: string;
+  coverImageUrl?: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -118,7 +119,7 @@ export default function DocumentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -129,7 +130,7 @@ export default function DocumentsPage() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -154,26 +155,58 @@ export default function DocumentsPage() {
           <p className="text-muted-foreground">Geen documenten gevonden.</p>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white">
+        <div className="rounded-lg border bg-white overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Titel</TableHead>
-                <TableHead>Auteur</TableHead>
-                <TableHead>Datum</TableHead>
+                <TableHead className="min-w-[200px]">Titel</TableHead>
+                <TableHead className="hidden sm:table-cell">Auteur</TableHead>
+                <TableHead className="hidden md:table-cell">Datum</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Views</TableHead>
+                <TableHead className="hidden sm:table-cell">Views</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {docs.map((doc) => (
                 <TableRow key={doc._id}>
-                  <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="font-medium max-w-[300px]">
+                    <div className="flex items-center gap-3">
+                      {doc.coverImageUrl ? (
+                        <img
+                          src={doc.coverImageUrl}
+                          alt=""
+                          className="hidden sm:block h-8 w-12 flex-shrink-0 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="hidden sm:flex h-8 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-100">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="truncate">
+                          {doc.status === "ready" ? (
+                            <Link
+                              href={`/d/${doc.shortId}`}
+                              className="hover:underline"
+                              style={{ color: "#0062EB" }}
+                            >
+                              {doc.title}
+                            </Link>
+                          ) : (
+                            doc.title
+                          )}
+                        </div>
+                        <div className="sm:hidden text-xs text-muted-foreground mt-1">
+                          {doc.authors?.[0] || "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
                     {doc.authors?.[0] || "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground hidden md:table-cell whitespace-nowrap">
                     {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
                   </TableCell>
                   <TableCell>
@@ -181,7 +214,7 @@ export default function DocumentsPage() {
                       {statusLabels[doc.status] || doc.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{doc.analytics?.totalViews || 0}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{doc.analytics?.totalViews || 0}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

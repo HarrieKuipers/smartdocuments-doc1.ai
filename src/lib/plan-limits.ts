@@ -21,6 +21,15 @@ export function canUseCustomBrand(plan: PlanType): boolean {
   return plan !== "free";
 }
 
+export function canUseTemplate(plan: PlanType, templateId: string): boolean {
+  if (templateId === "doc1") return true;
+  return plan !== "free";
+}
+
+export function canEditContent(plan: PlanType): boolean {
+  return plan !== "free";
+}
+
 export function getMaxTeamMembers(plan: PlanType): number {
   return PLANS[plan].maxTeamMembers;
 }
