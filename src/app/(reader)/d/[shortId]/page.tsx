@@ -46,6 +46,7 @@ interface ReaderDocument {
   };
   template?: string;
   chatMode?: "full" | "terms-only";
+  languageLevel?: "B1" | "B2" | "C1";
   coverImageUrl?: string;
   brandOverride?: { primary?: string };
   organization: {
@@ -63,7 +64,6 @@ export default function ReaderPage() {
   const [doc, setDoc] = useState<ReaderDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsPassword, setNeedsPassword] = useState(false);
-  const [languageLevel, setLanguageLevel] = useState<LanguageLevel>("original");
   const [error, setError] = useState("");
   const [isOwner, setIsOwner] = useState(false);
   const chatRef = useRef<ChatWidgetRef>(null);
@@ -211,6 +211,8 @@ export default function ReaderPage() {
   const brandPrimary = doc.brandOverride?.primary || template.primary;
   const primaryLight = template.primaryLight;
 
+  const languageLevel: LanguageLevel = doc.languageLevel || "original";
+
   const currentSummary =
     languageLevel === "original"
       ? doc.content.summary.original
@@ -356,49 +358,18 @@ export default function ReaderPage() {
                 </Button>
               </div>
 
-              {/* Language Level Card */}
+              {/* Language Level Card (read-only) */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">
                   Taalniveau
                 </p>
 
-                {/* B1 language button (template-specific) */}
-                {template.showB1Button && (
-                  <button
-                    onClick={() => setLanguageLevel("B1")}
-                    className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white transition-all ${
-                      languageLevel === "B1"
-                        ? "bg-emerald-600"
-                        : "bg-emerald-500 hover:bg-emerald-600"
-                    }`}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    B1 Taalniveau
-                  </button>
-                )}
-
-                <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-50 p-1">
-                  {(["original", "B1", "B2", "C1"] as const).map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => {
-                        setLanguageLevel(level);
-                        if (level !== languageLevel) analytics.trackLanguageSwitch();
-                      }}
-                      className={`rounded-lg px-2 py-2 text-xs font-medium transition-all ${
-                        languageLevel === level
-                          ? "text-white shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                      style={
-                        languageLevel === level
-                          ? { backgroundColor: brandPrimary }
-                          : undefined
-                      }
-                    >
-                      {level === "original" ? "Orig." : level}
-                    </button>
-                  ))}
+                <div
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white"
+                  style={{ backgroundColor: brandPrimary }}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {languageLevel === "original" ? "Origineel" : `${languageLevel} Taalniveau`}
                 </div>
               </div>
             </div>

@@ -25,11 +25,19 @@ export async function POST(
 
     // Get document for context
     const doc = await DocumentModel.findById(id)
-      .select("title content.originalText content.summary.original")
+      .select("title chatMode content.originalText content.summary.original")
       .lean();
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
+    }
+
+    // Block AI chat requests for terms-only documents
+    if (doc.chatMode === "terms-only") {
+      return NextResponse.json(
+        { error: "Dit document heeft alleen voorgedefinieerde begrippen." },
+        { status: 403 }
+      );
     }
 
     // Build context - use summary + first chunk of original text

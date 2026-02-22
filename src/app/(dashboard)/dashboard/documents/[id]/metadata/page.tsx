@@ -27,6 +27,7 @@ interface DocumentData {
   version?: string;
   tags: string[];
   description?: string;
+  languageLevel?: string;
   sourceFile: { filename: string };
 }
 
@@ -66,6 +67,7 @@ export default function MetadataPage() {
         setVersion(data.version || "");
         setTags(data.tags || []);
         setDescription(data.description || "");
+        setLanguageLevel(data.languageLevel || "B1");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -110,6 +112,7 @@ export default function MetadataPage() {
           version: version || undefined,
           tags,
           description,
+          languageLevel,
         }),
       });
       if (!res.ok) throw new Error();
