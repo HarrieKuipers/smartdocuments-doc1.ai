@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, Wand2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -230,12 +230,20 @@ export default function DocumentsPage() {
                           </Link>
                         </DropdownMenuItem>
                         {doc.status === "ready" && (
-                          <DropdownMenuItem asChild>
-                            <Link href={`/d/${doc.shortId}`} target="_blank">
-                              <Eye className="mr-2 h-4 w-4" />
-                              Bekijken
-                            </Link>
-                          </DropdownMenuItem>
+                          <>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/d/${doc.shortId}`} target="_blank">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Bekijken
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/documents/${doc._id}/rewrite`}>
+                                <Wand2 className="mr-2 h-4 w-4" />
+                                Herschrijven
+                              </Link>
+                            </DropdownMenuItem>
+                          </>
                         )}
                         <DropdownMenuItem
                           onClick={() => handleDelete(doc._id)}

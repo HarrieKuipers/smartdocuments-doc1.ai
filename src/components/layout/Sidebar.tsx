@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
+  Wand2,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 

@@ -36,6 +36,7 @@ import {
   Plus,
   Settings,
   Trash2,
+  Wand2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -336,6 +337,16 @@ export default function DocumentEditPage() {
             ) : null}
             {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Niet opgeslagen"}
           </span>
+          {doc.status === "ready" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/dashboard/documents/${params.id}/rewrite`)}
+            >
+              <Wand2 className="mr-1 h-4 w-4" />
+              Herschrijven
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
