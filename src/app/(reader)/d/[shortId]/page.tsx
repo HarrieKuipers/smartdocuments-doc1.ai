@@ -24,6 +24,7 @@ import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader
 import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
+import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 
 interface ReaderDocument {
   _id: string;
@@ -65,17 +66,20 @@ export default function ReaderPage() {
   const [error, setError] = useState("");
   const [isOwner, setIsOwner] = useState(false);
   const chatRef = useRef<ChatWidgetRef>(null);
+  const analytics = useDocumentAnalytics(doc?._id || "");
 
   const handleTermClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.hasAttribute("data-term")) {
       e.preventDefault();
       const term = target.getAttribute("data-term") || target.textContent;
+      const definition = target.getAttribute("title") || "";
+      analytics.trackTermClick(term || "", definition);
       chatRef.current?.askQuestion(
         `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
       );
     }
-  }, []);
+  }, [analytics]);
 
   async function fetchDocument(password?: string) {
     try {
@@ -131,9 +135,48 @@ export default function ReaderPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA]">
-        <div className="mx-auto max-w-[1400px] p-8">
-          <Skeleton className="mb-6 h-16 w-full" />
-          <Skeleton className="h-96 w-full" />
+        {/* Header skeleton */}
+        <div className="sticky top-0 z-50 border-b bg-white shadow-sm">
+          <div className="mx-auto flex max-w-[1400px] items-center px-6 py-4">
+            <Skeleton className="h-7 w-64" />
+          </div>
+        </div>
+        <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+            {/* Sidebar skeleton */}
+            <aside className="order-2 lg:order-1">
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <Skeleton className="mb-5 w-full rounded-lg" style={{ aspectRatio: "210/297" }} />
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <Skeleton className="mt-4 h-10 w-full rounded-md" />
+              </div>
+            </aside>
+            {/* Content skeleton */}
+            <main className="order-1 space-y-6 lg:order-2">
+              <div className="rounded-xl bg-white p-8 shadow-sm">
+                <Skeleton className="mb-4 h-8 w-48" />
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-5/6" />
+                </div>
+              </div>
+              <div className="rounded-xl bg-white p-8 shadow-sm">
+                <Skeleton className="mb-4 h-8 w-40" />
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                </div>
+              </div>
+            </main>
+          </div>
         </div>
       </div>
     );
@@ -167,17 +210,29 @@ export default function ReaderPage() {
 
   function highlightTerms(text: string) {
     if (!doc?.content.terms?.length) return text;
-    let result = text;
-    doc.content.terms.forEach((t) => {
+
+    // Build a lookup map and a single combined regex to avoid sequential replacement issues
+    const termMap = new Map<string, { term: string; definition: string }>();
+    const escapedTerms: string[] = [];
+
+    // Sort by length descending so longer terms match first (e.g. "arbeidsovereenkomst" before "arbeid")
+    const sorted = [...doc.content.terms].sort((a, b) => b.term.length - a.term.length);
+
+    for (const t of sorted) {
       const escaped = t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const escapedDef = t.definition.replace(/"/g, '&quot;');
-      const regex = new RegExp(`\\b(${escaped})\\b`, "gi");
-      result = result.replace(
-        regex,
-        `<span class="cursor-pointer border-b border-dotted hover:opacity-80 transition-opacity" style="border-color: ${brandPrimary}; color: ${brandPrimary}" data-term="${escaped}" title="${escapedDef}">$1</span>`
-      );
+      termMap.set(t.term.toLowerCase(), t);
+      escapedTerms.push(escaped);
+    }
+
+    if (escapedTerms.length === 0) return text;
+
+    const regex = new RegExp(`\\b(${escapedTerms.join("|")})\\b`, "gi");
+    return text.replace(regex, (match) => {
+      const entry = termMap.get(match.toLowerCase());
+      if (!entry) return match;
+      const escapedDef = entry.definition.replace(/"/g, '&quot;');
+      return `<span class="cursor-pointer border-b border-dotted hover:opacity-80 transition-opacity" style="border-color: ${brandPrimary}; color: ${brandPrimary}" data-term="${entry.term}" title="${escapedDef}">${match}</span>`;
     });
-    return result;
   }
 
   return (
@@ -199,57 +254,74 @@ export default function ReaderPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
           {/* Sidebar */}
           <aside className="order-2 lg:order-1">
-            <div className="sticky top-[80px] rounded-xl bg-white p-6 shadow-sm">
-              {/* Cover Image (A4 aspect ratio like reference) */}
-              {doc.coverImageUrl && (
-                <div
-                  className="mb-5 overflow-hidden rounded-lg shadow-md"
-                  style={{ aspectRatio: "210/297" }}
-                >
-                  <img
-                    src={doc.coverImageUrl}
-                    alt={doc.title}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              )}
+            <div className="sticky top-[80px] space-y-4">
+              {/* Cover + Metadata Card */}
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                {/* Cover Image */}
+                {doc.coverImageUrl && (
+                  <div
+                    className="mb-5 overflow-hidden rounded-xl"
+                    style={{ aspectRatio: "210/297" }}
+                  >
+                    <img
+                      src={doc.coverImageUrl}
+                      alt={doc.title}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
 
-              {/* Metadata */}
-              <div className="space-y-2 text-sm text-gray-600">
-                {doc.authors?.[0] && (
-                  <div>
-                    <strong className="inline-flex items-center gap-1 text-xs">
-                      <User className="h-3.5 w-3.5" /> Auteur:
-                    </strong>{" "}
-                    {doc.authors.join(", ")}
-                  </div>
-                )}
-                {doc.publicationDate && (
-                  <div>
-                    <strong className="inline-flex items-center gap-1 text-xs">
-                      <Calendar className="h-3.5 w-3.5" /> Datum:
-                    </strong>{" "}
-                    {new Date(doc.publicationDate).toLocaleDateString("nl-NL")}
-                  </div>
-                )}
-                {doc.version && (
-                  <div>
-                    <strong className="inline-flex items-center gap-1 text-xs">
-                      <Hash className="h-3.5 w-3.5" /> Versie:
-                    </strong>{" "}
-                    {doc.version}
-                  </div>
-                )}
-                {doc.pageCount && (
-                  <div>
-                    <strong className="inline-flex items-center gap-1 text-xs">
-                      <FileText className="h-3.5 w-3.5" /> Pagina&apos;s:
-                    </strong>{" "}
-                    {doc.pageCount}
-                  </div>
-                )}
+                {/* Metadata */}
+                <div className="space-y-3">
+                  {doc.authors?.[0] && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
+                        <User className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Auteur</p>
+                        <p className="text-sm text-gray-700">{doc.authors.join(", ")}</p>
+                      </div>
+                    </div>
+                  )}
+                  {doc.publicationDate && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Datum</p>
+                        <p className="text-sm text-gray-700">{new Date(doc.publicationDate).toLocaleDateString("nl-NL")}</p>
+                      </div>
+                    </div>
+                  )}
+                  {doc.version && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
+                        <Hash className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Versie</p>
+                        <p className="text-sm text-gray-700">{doc.version}</p>
+                      </div>
+                    </div>
+                  )}
+                  {doc.pageCount && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
+                        <FileText className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Pagina&apos;s</p>
+                        <p className="text-sm text-gray-700">{doc.pageCount}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tags */}
                 {doc.tags?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-2">
+                  <div className="mt-4 flex flex-wrap gap-1.5 border-t border-gray-100 pt-4">
                     {doc.tags.map((tag, i) => (
                       <span
                         key={i}
@@ -261,47 +333,54 @@ export default function ReaderPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Download Button */}
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full rounded-xl"
+                  onClick={() => {
+                    analytics.trackDownload();
+                    window.open(doc.sourceFile.url, "_blank");
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
               </div>
 
-              {/* Download Button */}
-              <Button
-                variant="outline"
-                className="mt-4 w-full"
-                onClick={() => window.open(doc.sourceFile.url, "_blank")}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </Button>
-
-              {/* B1 language button (template-specific) */}
-              {template.showB1Button && (
-                <button
-                  onClick={() => setLanguageLevel("B1")}
-                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all ${
-                    languageLevel === "B1"
-                      ? "bg-emerald-600"
-                      : "bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5"
-                  }`}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  B1 Taalniveau
-                </button>
-              )}
-
-              {/* Language level switcher */}
-              <div className="mt-4 space-y-2">
-                <p className="text-xs font-medium uppercase text-gray-500">
+              {/* Language Level Card */}
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">
                   Taalniveau
                 </p>
-                <div className="grid grid-cols-2 gap-1">
+
+                {/* B1 language button (template-specific) */}
+                {template.showB1Button && (
+                  <button
+                    onClick={() => setLanguageLevel("B1")}
+                    className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white transition-all ${
+                      languageLevel === "B1"
+                        ? "bg-emerald-600"
+                        : "bg-emerald-500 hover:bg-emerald-600"
+                    }`}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    B1 Taalniveau
+                  </button>
+                )}
+
+                <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-50 p-1">
                   {(["original", "B1", "B2", "C1"] as const).map((level) => (
                     <button
                       key={level}
-                      onClick={() => setLanguageLevel(level)}
-                      className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                      onClick={() => {
+                        setLanguageLevel(level);
+                        if (level !== languageLevel) analytics.trackLanguageSwitch();
+                      }}
+                      className={`rounded-lg px-2 py-2 text-xs font-medium transition-all ${
                         languageLevel === level
-                          ? "text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          ? "text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
                       }`}
                       style={
                         languageLevel === level
@@ -309,7 +388,7 @@ export default function ReaderPage() {
                           : undefined
                       }
                     >
-                      {level === "original" ? "Origineel" : level}
+                      {level === "original" ? "Orig." : level}
                     </button>
                   ))}
                 </div>
@@ -342,36 +421,36 @@ export default function ReaderPage() {
             {/* Key Points */}
             {doc.content.keyPoints?.length > 0 && (
               <section id="hoofdpunten" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                   <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
                   Hoofdpunten
                 </h2>
-                <ul className="space-y-3" onClick={handleTermClick}>
+                <div className="space-y-3" onClick={handleTermClick}>
                   {doc.content.keyPoints.map((kp, i) => (
-                    <li
+                    <div
                       key={i}
-                      className="relative rounded-lg bg-gray-50 py-3 pl-14 pr-4"
+                      className="flex gap-4 rounded-2xl border border-gray-100 bg-white p-5 transition-all hover:border-gray-200 hover:shadow-md"
                     >
                       <span
-                        className="absolute left-5 top-1/2 -translate-y-1/2 text-lg font-bold"
-                        style={{ color: brandPrimary }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                        style={{ backgroundColor: brandPrimary }}
                       >
-                        ✓
+                        {i + 1}
                       </span>
                       <span
-                        className="text-sm leading-relaxed"
+                        className="text-sm leading-relaxed text-gray-700 pt-1"
                         dangerouslySetInnerHTML={{ __html: highlightTerms(kp.text) }}
                       />
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </section>
             )}
 
             {/* Findings */}
             {doc.content.findings?.length > 0 && (
               <section id="bevindingen" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
-                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                   <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
                   Belangrijke Bevindingen
                 </h2>
@@ -379,20 +458,18 @@ export default function ReaderPage() {
                   {doc.content.findings.map((f, i) => (
                     <div
                       key={i}
-                      className="rounded-xl p-5"
-                      style={{
-                        background: `linear-gradient(135deg, ${primaryLight}, white)`,
-                        borderLeft: `4px solid ${brandPrimary}`,
-                      }}
+                      className="group rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:border-gray-200 hover:shadow-md"
                     >
-                      <h4
-                        className="mb-2 text-sm font-semibold"
-                        style={{ color: brandPrimary }}
+                      <span
+                        className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-medium"
+                        style={{ backgroundColor: primaryLight, color: brandPrimary }}
                       >
                         {f.category}
-                      </h4>
-                      <h3 className="mb-1 font-medium text-gray-900">{f.title}</h3>
-                      <p className="text-sm leading-relaxed text-gray-600">
+                      </span>
+                      <h3 className="mb-2 text-base font-semibold text-gray-900 leading-snug">
+                        {f.title}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-gray-500">
                         {f.content}
                       </p>
                     </div>

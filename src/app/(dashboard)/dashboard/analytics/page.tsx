@@ -1,179 +1,228 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Clock, Download, BarChart3, MessageSquare } from "lucide-react";
+import { Eye, Users, Clock, MessageSquare, Download } from "lucide-react";
+import KPICard from "@/components/analytics/cards/KPICard";
+import PeriodSelector from "@/components/analytics/filters/PeriodSelector";
+import TimeSeriesChart from "@/components/analytics/charts/TimeSeriesChart";
+import DonutChart from "@/components/analytics/charts/DonutChart";
+import DocumentsTable from "@/components/analytics/tables/DocumentsTable";
+import { CHART_COLORS, type Period } from "@/lib/analytics/constants";
+import { formatDuration } from "@/lib/analytics/helpers";
 
-interface AnalyticsData {
-  totalViews: number;
-  averageReadTime: number;
-  totalDownloads: number;
-  chatInteractions: number;
+interface OverviewData {
+  overview: {
+    totalViews: number;
+    viewsTrend: number;
+    uniqueVisitors: number;
+    visitorsTrend: number;
+    avgReadTime: number;
+    readTimeTrend: number;
+    totalChatMessages: number;
+    chatTrend: number;
+    totalDownloads: number;
+    downloadsTrend: number;
+  };
+  timeseries: { date: string; views: number; uniqueVisitors: number }[];
   topDocuments: {
+    documentId: string;
     title: string;
+    shortId: string;
     views: number;
+    uniqueVisitors: number;
+  }[];
+  deviceBreakdown: { desktop: number; mobile: number; tablet: number };
+  documents: {
+    _id: string;
+    title: string;
+    shortId: string;
+    views: number;
+    uniqueVisitors: number;
+    downloads: number;
+    chatMessages: number;
+    avgReadTime: number;
   }[];
 }
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>("30d");
 
-  useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        const res = await fetch("/api/documents?limit=100");
-        if (res.ok) {
-          const result = await res.json();
-          const docs = result.data || [];
-
-          const analytics: AnalyticsData = {
-            totalViews: docs.reduce(
-              (acc: number, d: { analytics?: { totalViews?: number } }) =>
-                acc + (d.analytics?.totalViews || 0),
-              0
-            ),
-            averageReadTime: 0,
-            totalDownloads: docs.reduce(
-              (acc: number, d: { analytics?: { totalDownloads?: number } }) =>
-                acc + (d.analytics?.totalDownloads || 0),
-              0
-            ),
-            chatInteractions: docs.reduce(
-              (acc: number, d: { analytics?: { chatInteractions?: number } }) =>
-                acc + (d.analytics?.chatInteractions || 0),
-              0
-            ),
-            topDocuments: docs
-              .sort(
-                (a: { analytics?: { totalViews?: number } }, b: { analytics?: { totalViews?: number } }) =>
-                  (b.analytics?.totalViews || 0) - (a.analytics?.totalViews || 0)
-              )
-              .slice(0, 5)
-              .map((d: { title: string; analytics?: { totalViews?: number } }) => ({
-                title: d.title,
-                views: d.analytics?.totalViews || 0,
-              })),
-          };
-          setData(analytics);
-        }
-      } catch {
-        // silently fail
-      } finally {
-        setLoading(false);
+  const fetchAnalytics = useCallback(async (p: Period) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/analytics/overview?period=${p}`);
+      if (res.ok) {
+        const result = await res.json();
+        setData(result);
       }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
     }
-    fetchAnalytics();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    fetchAnalytics(period);
+  }, [period, fetchAnalytics]);
+
+  function handlePeriodChange(p: Period) {
+    setPeriod(p);
+  }
+
+  if (loading && !data) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-64" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
+            <Skeleton key={i} className="h-28" />
           ))}
         </div>
+        <Skeleton className="h-80" />
       </div>
     );
   }
 
+  const overview = data?.overview;
+  const deviceData = data?.deviceBreakdown
+    ? [
+        {
+          name: "Desktop",
+          value: data.deviceBreakdown.desktop,
+          color: CHART_COLORS.devices.desktop,
+        },
+        {
+          name: "Mobile",
+          value: data.deviceBreakdown.mobile,
+          color: CHART_COLORS.devices.mobile,
+        },
+        {
+          name: "Tablet",
+          value: data.deviceBreakdown.tablet,
+          color: CHART_COLORS.devices.tablet,
+        },
+      ]
+    : [];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground">
-          Inzicht in het gebruik van je documenten
-        </p>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            Inzicht in het gebruik van je documenten
+          </p>
+        </div>
+        <PeriodSelector value={period} onChange={handlePeriodChange} />
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Totaal Views
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <KPICard
+          title="Views"
+          value={overview?.totalViews || 0}
+          trend={overview?.viewsTrend}
+          icon={Eye}
+          subtitle="vs vorige periode"
+        />
+        <KPICard
+          title="Unieke Bezoekers"
+          value={overview?.uniqueVisitors || 0}
+          trend={overview?.visitorsTrend}
+          icon={Users}
+          subtitle="vs vorige periode"
+        />
+        <KPICard
+          title="Gem. Leestijd"
+          value={formatDuration(overview?.avgReadTime || 0)}
+          trend={overview?.readTimeTrend}
+          icon={Clock}
+          subtitle="vs vorige periode"
+        />
+        <KPICard
+          title="AI Chat Vragen"
+          value={overview?.totalChatMessages || 0}
+          trend={overview?.chatTrend}
+          icon={MessageSquare}
+          subtitle="vs vorige periode"
+        />
+        <KPICard
+          title="Downloads"
+          value={overview?.totalDownloads || 0}
+          trend={overview?.downloadsTrend}
+          icon={Download}
+          subtitle="vs vorige periode"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Views Over Time */}
+        <Card className="border-0 shadow-sm lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">
+              Views & Bezoekers Over Tijd
             </CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{data?.totalViews || 0}</p>
+            {data?.timeseries && data.timeseries.length > 0 ? (
+              <TimeSeriesChart
+                data={data.timeseries}
+                series={[
+                  { key: "views", label: "Views", color: CHART_COLORS.primary },
+                  {
+                    key: "uniqueVisitors",
+                    label: "Unieke Bezoekers",
+                    color: CHART_COLORS.secondary,
+                  },
+                ]}
+                height={300}
+              />
+            ) : (
+              <div className="flex h-[300px] items-center justify-center text-sm text-gray-400">
+                Nog geen data beschikbaar
+              </div>
+            )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Gem. Leestijd
+
+        {/* Device Breakdown */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">
+              Apparaten
             </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {data?.averageReadTime || 0}s
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Totaal Downloads
-            </CardTitle>
-            <Download className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{data?.totalDownloads || 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              AI Interacties
-            </CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {data?.chatInteractions || 0}
-            </p>
+            {deviceData.some((d) => d.value > 0) ? (
+              <DonutChart data={deviceData} height={180} />
+            ) : (
+              <div className="flex h-[180px] items-center justify-center text-sm text-gray-400">
+                Nog geen data beschikbaar
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Documents */}
-      <Card>
+      {/* Documents Table */}
+      <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Top Documenten
+          <CardTitle className="text-base font-semibold">
+            Documenten
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {data?.topDocuments?.length ? (
-            <div className="space-y-3">
-              {data.topDocuments.map((doc, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0062EB]/10 text-xs font-medium text-[#0062EB]">
-                      {i + 1}
-                    </span>
-                    <span className="text-sm font-medium">{doc.title}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {doc.views} views
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nog geen data beschikbaar.
-            </p>
-          )}
+          <DocumentsTable documents={data?.documents || []} />
         </CardContent>
       </Card>
     </div>

@@ -16,9 +16,11 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.11.0",
     "mongoose": "^9.2.1",
+    "mupdf": "^1.27.0",
     "nanoid": "^3.3.11",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
@@ -31,7 +33,9 @@
     "resend": "^6.9.2",
     "sonner": "^2.0.7",
     "stripe": "^20.3.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "ua-parser-js": "^2.0.9",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -40,6 +44,8 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ua-parser-js": "^0.7.39",
+    "@types/uuid": "^10.0.0",
     "eslint": "^10.0.1",
     "eslint-config-next": "^0.2.4",
     "shadcn": "^3.8.5",

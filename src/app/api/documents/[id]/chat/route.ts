@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import ChatMessage from "@/models/ChatMessage";
+import ChatQuestion from "@/models/ChatQuestion";
 import anthropic, { MODELS } from "@/lib/ai/client";
 import { nanoid } from "nanoid";
 
@@ -44,6 +45,7 @@ export async function POST(
       })
     );
 
+    const chatStartTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODELS.chat,
       max_tokens: 1024,
@@ -88,6 +90,17 @@ ${docContext}`,
     await DocumentModel.findByIdAndUpdate(id, {
       $inc: { "analytics.chatInteractions": 1 },
     });
+
+    // Log question for analytics
+    ChatQuestion.create({
+      documentId: id,
+      sessionId,
+      question: message,
+      answer: assistantResponse,
+      responseTimeMs: Date.now() - chatStartTime,
+      tokensUsed: response.usage?.output_tokens,
+      aiModel: MODELS.chat,
+    }).catch(() => {}); // fire-and-forget
 
     const res = NextResponse.json({
       data: { response: assistantResponse },
