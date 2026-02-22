@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
@@ -32,7 +33,13 @@ export async function GET(
           { status: 401 }
         );
       }
-      // TODO: bcrypt compare
+      const isValid = await bcrypt.compare(password, doc.access.password || "");
+      if (!isValid) {
+        return NextResponse.json(
+          { error: "Onjuist wachtwoord.", requiresPassword: true },
+          { status: 401 }
+        );
+      }
     }
 
     // Get organization

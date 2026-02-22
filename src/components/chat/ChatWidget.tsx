@@ -13,7 +13,7 @@ interface Message {
 interface ChatWidgetProps {
   documentId: string;
   brandPrimary?: string;
-  chatMode?: "full" | "terms-only";
+  chatMode?: "terms-only" | "terms-and-chat" | "full";
   terms?: { term: string; definition: string; occurrences: number }[];
 }
 
@@ -23,7 +23,7 @@ export interface ChatWidgetRef {
 }
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "full", terms = [] },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [] },
   ref
 ) {
   const [open, setOpen] = useState(false);
@@ -150,7 +150,11 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   {chatMode === "terms-only" ? "Begrippen" : "AI Assistent"}
                 </p>
                 <p className="text-xs opacity-80">
-                  {chatMode === "terms-only" ? "Klik op een begrip in de tekst" : "Altijd beschikbaar"}
+                  {chatMode === "terms-only"
+                    ? "Klik op een begrip in de tekst"
+                    : chatMode === "terms-and-chat"
+                      ? "Begrippen & vragen"
+                      : "Altijd beschikbaar"}
                 </p>
               </div>
             </div>
@@ -192,7 +196,47 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 )}
               </div>
             )}
-            {messages.length === 0 && chatMode !== "terms-only" && (
+            {messages.length === 0 && chatMode === "terms-and-chat" && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground text-center">
+                  Klik op een begrip of stel een vraag over het document
+                </p>
+                {terms.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Begrippen in dit document</p>
+                    {terms.slice(0, 5).map((t, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setMessages((prev) => [
+                            ...prev,
+                            { role: "user", content: `Wat betekent "${t.term}"?` },
+                            { role: "assistant", content: t.definition },
+                          ]);
+                        }}
+                        className="flex items-center gap-2 w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                        <span className="font-medium" style={{ color: brandPrimary }}>{t.term}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Of stel een vraag</p>
+                  {suggestedQuestions.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInput(q)}
+                      className="block w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.length === 0 && chatMode === "full" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
                   Stel een vraag over het document
@@ -201,9 +245,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   {suggestedQuestions.map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => {
-                        setInput(q);
-                      }}
+                      onClick={() => setInput(q)}
                       className="block w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
                     >
                       {q}
@@ -246,7 +288,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
           </div>
 
           {/* Input - hidden in terms-only mode */}
-          {chatMode === "full" ? (
+          {chatMode !== "terms-only" ? (
             <form onSubmit={sendMessage} className="border-t p-3">
               <div className="flex gap-2">
                 <Input

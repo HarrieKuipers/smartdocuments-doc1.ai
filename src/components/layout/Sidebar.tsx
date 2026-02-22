@@ -12,8 +12,9 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 const navItems = [
   {
@@ -50,6 +51,8 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.isSuperAdmin;
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
@@ -88,6 +91,25 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin link for superadmins */}
+        {isSuperAdmin && (
+          <>
+            <div className="my-2 border-t border-gray-200" />
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                pathname.startsWith("/admin")
+                  ? "bg-[#0062EB]/10 text-[#0062EB]"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              )}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Admin
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* Logout */}

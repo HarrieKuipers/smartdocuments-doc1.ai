@@ -45,7 +45,7 @@ interface ReaderDocument {
     terms: { term: string; definition: string; occurrences: number }[];
   };
   template?: string;
-  chatMode?: "full" | "terms-only";
+  chatMode?: "terms-only" | "terms-and-chat" | "full";
   languageLevel?: "B1" | "B2" | "C1";
   coverImageUrl?: string;
   brandOverride?: { primary?: string };
@@ -77,14 +77,14 @@ export default function ReaderPage() {
       const definition = target.getAttribute("title") || "";
       analytics.trackTermClick(term, definition);
 
-      if (doc?.chatMode === "terms-only") {
-        // Show predefined definition directly - no AI call
-        chatRef.current?.showTermDefinition(term, definition);
-      } else {
-        // Full mode: ask AI for contextual explanation
+      if (doc?.chatMode === "full") {
+        // Full AI mode: ask AI for contextual explanation
         chatRef.current?.askQuestion(
           `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
         );
+      } else {
+        // terms-only and terms-and-chat: show predefined definition directly - no AI call
+        chatRef.current?.showTermDefinition(term, definition);
       }
     }
   }, [analytics, doc?.chatMode]);
@@ -477,7 +477,7 @@ export default function ReaderPage() {
         ref={chatRef}
         documentId={doc._id}
         brandPrimary={brandPrimary}
-        chatMode={doc.chatMode || "full"}
+        chatMode={doc.chatMode || "terms-only"}
         terms={doc.content.terms}
       />
     </div>

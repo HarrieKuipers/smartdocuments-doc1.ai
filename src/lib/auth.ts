@@ -94,6 +94,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.isSuperAdmin = dbUser.isSuperAdmin || false;
           token.picture = dbUser.image || null;
         }
+      } else if (token.userId) {
+        // Refresh isSuperAdmin from DB on every token refresh
+        await connectDB();
+        const dbUser = await User.findOne({ _id: token.userId }).select("isSuperAdmin").lean();
+        if (dbUser) {
+          token.isSuperAdmin = dbUser.isSuperAdmin || false;
+        }
       }
       return token;
     },

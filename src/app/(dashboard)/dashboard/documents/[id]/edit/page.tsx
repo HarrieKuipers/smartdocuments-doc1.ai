@@ -59,7 +59,7 @@ interface DocumentData {
     terms: { term: string; definition: string; occurrences: number }[];
   };
   template?: string;
-  chatMode?: "full" | "terms-only";
+  chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: { primary?: string };
 }
 
@@ -156,9 +156,10 @@ export default function DocumentEditPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [accessType, setAccessType] = useState("public");
+  const [accessPassword, setAccessPassword] = useState("");
   const [summary, setSummary] = useState("");
   const [templateId, setTemplateId] = useState<TemplateId>("doc1");
-  const [chatMode, setChatMode] = useState<"full" | "terms-only">("full");
+  const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
   const [keyPoints, setKeyPoints] = useState<{ text: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
@@ -181,7 +182,7 @@ export default function DocumentEditPage() {
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
         setTemplateId((data.template as TemplateId) || "doc1");
-        setChatMode(data.chatMode || "full");
+        setChatMode(data.chatMode || "terms-only");
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
         setTerms(data.content?.terms || []);
@@ -205,7 +206,7 @@ export default function DocumentEditPage() {
         body: JSON.stringify({
           title,
           description,
-          access: { type: accessType },
+          access: { type: accessType, ...(accessType === "password" && accessPassword ? { password: accessPassword } : {}) },
           "content.summary.original": summary,
           "content.keyPoints": keyPoints,
           "content.findings": findings,
@@ -221,14 +222,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, description, accessType, summary, templateId, chatMode, keyPoints, findings, terms]);
+  }, [params.id, doc, title, description, accessType, accessPassword, summary, templateId, chatMode, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, description, accessType, summary, templateId, chatMode, contentVersion, saveChanges, doc]);
+  }, [title, description, accessType, accessPassword, summary, templateId, chatMode, contentVersion, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -444,6 +445,15 @@ export default function DocumentEditPage() {
                           </SelectItem>
                         </SelectContent>
                       </Select>
+                      {accessType === "password" && (
+                        <Input
+                          type="password"
+                          placeholder="Voer wachtwoord in"
+                          value={accessPassword}
+                          onChange={(e) => setAccessPassword(e.target.value)}
+                          className="mt-2"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -485,27 +495,34 @@ export default function DocumentEditPage() {
 
                     <div className="space-y-2">
                       <Label>AI Assistent modus</Label>
-                      <Select value={chatMode} onValueChange={(v: "full" | "terms-only") => setChatMode(v)}>
+                      <Select value={chatMode} onValueChange={(v: "terms-only" | "terms-and-chat" | "full") => setChatMode(v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="full">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare className="h-3 w-3" /> Volledig (vragen + begrippen)
-                            </div>
-                          </SelectItem>
                           <SelectItem value="terms-only">
                             <div className="flex items-center gap-2">
                               <BookOpen className="h-3 w-3" /> Alleen begrippen
                             </div>
                           </SelectItem>
+                          <SelectItem value="terms-and-chat">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" /> Begrippen + vragen
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="full">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" /> Volledig AI
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-[10px] text-muted-foreground">
-                        {chatMode === "full"
-                          ? "Gebruikers kunnen vragen stellen en op begrippen klikken"
-                          : "Gebruikers zien alleen voorgedefinieerde begrippen, geen vrije vragen"}
+                        {chatMode === "terms-only"
+                          ? "Gebruikers zien alleen voorgedefinieerde begrippen, geen vrije vragen"
+                          : chatMode === "terms-and-chat"
+                            ? "Begrippen uit de lijst bij klik, plus vrije vragen aan de AI"
+                            : "AI genereert antwoorden voor begrippen en vragen"}
                       </p>
                     </div>
 

@@ -52,6 +52,7 @@ export const TEMPLATES: Record<TemplateId, TemplateConfig> = {
   },
 };
 
+/** Sync fallback — returns static defaults (use in client components). */
 export function getTemplate(id: TemplateId | string | undefined): TemplateConfig {
   if (id && id in TEMPLATES) return TEMPLATES[id as TemplateId];
   return TEMPLATES.doc1;

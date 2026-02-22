@@ -32,7 +32,7 @@ export async function POST(
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }
 
-    // Block AI chat requests for terms-only documents
+    // Block AI chat requests for terms-only documents (no free questions allowed)
     if (doc.chatMode === "terms-only") {
       return NextResponse.json(
         { error: "Dit document heeft alleen voorgedefinieerde begrippen." },

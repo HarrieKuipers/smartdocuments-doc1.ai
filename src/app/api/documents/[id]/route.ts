@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { generateAndUploadCover } from "@/lib/ai/generate-cover";
+import bcrypt from "bcryptjs";
 
 export async function GET(
   req: NextRequest,
@@ -54,6 +55,11 @@ export async function PUT(
     delete updates.organizationId;
     delete updates.uploadedBy;
     delete updates.shortId;
+
+    // Hash password if access type is password
+    if (updates.access?.type === "password" && updates.access?.password) {
+      updates.access.password = await bcrypt.hash(updates.access.password, 12);
+    }
 
     const doc = await DocumentModel.findOneAndUpdate(
       { _id: id, organizationId: session.user.organizationId },
