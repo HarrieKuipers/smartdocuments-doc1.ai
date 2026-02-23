@@ -104,9 +104,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (user || trigger === "update") {
           console.log("[auth] JWT callback: initial token creation for", user?.email || token.userId);
           await connectDB();
-          const dbUser = await User.findOne({
-            ...(user?.email ? { email: user.email } : { _id: token.userId }),
-          });
+          const dbUser = await User.findOne(
+            user?.email ? { email: user.email } : { _id: token.userId as string }
+          );
           if (dbUser) {
             token.userId = dbUser._id.toString();
             token.organizationId = dbUser.organizationId?.toString();
