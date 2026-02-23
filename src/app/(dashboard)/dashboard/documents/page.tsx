@@ -21,12 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, Wand2 } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, Wand2, FolderOpen } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
@@ -39,6 +42,12 @@ interface Document {
   analytics: { totalViews: number };
   shortId: string;
   coverImageUrl?: string;
+  collectionId?: string;
+}
+
+interface Collection {
+  _id: string;
+  name: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -60,6 +69,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [collections, setCollections] = useState<Collection[]>([]);
 
   async function fetchDocs() {
     try {
@@ -81,7 +91,35 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     fetchDocs();
+    fetchCollections();
   }, [statusFilter]);
+
+  async function fetchCollections() {
+    try {
+      const res = await fetch("/api/collections");
+      if (res.ok) {
+        const { data } = await res.json();
+        setCollections(data || []);
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  async function handleMoveToCollection(docId: string, collectionId: string | null) {
+    try {
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectionId }),
+      });
+      if (res.ok) {
+        toast.success(collectionId ? "Document verplaatst naar collectie." : "Document uit collectie verwijderd.");
+      }
+    } catch {
+      toast.error("Kon document niet verplaatsen.");
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(fetchDocs, 500);
@@ -244,6 +282,33 @@ export default function DocumentsPage() {
                               </Link>
                             </DropdownMenuItem>
                           </>
+                        )}
+                        {collections.length > 0 && (
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <FolderOpen className="mr-2 h-4 w-4" />
+                              Collectie
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {collections.map((col) => (
+                                <DropdownMenuItem
+                                  key={col._id}
+                                  onClick={() => handleMoveToCollection(doc._id, col._id)}
+                                >
+                                  {col.name}
+                                  {doc.collectionId === col._id && " ✓"}
+                                </DropdownMenuItem>
+                              ))}
+                              {doc.collectionId && (
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveToCollection(doc._id, null)}
+                                  className="text-muted-foreground"
+                                >
+                                  Uit collectie verwijderen
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         )}
                         <DropdownMenuItem
                           onClick={() => handleDelete(doc._id)}

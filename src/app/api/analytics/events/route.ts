@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import DocumentEvent, { EVENT_TYPES, EventType } from "@/models/DocumentEvent";
+import { updateActiveSession } from "@/app/api/analytics/documents/[documentId]/live/route";
 
 const MAX_EVENTS_PER_REQUEST = 100;
 
@@ -69,6 +70,16 @@ export async function POST(req: NextRequest) {
     }));
 
     await DocumentEvent.insertMany(docs, { ordered: false });
+
+    // Update live session tracker for real-time dashboard
+    for (const e of docs) {
+      const meta = e.metadata as Record<string, unknown> | undefined;
+      updateActiveSession(e.documentId as string, e.sessionId, {
+        device: (meta?.device as string) || undefined,
+        city: (meta?.city as string) || undefined,
+        sectionTitle: (meta?.sectionTitle as string) || undefined,
+      });
+    }
 
     return NextResponse.json({ received: docs.length });
   } catch (error) {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { UAParser } from "ua-parser-js";
+import { getAnalyticsConsent } from "@/components/analytics/CookieBanner";
 
 type EventType = string;
 type Metadata = Record<string, unknown>;
@@ -65,10 +66,21 @@ export function useDocumentAnalytics(documentId: string) {
   const isActive = useRef(true);
   const eventQueue = useRef<QueuedEvent[]>([]);
   const flushTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [hasConsent, setHasConsent] = useState(false);
 
-  // Initialize sessionId on mount
+  // Initialize sessionId and check consent on mount
   useEffect(() => {
     sessionId.current = getOrCreateSessionId();
+    setHasConsent(getAnalyticsConsent());
+
+    // Listen for consent changes
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "doc1_analytics_consent") {
+        setHasConsent(e.newValue === "accepted");
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const flushEvents = useCallback(async () => {
@@ -92,6 +104,9 @@ export function useDocumentAnalytics(documentId: string) {
 
   const queueEvent = useCallback(
     (eventType: EventType, metadata: Metadata = {}) => {
+      // Respect Do Not Track and cookie consent
+      if (!hasConsent && typeof navigator !== "undefined" && navigator.doNotTrack === "1") return;
+
       const { browser, os } = getBrowserInfo();
 
       eventQueue.current.push({
@@ -113,7 +128,7 @@ export function useDocumentAnalytics(documentId: string) {
         flushEvents();
       }
     },
-    [documentId, flushEvents]
+    [documentId, flushEvents, hasConsent]
   );
 
   useEffect(() => {

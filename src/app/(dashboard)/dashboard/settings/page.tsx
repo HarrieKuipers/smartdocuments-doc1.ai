@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Building2, CreditCard, Camera, Loader2, Trash2 } from "lucide-react";
+import { User, Building2, CreditCard, Camera, Loader2, Trash2, BookOpen, ChevronRight, Bell } from "lucide-react";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const { data: session, update } = useSession();
@@ -16,6 +18,27 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [weeklyDigest, setWeeklyDigest] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/user/preferences")
+      .then((r) => r.json())
+      .then((d) => setWeeklyDigest(d.weeklyDigestEnabled ?? true))
+      .catch(() => {});
+  }, []);
+
+  async function handleDigestToggle(enabled: boolean) {
+    setWeeklyDigest(enabled);
+    try {
+      await fetch("/api/user/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weeklyDigestEnabled: enabled }),
+      });
+    } catch {
+      setWeeklyDigest(!enabled);
+    }
+  }
 
   const currentImage = avatarUrl ?? session?.user?.image;
 
@@ -182,6 +205,48 @@ export default function SettingsPage() {
             <Badge variant="secondary" className="capitalize">
               {session?.user?.role || "owner"}
             </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Schrijfwijzers */}
+      <Link href="/dashboard/settings/schrijfwijzers">
+        <Card className="transition-colors hover:bg-muted/50 cursor-pointer">
+          <CardContent className="flex items-center justify-between py-5">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-5 w-5 text-[#0062EB]" />
+              <div>
+                <p className="font-medium">Schrijfwijzers</p>
+                <p className="text-sm text-muted-foreground">
+                  Beheer de schrijfwijzers voor het herschrijven van documenten.
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Bell className="h-5 w-5" />
+            Notificaties
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Wekelijkse Digest</p>
+              <p className="text-sm text-muted-foreground">
+                Ontvang elke maandag een samenvatting van je analytics per e-mail.
+              </p>
+            </div>
+            <Switch
+              checked={weeklyDigest}
+              onCheckedChange={handleDigestToggle}
+            />
           </div>
         </CardContent>
       </Card>

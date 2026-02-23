@@ -1,16 +1,51 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Users, Clock, MessageSquare, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, Users, Clock, MessageSquare, Download, GitCompareArrows, FlaskConical } from "lucide-react";
 import KPICard from "@/components/analytics/cards/KPICard";
 import PeriodSelector from "@/components/analytics/filters/PeriodSelector";
+import DateRangePicker from "@/components/analytics/filters/DateRangePicker";
 import TimeSeriesChart from "@/components/analytics/charts/TimeSeriesChart";
 import DonutChart from "@/components/analytics/charts/DonutChart";
 import DocumentsTable from "@/components/analytics/tables/DocumentsTable";
+import GranularityToggle, { type Granularity } from "@/components/analytics/filters/GranularityToggle";
 import { CHART_COLORS, type Period } from "@/lib/analytics/constants";
 import { formatDuration } from "@/lib/analytics/helpers";
+
+function groupTimeseries(
+  data: { date: string; views: number; uniqueVisitors: number }[],
+  granularity: Granularity
+) {
+  if (granularity === "day" || granularity === "hour") return data;
+
+  const grouped = new Map<string, { views: number; uniqueVisitors: number }>();
+
+  for (const d of data) {
+    const date = new Date(d.date);
+    let key: string;
+    if (granularity === "week") {
+      const day = date.getDay();
+      const monday = new Date(date);
+      monday.setDate(date.getDate() - ((day + 6) % 7));
+      key = monday.toISOString().split("T")[0];
+    } else {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+    const existing = grouped.get(key) || { views: 0, uniqueVisitors: 0 };
+    existing.views += d.views;
+    existing.uniqueVisitors += d.uniqueVisitors;
+    grouped.set(key, existing);
+  }
+
+  return Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, vals]) => ({ date, ...vals }));
+}
 
 interface OverviewData {
   overview: {
@@ -47,14 +82,25 @@ interface OverviewData {
 }
 
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("30d");
+  const [customRange, setCustomRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [granularity, setGranularity] = useState<Granularity>("day");
 
-  const fetchAnalytics = useCallback(async (p: Period) => {
+  const periodParam = customRange
+    ? `period=custom&startDate=${customRange.start}&endDate=${customRange.end}`
+    : `period=${period}`;
+
+  const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/analytics/overview?period=${p}`);
+      const res = await fetch(`/api/analytics/overview?${periodParam}`);
       if (res.ok) {
         const result = await res.json();
         setData(result);
@@ -64,14 +110,38 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [periodParam]);
 
   useEffect(() => {
-    fetchAnalytics(period);
-  }, [period, fetchAnalytics]);
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   function handlePeriodChange(p: Period) {
     setPeriod(p);
+    setCustomRange(null);
+  }
+
+  function handleCustomRange(start: string, end: string) {
+    setCustomRange({ start, end });
+    setPeriod("30d");
+  }
+
+  function toggleDocSelect(docId: string) {
+    setSelectedDocs((prev) =>
+      prev.includes(docId)
+        ? prev.filter((id) => id !== docId)
+        : prev.length < 5
+          ? [...prev, docId]
+          : prev
+    );
+  }
+
+  function handleCompare() {
+    if (selectedDocs.length >= 2) {
+      router.push(
+        `/dashboard/analytics/compare?documents=${selectedDocs.join(",")}`
+      );
+    }
   }
 
   if (loading && !data) {
@@ -116,13 +186,30 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="text-sm text-muted-foreground">
-            Inzicht in het gebruik van je documenten
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Analytics</h1>
+            <p className="text-sm text-muted-foreground">
+              Inzicht in het gebruik van je documenten
+            </p>
+          </div>
         </div>
-        <PeriodSelector value={period} onChange={handlePeriodChange} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/analytics/ab-tests")}
+          >
+            <FlaskConical className="mr-2 h-4 w-4" />
+            A/B Tests
+          </Button>
+          <DateRangePicker
+            startDate={customRange?.start}
+            endDate={customRange?.end}
+            onChange={handleCustomRange}
+          />
+          <PeriodSelector value={period} onChange={handlePeriodChange} />
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -169,16 +256,23 @@ export default function AnalyticsPage() {
         {/* Views Over Time */}
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">
-              Views & Bezoekers Over Tijd
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">
+                Views & Bezoekers Over Tijd
+              </CardTitle>
+              <GranularityToggle value={granularity} onChange={setGranularity} />
+            </div>
           </CardHeader>
           <CardContent>
             {data?.timeseries && data.timeseries.length > 0 ? (
               <TimeSeriesChart
-                data={data.timeseries}
+                data={groupTimeseries(data.timeseries, granularity)}
                 series={[
-                  { key: "views", label: "Views", color: CHART_COLORS.primary },
+                  {
+                    key: "views",
+                    label: "Views",
+                    color: CHART_COLORS.primary,
+                  },
                   {
                     key: "uniqueVisitors",
                     label: "Unieke Bezoekers",
@@ -214,15 +308,33 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Documents Table */}
+      {/* Documents Table with Compare */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            Documenten
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">
+              Documenten
+            </CardTitle>
+            {selectedDocs.length >= 2 && (
+              <Button size="sm" variant="outline" onClick={handleCompare}>
+                <GitCompareArrows className="mr-2 h-4 w-4" />
+                Vergelijk ({selectedDocs.length})
+              </Button>
+            )}
+          </div>
+          {data?.documents && data.documents.length > 1 && (
+            <p className="text-xs text-gray-400">
+              Selecteer 2-5 documenten om te vergelijken
+            </p>
+          )}
         </CardHeader>
         <CardContent>
-          <DocumentsTable documents={data?.documents || []} />
+          <DocumentsTable
+            documents={data?.documents || []}
+            selectable
+            selectedIds={selectedDocs}
+            onToggleSelect={toggleDocSelect}
+          />
         </CardContent>
       </Card>
     </div>

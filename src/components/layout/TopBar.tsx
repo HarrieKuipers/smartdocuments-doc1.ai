@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
 import { Settings, LogOut, User } from "lucide-react";
 import Link from "next/link";
+import NotificationBell from "@/components/analytics/NotificationBell";
 
 export default function TopBar() {
   const { data: session } = useSession();
@@ -29,6 +30,7 @@ export default function TopBar() {
       <div />
 
       <div className="flex items-center gap-4">
+        <NotificationBell />
         <Badge
           variant="secondary"
           className="bg-[#0062EB]/10 text-[#0062EB] capitalize"

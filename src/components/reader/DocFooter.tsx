@@ -10,15 +10,10 @@ export default function DocFooter({ brandPrimary }: DocFooterProps) {
           <span>Mogelijk gemaakt door</span>
           <a
             href="https://doc1.ai"
-            className="inline-flex items-center gap-1.5 font-medium"
-            style={{ color: brandPrimary }}
+            className="inline-flex items-center font-bold text-base hover:opacity-80 transition-opacity"
           >
-            <img
-              src="/logo_DOC1.svg"
-              alt="Doc1.ai"
-              className="h-5"
-            />
-            doc1.ai
+            <span className="text-gray-900">DOC</span>
+            <span style={{ color: brandPrimary }}>1</span>
           </a>
         </div>
         <p className="text-xs text-muted-foreground">

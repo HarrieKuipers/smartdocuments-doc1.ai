@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Collection from "@/models/Collection";
@@ -48,6 +49,20 @@ export async function PUT(
     await connectDB();
     const { id } = await params;
     const updates = await req.json();
+
+    // Hash password if setting password access
+    if (updates.access?.type === "password" && updates.access.password) {
+      updates.access.password = await bcrypt.hash(updates.access.password, 10);
+    } else if (updates.access?.type === "password" && !updates.access.password) {
+      // Keep existing password if not provided
+      const existing = await Collection.findOne({
+        _id: id,
+        organizationId: session.user.organizationId,
+      }).lean();
+      if (existing?.access?.password) {
+        updates.access.password = existing.access.password;
+      }
+    }
 
     const collection = await Collection.findOneAndUpdate(
       { _id: id, organizationId: session.user.organizationId },

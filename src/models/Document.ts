@@ -36,6 +36,8 @@ export interface IDocument extends MongoDocument {
     type: "public" | "link-only" | "password";
     password?: string;
   };
+  publicationTypes: ("smart" | "herziend")[];
+  schrijfwijzerIds: mongoose.Types.ObjectId[];
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   languageLevel?: "B1" | "B2" | "C1";
@@ -128,6 +130,11 @@ const DocumentSchema = new Schema<IDocument>(
       },
       password: { type: String },
     },
+    publicationTypes: {
+      type: [{ type: String, enum: ["smart", "herziend"] }],
+      default: ["smart"],
+    },
+    schrijfwijzerIds: [{ type: Schema.Types.ObjectId, ref: "Schrijfwijzer" }],
     template: {
       type: String,
       enum: ["doc1", "rijksoverheid", "amsterdam"],

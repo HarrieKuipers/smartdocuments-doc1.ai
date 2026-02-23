@@ -8,6 +8,10 @@ export interface ICollection extends Document {
   organizationId: mongoose.Types.ObjectId;
   coverImage?: string;
   documentCount: number;
+  access: {
+    type: "public" | "password";
+    password?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +29,14 @@ const CollectionSchema = new Schema<ICollection>(
     },
     coverImage: { type: String },
     documentCount: { type: Number, default: 0 },
+    access: {
+      type: {
+        type: String,
+        enum: ["public", "password"],
+        default: "public",
+      },
+      password: { type: String },
+    },
   },
   { timestamps: true }
 );

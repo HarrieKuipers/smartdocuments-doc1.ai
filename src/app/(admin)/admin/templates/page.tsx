@@ -21,8 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Info, Layout, Loader2, Pencil } from "lucide-react";
+import {
+  BookOpen,
+  Info,
+  Layout,
+  Loader2,
+  Pencil,
+  Upload,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+import { useRef, useCallback } from "react";
 
 interface TemplateData {
   templateId: string;
@@ -42,6 +51,56 @@ export default function AdminTemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<TemplateData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = useCallback(
+    async (file: File) => {
+      if (!editing) return;
+      setUploadingLogo(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch(
+          `/api/admin/templates/${editing.templateId}/logo`,
+          { method: "POST", body: formData }
+        );
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Upload mislukt");
+        }
+        const { logo } = await res.json();
+        setEditing((prev) => (prev ? { ...prev, logo } : null));
+        toast.success("Logo geüpload");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Logo uploaden mislukt"
+        );
+      } finally {
+        setUploadingLogo(false);
+        if (logoInputRef.current) logoInputRef.current.value = "";
+      }
+    },
+    [editing]
+  );
+
+  async function handleDeleteLogo() {
+    if (!editing) return;
+    setUploadingLogo(true);
+    try {
+      const res = await fetch(
+        `/api/admin/templates/${editing.templateId}/logo`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error();
+      setEditing((prev) => (prev ? { ...prev, logo: undefined } : null));
+      toast.success("Logo verwijderd");
+    } catch {
+      toast.error("Logo verwijderen mislukt");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/admin/templates")
@@ -227,16 +286,60 @@ export default function AdminTemplatesPage() {
                 ))}
               </div>
 
-              {/* Logo URL */}
+              {/* Logo */}
               <div className="space-y-1.5">
-                <Label>Logo URL</Label>
-                <Input
-                  value={editing.logo || ""}
-                  onChange={(e) =>
-                    setEditing({ ...editing, logo: e.target.value || undefined })
-                  }
-                  placeholder="/templates/logo.png"
+                <Label>Logo</Label>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/svg+xml,image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
                 />
+                {editing.logo ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
+                    <img
+                      src={editing.logo}
+                      alt="Logo"
+                      className="h-10 max-w-[120px] object-contain"
+                    />
+                    <span className="flex-1 truncate text-xs text-gray-500">
+                      {editing.logo.split("/").pop()}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-400 hover:text-red-500"
+                      onClick={handleDeleteLogo}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                  >
+                    {uploadingLogo ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    Logo uploaden
+                  </Button>
+                )}
               </div>
 
               {/* Header style */}

@@ -4,6 +4,7 @@ import DocumentModel from "@/models/Document";
 import DocumentEvent from "@/models/DocumentEvent";
 import DocumentAnalyticsSummary from "@/models/DocumentAnalyticsSummary";
 import { startOfDay, subDays, endOfDay } from "date-fns";
+import { checkAlerts } from "@/lib/analytics/checkAlerts";
 
 export async function GET(req: NextRequest) {
   // Verify cron secret
@@ -297,6 +298,13 @@ export async function GET(req: NextRequest) {
       });
 
       aggregated++;
+    }
+
+    // Run alert checks after aggregation
+    try {
+      await checkAlerts();
+    } catch (alertErr) {
+      console.error("Alert check error:", alertErr);
     }
 
     return NextResponse.json({

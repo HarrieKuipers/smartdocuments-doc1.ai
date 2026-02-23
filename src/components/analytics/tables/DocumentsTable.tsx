@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { formatDuration } from "@/lib/analytics/helpers";
 
@@ -26,11 +27,24 @@ interface DocumentStat {
 
 interface DocumentsTableProps {
   documents: DocumentStat[];
+  selectable?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
-type SortKey = "views" | "uniqueVisitors" | "downloads" | "chatMessages" | "avgReadTime";
+type SortKey =
+  | "views"
+  | "uniqueVisitors"
+  | "downloads"
+  | "chatMessages"
+  | "avgReadTime";
 
-export default function DocumentsTable({ documents }: DocumentsTableProps) {
+export default function DocumentsTable({
+  documents,
+  selectable = false,
+  selectedIds = [],
+  onToggleSelect,
+}: DocumentsTableProps) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -62,6 +76,7 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
+          {selectable && <TableHead className="w-10" />}
           <TableHead className="w-[250px]">Document</TableHead>
           <TableHead
             className="cursor-pointer text-right"
@@ -100,10 +115,16 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
           <TableRow
             key={doc._id}
             className="cursor-pointer hover:bg-gray-50"
-            onClick={() =>
-              router.push(`/dashboard/analytics/${doc._id}`)
-            }
+            onClick={() => router.push(`/dashboard/analytics/${doc._id}`)}
           >
+            {selectable && (
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={selectedIds.includes(doc._id)}
+                  onCheckedChange={() => onToggleSelect?.(doc._id)}
+                />
+              </TableCell>
+            )}
             <TableCell className="font-medium">
               <span className="line-clamp-1">{doc.title}</span>
             </TableCell>
@@ -122,7 +143,10 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
         ))}
         {sorted.length === 0 && (
           <TableRow>
-            <TableCell colSpan={6} className="py-8 text-center text-gray-400">
+            <TableCell
+              colSpan={selectable ? 7 : 6}
+              className="py-8 text-center text-gray-400"
+            >
               Geen data beschikbaar voor deze periode
             </TableCell>
           </TableRow>

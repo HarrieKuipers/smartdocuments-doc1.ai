@@ -24,10 +24,13 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const search = searchParams.get("search");
 
+    const collectionId = searchParams.get("collectionId");
+
     const filter: Record<string, unknown> = {
       organizationId: session.user.organizationId,
     };
     if (status) filter.status = status;
+    if (collectionId) filter.collectionId = collectionId;
     if (search) {
       filter.title = { $regex: search, $options: "i" };
     }

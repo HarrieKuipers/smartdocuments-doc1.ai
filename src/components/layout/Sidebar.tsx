@@ -13,7 +13,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  Wand2,
+  BookOpen,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -42,6 +42,11 @@ const navItems = [
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart3,
+  },
+  {
+    label: "Schrijfwijzers",
+    href: "/dashboard/settings/schrijfwijzers",
+    icon: BookOpen,
   },
   {
     label: "Instellingen",
@@ -75,7 +80,9 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            (item.href !== "/dashboard" &&
+              item.href !== "/dashboard/settings" &&
+              pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
