@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,6 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +57,7 @@ export default function RegisterPage() {
         setError("Account aangemaakt, maar inloggen mislukt. Probeer handmatig in te loggen.");
         setLoading(false);
       } else {
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }
     } catch {
       setError("Er is een fout opgetreden. Probeer het opnieuw.");

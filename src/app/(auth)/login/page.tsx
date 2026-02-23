@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,17 +28,23 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Ongeldige inloggegevens. Probeer het opnieuw.");
+      if (result?.error) {
+        setError("Ongeldige inloggegevens. Probeer het opnieuw.");
+        setLoading(false);
+      } else {
+        // Use full page navigation to ensure the session cookie is sent
+        window.location.href = "/dashboard";
+      }
+    } catch {
+      setError("Er is iets misgegaan. Probeer het opnieuw.");
       setLoading(false);
-    } else {
-      router.push("/dashboard");
     }
   }
 
