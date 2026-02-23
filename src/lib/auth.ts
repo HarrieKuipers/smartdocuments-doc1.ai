@@ -100,26 +100,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true;
     },
     async jwt({ token, user, trigger }) {
-      if (user || trigger === "update") {
-        await connectDB();
-        const dbUser = await User.findOne({
-          ...(user?.email ? { email: user.email } : { _id: token.userId }),
-        });
-        if (dbUser) {
-          token.userId = dbUser._id.toString();
-          token.organizationId = dbUser.organizationId?.toString();
-          token.role = dbUser.role;
-          token.plan = dbUser.plan;
-          token.isSuperAdmin = dbUser.isSuperAdmin || false;
-          token.picture = dbUser.image || null;
+      try {
+        if (user || trigger === "update") {
+          console.log("[auth] JWT callback: initial token creation for", user?.email || token.userId);
+          await connectDB();
+          const dbUser = await User.findOne({
+            ...(user?.email ? { email: user.email } : { _id: token.userId }),
+          });
+          if (dbUser) {
+            token.userId = dbUser._id.toString();
+            token.organizationId = dbUser.organizationId?.toString();
+            token.role = dbUser.role;
+            token.plan = dbUser.plan;
+            token.isSuperAdmin = dbUser.isSuperAdmin || false;
+            token.picture = dbUser.image || null;
+            console.log("[auth] JWT token populated for userId:", token.userId, "orgId:", token.organizationId);
+          } else {
+            console.error("[auth] JWT callback: user NOT found in DB for", user?.email || token.userId);
+          }
+        } else if (token.userId) {
+          await connectDB();
+          const dbUser = await User.findOne({ _id: token.userId }).select("isSuperAdmin").lean();
+          if (dbUser) {
+            token.isSuperAdmin = dbUser.isSuperAdmin || false;
+          }
         }
-      } else if (token.userId) {
-        // Refresh isSuperAdmin from DB on every token refresh
-        await connectDB();
-        const dbUser = await User.findOne({ _id: token.userId }).select("isSuperAdmin").lean();
-        if (dbUser) {
-          token.isSuperAdmin = dbUser.isSuperAdmin || false;
-        }
+      } catch (error) {
+        console.error("[auth] JWT callback error:", error);
       }
       return token;
     },
