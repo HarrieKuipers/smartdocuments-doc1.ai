@@ -14,6 +14,24 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["pdf-parse", "mammoth", "mupdf"],
+  async headers() {
+    return [
+      {
+        // Prevent Cloudflare from caching RSC responses for all pages
+        source: "/:path*",
+        headers: [
+          {
+            key: "CDN-Cache-Control",
+            value: "no-store",
+          },
+          {
+            key: "Cloudflare-CDN-Cache-Control",
+            value: "no-store",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
