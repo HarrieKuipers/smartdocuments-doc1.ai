@@ -113,7 +113,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-8 right-8 z-50 h-[70px] w-[70px] rounded-full shadow-xl transition-transform hover:scale-110 active:scale-95 animate-[pulse-ring_2s_infinite]"
+          className="fixed bottom-24 right-8 z-50 h-[70px] w-[70px] rounded-full shadow-xl transition-transform hover:scale-110 active:scale-95 animate-[pulse-ring_2s_infinite]"
           style={{
             background: `linear-gradient(135deg, ${brandPrimary}, ${brandPrimary}dd)`,
           }}
@@ -131,7 +131,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
+        <div className="fixed bottom-20 right-6 z-50 flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 text-white"

@@ -15,7 +15,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { shortId } = await params;
   await connectDB();
 
-  const doc = await DocumentModel.findOne({ shortId, status: "ready" })
+  const doc = await DocumentModel.findOne({
+    $or: [{ shortId }, { customSlug: shortId }],
+    status: "ready",
+  })
     .select("title description tags coverImageUrl organizationId")
     .lean();
 

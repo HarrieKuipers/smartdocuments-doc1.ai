@@ -1,4 +1,5 @@
 import anthropic, { MODELS } from "./client";
+import type { AudienceAnalysis } from "./analyze-audience";
 
 interface LanguageLevelSummaries {
   B1: string;
@@ -7,8 +8,15 @@ interface LanguageLevelSummaries {
 }
 
 export async function generateLanguageLevelSummaries(
-  originalSummary: string
+  originalSummary: string,
+  audienceContext?: AudienceAnalysis
 ): Promise<LanguageLevelSummaries> {
+  const isInternal = audienceContext && !audienceContext.isExternal;
+
+  const perspectiveInstruction = isInternal
+    ? `\nBELANGRIJK: Dit is een intern document bedoeld voor ${audienceContext.audience}. Herschrijf naar een helder en overzichtelijk format speciaal voor ${audienceContext.audience}. Behoud het instructieve karakter. Spreek de lezer direct aan (je/jij) en vertel wat zij moeten doen. Vermijd het uitleggen van de organisatie zelf alsof de lezer een buitenstaander is. Focus op actiegerichte stappen en heldere interne procedures.`
+    : "";
+
   const response = await anthropic.messages.create({
     model: MODELS.processing,
     max_tokens: 4096,
@@ -16,7 +24,7 @@ export async function generateLanguageLevelSummaries(
       {
         role: "user",
         content: `Herschrijf de volgende samenvatting op drie verschillende taalniveaus. Alle output in het Nederlands.
-
+${perspectiveInstruction}
 Originele samenvatting:
 ${originalSummary}
 

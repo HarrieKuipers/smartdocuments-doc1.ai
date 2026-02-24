@@ -12,7 +12,9 @@ export async function GET(
     await connectDB();
     const { shortId } = await params;
 
-    const doc = await DocumentModel.findOne({ shortId }).lean();
+    const doc = await DocumentModel.findOne({
+      $or: [{ shortId }, { customSlug: shortId }],
+    }).lean();
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }

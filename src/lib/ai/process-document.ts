@@ -2,10 +2,12 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { getPresignedDownloadUrl, BUCKET } from "@/lib/storage";
 import { extractText } from "./extract-text";
+import { analyzeAudience, type AudienceAnalysis } from "./analyze-audience";
 import { analyzeContent } from "./analyze-content";
 import { generateLanguageLevelSummaries } from "./generate-summary";
 import { extractTerms } from "./extract-terms";
 import { generateAndUploadCover } from "./generate-cover";
+import { generateDisplayTitle } from "./generate-display-title";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
 
@@ -42,12 +44,30 @@ export async function processDocument(
     if (pageCount) doc.pageCount = pageCount;
     await doc.save();
 
+    // Step 1b: Audience analysis (pre-processing)
+    await onProgress?.("audience-analysis", 18);
+    doc.processingProgress = { step: "audience-analysis", percentage: 18 };
+    await doc.save();
+
+    let audienceContext: AudienceAnalysis | undefined;
+    try {
+      audienceContext = await analyzeAudience(text);
+      doc.audienceContext = {
+        documentType: audienceContext.documentType,
+        audience: audienceContext.audience,
+        isExternal: audienceContext.isExternal,
+      };
+      await doc.save();
+    } catch (err) {
+      console.error("Audience analysis failed (non-blocking):", err);
+    }
+
     // Step 2: Content analysis
     await onProgress?.("content-analysis", 30);
     doc.processingProgress = { step: "content-analysis", percentage: 30 };
     await doc.save();
 
-    const analysis = await analyzeContent(text);
+    const analysis = await analyzeContent(text, audienceContext);
     doc.content.summary = {
       original: analysis.summary,
       B1: "",
@@ -58,10 +78,24 @@ export async function processDocument(
     doc.content.findings = analysis.findings;
     await doc.save();
 
-    // Step 3: Summary generation (already done in analysis)
+    // Step 3: Summary generation (already done in analysis) + display title
     await onProgress?.("summary-generation", 50);
     doc.processingProgress = { step: "summary-generation", percentage: 50 };
     await doc.save();
+
+    // Generate communicative display title if not already set
+    if (!doc.displayTitle) {
+      try {
+        const displayTitle = await generateDisplayTitle(
+          doc.title,
+          analysis.summary
+        );
+        doc.displayTitle = displayTitle;
+        await doc.save();
+      } catch (err) {
+        console.error("Display title generation failed (non-blocking):", err);
+      }
+    }
 
     // Step 4: Language level rewriting
     await onProgress?.("language-levels", 65);
@@ -69,7 +103,8 @@ export async function processDocument(
     await doc.save();
 
     const levelSummaries = await generateLanguageLevelSummaries(
-      analysis.summary
+      analysis.summary,
+      audienceContext
     );
     doc.content.summary.B1 = levelSummaries.B1;
     doc.content.summary.B2 = levelSummaries.B2;

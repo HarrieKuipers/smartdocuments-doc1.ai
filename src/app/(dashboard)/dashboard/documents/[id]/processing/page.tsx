@@ -49,6 +49,11 @@ const SMART_STEPS = [
     description: "Content uit het bestand halen",
   },
   {
+    key: "audience-analysis",
+    label: "Doelgroep Analyse",
+    description: "Documenttype en doelgroep bepalen",
+  },
+  {
     key: "content-analysis",
     label: "Inhoud Analyse",
     description: "AI analyseert structuur en kernthema's",

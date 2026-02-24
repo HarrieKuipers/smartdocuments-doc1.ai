@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { generateAndUploadCover } from "@/lib/ai/generate-cover";
+import { generateSlug } from "@/lib/slug";
 import bcrypt from "bcryptjs";
 
 export async function GET(
@@ -59,6 +60,33 @@ export async function PUT(
     // Hash password if access type is password
     if (updates.access?.type === "password" && updates.access?.password) {
       updates.access.password = await bcrypt.hash(updates.access.password, 12);
+    }
+
+    // Validate and slugify customSlug
+    if ("customSlug" in updates) {
+      if (updates.customSlug === "" || updates.customSlug === null) {
+        updates.customSlug = null;
+      } else {
+        const slugified = generateSlug(updates.customSlug);
+        if (slugified.length < 3) {
+          return NextResponse.json(
+            { error: "Custom URL moet minimaal 3 tekens bevatten." },
+            { status: 400 }
+          );
+        }
+        // Check uniqueness
+        const existing = await DocumentModel.findOne({
+          customSlug: slugified,
+          _id: { $ne: id },
+        });
+        if (existing) {
+          return NextResponse.json(
+            { error: "Deze custom URL is al in gebruik." },
+            { status: 409 }
+          );
+        }
+        updates.customSlug = slugified;
+      }
     }
 
     const doc = await DocumentModel.findOneAndUpdate(

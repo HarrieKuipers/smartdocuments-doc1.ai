@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,14 @@ import {
   Download,
   Calendar,
   User,
-  BookOpen,
   CheckCircle,
   BarChart3,
   Hash,
+  Eye,
+  Building,
+  Users,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import PasswordGate from "@/components/reader/PasswordGate";
 import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
@@ -26,23 +30,31 @@ import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 
+const PdfViewer = lazy(() => import("@/components/reader/PdfViewer"));
+
 interface ReaderDocument {
   _id: string;
   shortId: string;
   organizationId: string;
   title: string;
+  displayTitle?: string;
   authors: string[];
   description?: string;
   publicationDate?: string;
   version?: string;
   pageCount?: number;
   tags: string[];
-  sourceFile: { url: string; filename: string };
+  sourceFile: { url: string; filename: string; mimeType?: string };
   content: {
     summary: { original: string; B1: string; B2: string; C1: string };
     keyPoints: { text: string; linkedTerms: string[] }[];
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
+  };
+  audienceContext?: {
+    documentType: string;
+    audience: string;
+    isExternal: boolean;
   };
   template?: string;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
@@ -66,8 +78,92 @@ export default function ReaderPage() {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [error, setError] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [expandedKeyPoint, setExpandedKeyPoint] = useState<number | null>(null);
+  const [keyPointExplanations, setKeyPointExplanations] = useState<Record<number, string>>({});
+  const [loadingKeyPoint, setLoadingKeyPoint] = useState<number | null>(null);
+  const [expandedFinding, setExpandedFinding] = useState<number | null>(null);
+  const [findingExplanations, setFindingExplanations] = useState<Record<number, string>>({});
+  const [loadingFinding, setLoadingFinding] = useState<number | null>(null);
   const chatRef = useRef<ChatWidgetRef>(null);
   const analytics = useDocumentAnalytics(doc?._id || "");
+
+  const fetchExplanation = useCallback(async (
+    documentId: string,
+    prompt: string,
+    type: "keypoint" | "finding",
+    index: number,
+  ) => {
+    if (type === "keypoint") {
+      setLoadingKeyPoint(index);
+    } else {
+      setLoadingFinding(index);
+    }
+
+    try {
+      const res = await fetch(`/api/documents/${documentId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: prompt, history: [] }),
+      });
+
+      if (!res.ok) throw new Error();
+      const { data } = await res.json();
+
+      if (type === "keypoint") {
+        setKeyPointExplanations((prev) => ({ ...prev, [index]: data.response }));
+      } else {
+        setFindingExplanations((prev) => ({ ...prev, [index]: data.response }));
+      }
+    } catch {
+      const fallback = "Kon geen uitleg ophalen. Probeer het later opnieuw.";
+      if (type === "keypoint") {
+        setKeyPointExplanations((prev) => ({ ...prev, [index]: fallback }));
+      } else {
+        setFindingExplanations((prev) => ({ ...prev, [index]: fallback }));
+      }
+    } finally {
+      if (type === "keypoint") {
+        setLoadingKeyPoint(null);
+      } else {
+        setLoadingFinding(null);
+      }
+    }
+  }, []);
+
+  const toggleKeyPoint = useCallback((index: number) => {
+    if (expandedKeyPoint === index) {
+      setExpandedKeyPoint(null);
+      return;
+    }
+    setExpandedKeyPoint(index);
+    if (!keyPointExplanations[index] && doc) {
+      const kp = doc.content.keyPoints[index];
+      fetchExplanation(
+        doc._id,
+        `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`,
+        "keypoint",
+        index,
+      );
+    }
+  }, [expandedKeyPoint, keyPointExplanations, doc, fetchExplanation]);
+
+  const toggleFinding = useCallback((index: number) => {
+    if (expandedFinding === index) {
+      setExpandedFinding(null);
+      return;
+    }
+    setExpandedFinding(index);
+    if (!findingExplanations[index] && doc) {
+      const f = doc.content.findings[index];
+      fetchExplanation(
+        doc._id,
+        `Geef meer context en uitleg over de volgende bevinding uit het document "${doc.title}" in 2-3 zinnen. Categorie: "${f.category}". Titel: "${f.title}". Inhoud: "${f.content}"`,
+        "finding",
+        index,
+      );
+    }
+  }, [expandedFinding, findingExplanations, doc, fetchExplanation]);
 
   const handleTermClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -250,14 +346,17 @@ export default function ReaderPage() {
       className="brand-themed min-h-screen bg-[#F5F7FA]"
       style={{ "--doc-brand-primary": brandPrimary } as React.CSSProperties}
     >
-      {/* Header */}
-      {template.headerStyle === "split-bar" && template.logo ? (
-        <RijksoverheidHeader title={doc.title} brandPrimary={brandPrimary} logo={template.logo} />
-      ) : template.headerStyle === "inline-logo" && template.logo ? (
-        <AmsterdamHeader title={doc.title} brandPrimary={brandPrimary} logo={template.logo} />
-      ) : (
-        <DefaultHeader title={doc.title} organization={doc.organization} brandPrimary={brandPrimary} />
-      )}
+      {/* Header — show displayTitle (communicative) or fall back to title */}
+      {(() => {
+        const headerTitle = doc.displayTitle || doc.title;
+        return template.headerStyle === "split-bar" && template.logo ? (
+          <RijksoverheidHeader title={headerTitle} brandPrimary={brandPrimary} logo={template.logo} />
+        ) : template.headerStyle === "inline-logo" && template.logo ? (
+          <AmsterdamHeader title={headerTitle} brandPrimary={brandPrimary} logo={template.logo} />
+        ) : (
+          <DefaultHeader title={headerTitle} organization={doc.organization} brandPrimary={brandPrimary} />
+        );
+      })()}
 
       {/* Main layout: sidebar + content (matching reference HTML) */}
       <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6">
@@ -265,24 +364,64 @@ export default function ReaderPage() {
           {/* Sidebar */}
           <aside className="order-2 lg:order-1">
             <div className="sticky top-[80px] space-y-4">
-              {/* Cover + Metadata Card */}
+              {/* Document Info Card */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
+                {/* Document name + filename */}
+                <div className="mb-4">
+                  <h2 className="text-sm font-semibold text-gray-900 leading-snug">
+                    {doc.title}
+                  </h2>
+                  {doc.sourceFile.filename && (
+                    <p className="mt-1 text-xs text-gray-400 truncate" title={doc.sourceFile.filename}>
+                      {doc.sourceFile.filename}
+                    </p>
+                  )}
+                </div>
+
                 {/* Cover Image */}
                 {doc.coverImageUrl && (
-                  <div
-                    className="mb-5 overflow-hidden rounded-xl"
-                    style={{ aspectRatio: "210/297" }}
-                  >
+                  <div className="mb-4 overflow-hidden rounded-xl bg-gray-100">
                     <img
                       src={doc.coverImageUrl}
                       alt={doc.title}
-                      className="h-full w-full object-cover"
+                      className="w-full h-auto block"
                     />
                   </div>
                 )}
 
+                {/* Page count + Download + View PDF */}
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                  <FileText className="h-3.5 w-3.5 text-gray-400" />
+                  {doc.pageCount && (
+                    <span>{doc.pageCount} pagina&apos;s</span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 rounded-xl"
+                    onClick={() => {
+                      analytics.trackDownload();
+                      window.open(doc.sourceFile.url, "_blank");
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </Button>
+                  <Button
+                    variant={showPdfViewer ? "default" : "outline"}
+                    className="rounded-xl"
+                    style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                    onClick={() => setShowPdfViewer(!showPdfViewer)}
+                    title="PDF bekijken"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 {/* Metadata */}
-                <div className="space-y-3">
+                <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
                   {doc.authors?.[0] && (
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
@@ -316,17 +455,6 @@ export default function ReaderPage() {
                       </div>
                     </div>
                   )}
-                  {doc.pageCount && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50">
-                        <FileText className="h-3.5 w-3.5 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Pagina&apos;s</p>
-                        <p className="text-sm text-gray-700">{doc.pageCount}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Tags */}
@@ -343,40 +471,93 @@ export default function ReaderPage() {
                     ))}
                   </div>
                 )}
-
-                {/* Download Button */}
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full rounded-xl"
-                  onClick={() => {
-                    analytics.trackDownload();
-                    window.open(doc.sourceFile.url, "_blank");
-                  }}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </Button>
               </div>
 
-              {/* Language Level Card (read-only) */}
+              {/* Language Level Meter */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <p className="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-400">
                   Taalniveau
                 </p>
 
-                <div
-                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white"
-                  style={{ backgroundColor: brandPrimary }}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  {languageLevel === "original" ? "Origineel" : `${languageLevel} Taalniveau`}
-                </div>
+                {(() => {
+                  const levels = ["B1", "B2", "C1", "original"] as const;
+                  const labels = ["B1", "B2", "C1", "Origineel"];
+                  const activeIndex = levels.indexOf(languageLevel as typeof levels[number]);
+                  const fillPercent = activeIndex >= 0 ? ((activeIndex + 1) / levels.length) * 100 : 100;
+
+                  return (
+                    <div>
+                      {/* Meter bar */}
+                      <div className="relative h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${fillPercent}%`,
+                            background: `linear-gradient(90deg, ${brandPrimary}88, ${brandPrimary})`,
+                          }}
+                        />
+                      </div>
+                      {/* Level labels */}
+                      <div className="mt-2 flex justify-between">
+                        {labels.map((label, i) => (
+                          <span
+                            key={label}
+                            className={`text-[11px] font-medium transition-colors ${
+                              i === activeIndex
+                                ? "font-bold"
+                                : "text-gray-300"
+                            }`}
+                            style={i === activeIndex ? { color: brandPrimary } : undefined}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </aside>
 
           {/* Main content */}
           <main className="order-1 space-y-6 lg:order-2">
+            {/* PDF Viewer */}
+            {showPdfViewer && (
+              <Suspense
+                fallback={
+                  <div className="flex h-[400px] items-center justify-center rounded-xl bg-white shadow-sm">
+                    <div
+                      className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
+                      style={{ borderColor: `${brandPrimary} transparent ${brandPrimary} ${brandPrimary}` }}
+                    />
+                  </div>
+                }
+              >
+                <PdfViewer shortId={doc.shortId} brandPrimary={brandPrimary} />
+              </Suspense>
+            )}
+
+            {/* Audience Context Badges */}
+            {doc.audienceContext && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 rounded-full border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
+                >
+                  <Building className="h-3.5 w-3.5 text-gray-400" />
+                  {doc.audienceContext.documentType}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 rounded-full border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
+                >
+                  <Users className="h-3.5 w-3.5 text-gray-400" />
+                  Voor: {doc.audienceContext.audience}
+                </Badge>
+              </div>
+            )}
+
             {/* Summary */}
             <section id="samenvatting" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
@@ -391,7 +572,7 @@ export default function ReaderPage() {
               <div onClick={handleTermClick}>
                 <div
                   className="prose max-w-none text-gray-700"
-                  style={{ fontSize: "1.05rem", lineHeight: "1.8" }}
+                  style={{ fontSize: "0.95rem", lineHeight: "1.8" }}
                   dangerouslySetInnerHTML={{ __html: highlightTerms(currentSummary) }}
                 />
               </div>
@@ -408,18 +589,50 @@ export default function ReaderPage() {
                   {doc.content.keyPoints.map((kp, i) => (
                     <div
                       key={i}
-                      className="flex gap-4 rounded-2xl border border-gray-100 bg-white p-5 transition-all hover:border-gray-200 hover:shadow-md"
+                      className={`rounded-2xl border bg-white transition-all ${
+                        expandedKeyPoint === i
+                          ? "border-gray-200 shadow-md"
+                          : "border-gray-100 hover:border-gray-200 hover:shadow-md"
+                      }`}
                     >
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                        style={{ backgroundColor: brandPrimary }}
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-4 p-5 text-left"
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).hasAttribute("data-term")) return;
+                          toggleKeyPoint(i);
+                        }}
                       >
-                        {i + 1}
-                      </span>
-                      <span
-                        className="text-sm leading-relaxed text-gray-700 pt-1"
-                        dangerouslySetInnerHTML={{ __html: highlightTerms(kp.text) }}
-                      />
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                          style={{ backgroundColor: brandPrimary }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span
+                          className="flex-1 text-base leading-relaxed text-gray-700"
+                          dangerouslySetInnerHTML={{ __html: highlightTerms(kp.text) }}
+                        />
+                        <ChevronDown
+                          className={`h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200 ${
+                            expandedKeyPoint === i ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {expandedKeyPoint === i && (
+                        <div className="border-t border-gray-100 px-5 pb-5 pt-4 pl-[4.25rem]">
+                          {loadingKeyPoint === i ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Uitleg laden...</span>
+                            </div>
+                          ) : keyPointExplanations[i] ? (
+                            <p className="text-sm leading-relaxed text-gray-600">
+                              {keyPointExplanations[i]}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -437,20 +650,48 @@ export default function ReaderPage() {
                   {doc.content.findings.map((f, i) => (
                     <div
                       key={i}
-                      className="group rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:border-gray-200 hover:shadow-md"
+                      className={`rounded-2xl border bg-white transition-all cursor-pointer ${
+                        expandedFinding === i
+                          ? "border-gray-200 shadow-md sm:col-span-2"
+                          : "border-gray-100 hover:border-gray-200 hover:shadow-md"
+                      }`}
+                      onClick={() => toggleFinding(i)}
                     >
-                      <span
-                        className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-medium"
-                        style={{ backgroundColor: primaryLight, color: brandPrimary }}
-                      >
-                        {f.category}
-                      </span>
-                      <h3 className="mb-2 text-base font-semibold text-gray-900 leading-snug">
-                        {f.title}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-gray-500">
-                        {f.content}
-                      </p>
+                      <div className="p-6">
+                        <div className="flex items-start justify-between gap-2">
+                          <span
+                            className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-medium"
+                            style={{ backgroundColor: primaryLight, color: brandPrimary }}
+                          >
+                            {f.category}
+                          </span>
+                          <ChevronDown
+                            className={`h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200 ${
+                              expandedFinding === i ? "rotate-180" : ""
+                            }`}
+                          />
+                        </div>
+                        <h3 className="mb-2 text-base font-semibold text-gray-900 leading-snug">
+                          {f.title}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-gray-500">
+                          {f.content}
+                        </p>
+                      </div>
+                      {expandedFinding === i && (
+                        <div className="border-t border-gray-100 px-6 pb-6 pt-4">
+                          {loadingFinding === i ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Meer context laden...</span>
+                            </div>
+                          ) : findingExplanations[i] ? (
+                            <p className="text-sm leading-relaxed text-gray-600">
+                              {findingExplanations[i]}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

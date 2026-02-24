@@ -46,6 +46,7 @@ interface DocumentData {
   _id: string;
   shortId: string;
   title: string;
+  displayTitle?: string;
   authors: string[];
   publicationDate?: string;
   version?: string;
@@ -62,6 +63,7 @@ interface DocumentData {
   template?: string;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: { primary?: string };
+  customSlug?: string;
 }
 
 // -- Rich Text Toolbar --
@@ -155,12 +157,14 @@ export default function DocumentEditPage() {
 
   // Editable fields
   const [title, setTitle] = useState("");
+  const [displayTitle, setDisplayTitle] = useState("");
   const [description, setDescription] = useState("");
   const [accessType, setAccessType] = useState("public");
   const [accessPassword, setAccessPassword] = useState("");
   const [summary, setSummary] = useState("");
   const [templateId, setTemplateId] = useState<TemplateId>("doc1");
   const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
+  const [customSlug, setCustomSlug] = useState("");
   const [keyPoints, setKeyPoints] = useState<{ text: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
@@ -179,11 +183,13 @@ export default function DocumentEditPage() {
         const { data } = await res.json();
         setDoc(data);
         setTitle(data.title || "");
+        setDisplayTitle(data.displayTitle || "");
         setDescription(data.description || "");
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
         setTemplateId((data.template as TemplateId) || "doc1");
         setChatMode(data.chatMode || "terms-only");
+        setCustomSlug(data.customSlug || "");
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
         setTerms(data.content?.terms || []);
@@ -201,11 +207,12 @@ export default function DocumentEditPage() {
     if (!doc) return;
     setSaving(true);
     try {
-      await fetch(`/api/documents/${params.id}`, {
+      const res = await fetch(`/api/documents/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
+          displayTitle,
           description,
           access: { type: accessType, ...(accessType === "password" && accessPassword ? { password: accessPassword } : {}) },
           "content.summary.original": summary,
@@ -214,23 +221,29 @@ export default function DocumentEditPage() {
           "content.terms": terms,
           template: templateId,
           chatMode,
+          customSlug: customSlug || null,
           brandOverride: { primary: getTemplate(templateId).primary },
         }),
       });
+      if (!res.ok) {
+        const { error } = await res.json();
+        if (error) toast.error(error);
+        return;
+      }
       setSaved(true);
     } catch {
       toast.error("Opslaan mislukt.");
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, description, accessType, accessPassword, summary, templateId, chatMode, keyPoints, findings, terms]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, templateId, chatMode, customSlug, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, description, accessType, accessPassword, summary, templateId, chatMode, contentVersion, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, templateId, chatMode, customSlug, contentVersion, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -395,11 +408,25 @@ export default function DocumentEditPage() {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Titel</Label>
+                      <Label>Documentnaam</Label>
                       <Input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                       />
+                      <p className="text-[10px] text-muted-foreground">
+                        De originele naam van het document
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Paginatitel</Label>
+                      <Input
+                        value={displayTitle}
+                        onChange={(e) => setDisplayTitle(e.target.value)}
+                        placeholder="Communicatieve titel voor de lezer..."
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        De titel die bezoekers zien in de header. Wordt automatisch gegenereerd, maar is aanpasbaar.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label>Beschrijving</Label>
@@ -540,11 +567,27 @@ export default function DocumentEditPage() {
                     <Separator />
 
                     <div className="space-y-2">
+                      <Label>Custom URL</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">/d/</span>
+                        <Input
+                          value={customSlug}
+                          onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                          placeholder={doc.shortId}
+                          className="text-xs"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Optioneel. Laat leeg om de standaard ID te gebruiken.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label>Deellink</Label>
                       <div className="flex items-center gap-2">
                         <Input
                           readOnly
-                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/d/${doc.shortId}`}
+                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/d/${customSlug || doc.shortId}`}
                           className="text-xs"
                         />
                         <Button
@@ -552,7 +595,7 @@ export default function DocumentEditPage() {
                           size="sm"
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              `${window.location.origin}/d/${doc.shortId}`
+                              `${window.location.origin}/d/${customSlug || doc.shortId}`
                             );
                             toast.success("Link gekopieerd!");
                           }}

@@ -15,13 +15,13 @@ export default function RijksoverheidHeader({ title, brandPrimary, logo }: Rijks
           className="mx-auto h-[60px] md:h-[100px]"
         />
       </div>
-      {/* Colored bar with centered title */}
+      {/* Colored bar with left-aligned title */}
       <div
-        className="px-4 py-4 text-center"
+        className="px-4 py-4 md:px-6"
         style={{ backgroundColor: brandPrimary }}
       >
-        <div className="mx-auto max-w-5xl">
-          <h1 className="text-lg font-normal leading-relaxed text-white md:text-xl">
+        <div className="mx-auto max-w-[1400px]">
+          <h1 className="text-lg font-normal leading-relaxed text-white md:text-xl lg:pl-[376px]">
             {title}
           </h1>
         </div>

@@ -7,6 +7,7 @@ export interface IDocument extends MongoDocument {
   organizationId: mongoose.Types.ObjectId;
   uploadedBy: mongoose.Types.ObjectId;
   title: string;
+  displayTitle?: string;
   authors: string[];
   publicationDate?: Date;
   version?: string;
@@ -36,6 +37,11 @@ export interface IDocument extends MongoDocument {
     type: "public" | "link-only" | "password";
     password?: string;
   };
+  audienceContext?: {
+    documentType: string;
+    audience: string;
+    isExternal: boolean;
+  };
   publicationTypes: ("smart" | "herziend")[];
   schrijfwijzerIds: mongoose.Types.ObjectId[];
   template?: "doc1" | "rijksoverheid" | "amsterdam";
@@ -58,6 +64,7 @@ export interface IDocument extends MongoDocument {
     averageReadTime: number;
     chatInteractions: number;
   };
+  customSlug?: string;
   coverImageUrl?: string;
   publishedAt?: Date;
   createdAt: Date;
@@ -80,6 +87,7 @@ const DocumentSchema = new Schema<IDocument>(
       required: true,
     },
     title: { type: String, default: "Untitled Document" },
+    displayTitle: { type: String },
     authors: [{ type: String }],
     publicationDate: { type: Date },
     version: { type: String },
@@ -130,6 +138,11 @@ const DocumentSchema = new Schema<IDocument>(
       },
       password: { type: String },
     },
+    audienceContext: {
+      documentType: { type: String },
+      audience: { type: String },
+      isExternal: { type: Boolean },
+    },
     publicationTypes: {
       type: [{ type: String, enum: ["smart", "herziend"] }],
       default: ["smart"],
@@ -171,6 +184,7 @@ const DocumentSchema = new Schema<IDocument>(
       averageReadTime: { type: Number, default: 0 },
       chatInteractions: { type: Number, default: 0 },
     },
+    customSlug: { type: String, sparse: true, unique: true },
     coverImageUrl: { type: String },
     publishedAt: { type: Date },
   },

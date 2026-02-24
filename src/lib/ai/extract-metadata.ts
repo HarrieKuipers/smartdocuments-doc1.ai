@@ -2,6 +2,7 @@ import anthropic, { MODELS } from "./client";
 
 interface ExtractedMetadata {
   title: string;
+  displayTitle: string;
   authors: string[];
   publicationDate: string | null;
   version: string | null;
@@ -29,6 +30,7 @@ ${excerpt}
 Geef een JSON object met exact deze structuur (geen markdown, alleen JSON):
 {
   "title": "de titel van het document",
+  "displayTitle": "een korte, communicatieve titel die de kern van het document duidelijk maakt voor de lezer (max 15 woorden, B1 niveau, geen jargon)",
   "authors": ["auteur1", "auteur2"],
   "publicationDate": "YYYY-MM-DD of null",
   "version": "versienummer of null",

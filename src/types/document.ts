@@ -51,6 +51,7 @@ export interface IBrandOverride {
 export interface IProcessingProgress {
   step:
     | "text-extraction"
+    | "audience-analysis"
     | "content-analysis"
     | "summary-generation"
     | "language-levels"
@@ -65,6 +66,12 @@ export interface IDocumentAnalytics {
   totalDownloads: number;
   averageReadTime: number;
   chatInteractions: number;
+}
+
+export interface IAudienceContext {
+  documentType: string;
+  audience: string;
+  isExternal: boolean;
 }
 
 export type DocumentStatus = "uploading" | "processing" | "ready" | "error";
