@@ -56,7 +56,7 @@ interface DocumentData {
   access: { type: string; password?: string };
   content: {
     summary: { original: string; B1: string; B2: string; C1: string };
-    keyPoints: { text: string; linkedTerms: string[] }[];
+    keyPoints: { text: string; explanation?: string; linkedTerms: string[] }[];
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
   };
@@ -165,7 +165,7 @@ export default function DocumentEditPage() {
   const [templateId, setTemplateId] = useState<TemplateId>("doc1");
   const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
   const [customSlug, setCustomSlug] = useState("");
-  const [keyPoints, setKeyPoints] = useState<{ text: string; linkedTerms: string[] }[]>([]);
+  const [keyPoints, setKeyPoints] = useState<{ text: string; explanation?: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
 
@@ -268,8 +268,8 @@ export default function DocumentEditPage() {
   }
 
   // -- Key Points CRUD --
-  function updateKeyPoint(index: number, text: string) {
-    setKeyPoints((prev) => prev.map((kp, i) => (i === index ? { ...kp, text } : kp)));
+  function updateKeyPoint(index: number, field: "text" | "explanation", value: string) {
+    setKeyPoints((prev) => prev.map((kp, i) => (i === index ? { ...kp, [field]: value } : kp)));
     markChanged();
   }
   function removeKeyPoint(index: number) {
@@ -656,22 +656,33 @@ export default function DocumentEditPage() {
               <CardContent>
                 <ul className="space-y-2">
                   {keyPoints.map((kp, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-primary" />
-                      <Input
-                        value={kp.text}
-                        onChange={(e) => updateKeyPoint(i, e.target.value)}
-                        placeholder="Hoofdpunt..."
-                        className="flex-1 text-sm"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-red-500"
-                        onClick={() => removeKeyPoint(i)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    <li key={i} className="space-y-1.5">
+                      <div className="flex items-start gap-2">
+                        <Check className="mt-2.5 h-4 w-4 flex-shrink-0 text-primary" />
+                        <Input
+                          value={kp.text}
+                          onChange={(e) => updateKeyPoint(i, "text", e.target.value)}
+                          placeholder="Hoofdpunt..."
+                          className="flex-1 text-sm"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-red-500"
+                          onClick={() => removeKeyPoint(i)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="pl-6">
+                        <Textarea
+                          value={kp.explanation || ""}
+                          onChange={(e) => updateKeyPoint(i, "explanation", e.target.value)}
+                          placeholder="Uitleg (2-3 zinnen met meer context)..."
+                          className="text-xs min-h-[3rem] resize-none"
+                          rows={2}
+                        />
+                      </div>
                     </li>
                   ))}
                   {keyPoints.length === 0 && (

@@ -29,7 +29,7 @@ export interface IDocument extends MongoDocument {
       B2: string;
       C1: string;
     };
-    keyPoints: { text: string; linkedTerms: string[] }[];
+    keyPoints: { text: string; explanation?: string; linkedTerms: string[] }[];
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
   };
@@ -112,6 +112,7 @@ const DocumentSchema = new Schema<IDocument>(
       keyPoints: [
         {
           text: { type: String },
+          explanation: { type: String },
           linkedTerms: [{ type: String }],
         },
       ],

@@ -3,7 +3,7 @@ import type { AudienceAnalysis } from "./analyze-audience";
 
 interface ContentAnalysis {
   summary: string;
-  keyPoints: { text: string; linkedTerms: string[] }[];
+  keyPoints: { text: string; explanation: string; linkedTerms: string[] }[];
   findings: { category: string; title: string; content: string }[];
 }
 
@@ -28,7 +28,7 @@ export async function analyzeContent(
         role: "user",
         content: `Je bent een expert document-analist. Analyseer de volgende tekst en genereer:
 1. Een uitgebreide samenvatting (managementniveau)
-2. De belangrijkste hoofdpunten (5-10 punten)
+2. De belangrijkste hoofdpunten (5-10 punten) met per punt een korte uitleg van 2-3 zinnen die meer context en achtergrond geeft
 3. Belangrijke bevindingen (4-6 stuks)
 ${perspectiveInstruction}
 BELANGRIJK voor de bevindingen (findings):
@@ -55,7 +55,7 @@ Geef het resultaat als JSON (geen markdown, alleen JSON):
 {
   "summary": "uitgebreide samenvatting van het document...",
   "keyPoints": [
-    {"text": "hoofdpunt tekst", "linkedTerms": ["term1", "term2"]}
+    {"text": "hoofdpunt tekst", "explanation": "korte uitleg van 2-3 zinnen met meer context en achtergrond over dit hoofdpunt", "linkedTerms": ["term1", "term2"]}
   ],
   "findings": [
     {"category": "De regels op een rij", "title": "korte, duidelijke titel", "content": "beschrijving in eenvoudige taal"}

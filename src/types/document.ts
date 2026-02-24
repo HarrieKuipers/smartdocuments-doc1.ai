@@ -15,6 +15,7 @@ export interface ISummary {
 
 export interface IKeyPoint {
   text: string;
+  explanation?: string;
   linkedTerms: string[];
 }
 

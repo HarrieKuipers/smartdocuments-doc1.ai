@@ -47,7 +47,7 @@ interface ReaderDocument {
   sourceFile: { url: string; filename: string; mimeType?: string };
   content: {
     summary: { original: string; B1: string; B2: string; C1: string };
-    keyPoints: { text: string; linkedTerms: string[] }[];
+    keyPoints: { text: string; explanation?: string; linkedTerms: string[] }[];
     findings: { category: string; title: string; content: string }[];
     terms: { term: string; definition: string; occurrences: number }[];
   };
@@ -139,12 +139,16 @@ export default function ReaderPage() {
     setExpandedKeyPoint(index);
     if (!keyPointExplanations[index] && doc) {
       const kp = doc.content.keyPoints[index];
-      fetchExplanation(
-        doc._id,
-        `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`,
-        "keypoint",
-        index,
-      );
+      if (kp.explanation) {
+        setKeyPointExplanations((prev) => ({ ...prev, [index]: kp.explanation! }));
+      } else {
+        fetchExplanation(
+          doc._id,
+          `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`,
+          "keypoint",
+          index,
+        );
+      }
     }
   }, [expandedKeyPoint, keyPointExplanations, doc, fetchExplanation]);
 
