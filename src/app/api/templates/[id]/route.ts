@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
-import Schrijfwijzer from "@/models/Schrijfwijzer";
+import Template from "@/models/Template";
 
 export async function GET(
   _req: NextRequest,
@@ -19,23 +19,26 @@ export async function GET(
     await connectDB();
     const { id } = await params;
 
-    const schrijfwijzer = await Schrijfwijzer.findOne({
-      _id: id,
-      organizationId: session.user.organizationId,
+    const template = await Template.findOne({
+      templateId: id,
+      $or: [
+        { isSystem: true },
+        { organizationId: session.user.organizationId },
+      ],
     }).lean();
 
-    if (!schrijfwijzer) {
+    if (!template) {
       return NextResponse.json(
-        { error: "Schrijfwijzer niet gevonden." },
+        { error: "Sjabloon niet gevonden." },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ data: schrijfwijzer });
+    return NextResponse.json({ data: template });
   } catch (error) {
-    console.error("Schrijfwijzer GET error:", error);
+    console.error("Template GET error:", error);
     return NextResponse.json(
-      { error: "Kon schrijfwijzer niet ophalen." },
+      { error: "Kon sjabloon niet ophalen." },
       { status: 500 }
     );
   }
@@ -57,41 +60,44 @@ export async function PUT(
     await connectDB();
     const { id } = await params;
 
-    const schrijfwijzer = await Schrijfwijzer.findOne({
-      _id: id,
+    const template = await Template.findOne({
+      templateId: id,
       organizationId: session.user.organizationId,
+      isSystem: false,
     });
 
-    if (!schrijfwijzer) {
+    if (!template) {
       return NextResponse.json(
-        { error: "Schrijfwijzer niet gevonden." },
+        { error: "Sjabloon niet gevonden of niet bewerkbaar." },
         { status: 404 }
       );
     }
 
-    const { name, description, rules, isDefault } = await req.json();
+    const body = await req.json();
+    const allowedFields = [
+      "name",
+      "primary",
+      "primaryDark",
+      "primaryLight",
+      "headerStyle",
+      "showB1Button",
+      "showInfoBox",
+      "infoBoxLabel",
+    ];
 
-    if (name) schrijfwijzer.name = name;
-    if (description !== undefined) schrijfwijzer.description = description;
-    if (rules) schrijfwijzer.rules = rules;
-    if (isDefault !== undefined) {
-      // If setting as default, unset other defaults first
-      if (isDefault) {
-        await Schrijfwijzer.updateMany(
-          { organizationId: session.user.organizationId, isDefault: true },
-          { isDefault: false }
-        );
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        (template as Record<string, unknown>)[key] = body[key];
       }
-      schrijfwijzer.isDefault = isDefault;
     }
 
-    await schrijfwijzer.save();
+    await template.save();
 
-    return NextResponse.json({ data: schrijfwijzer });
+    return NextResponse.json({ data: template });
   } catch (error) {
-    console.error("Schrijfwijzer PUT error:", error);
+    console.error("Template PUT error:", error);
     return NextResponse.json(
-      { error: "Kon schrijfwijzer niet bijwerken." },
+      { error: "Kon sjabloon niet bijwerken." },
       { status: 500 }
     );
   }
@@ -113,25 +119,26 @@ export async function DELETE(
     await connectDB();
     const { id } = await params;
 
-    const schrijfwijzer = await Schrijfwijzer.findOne({
-      _id: id,
+    const template = await Template.findOne({
+      templateId: id,
       organizationId: session.user.organizationId,
+      isSystem: false,
     });
 
-    if (!schrijfwijzer) {
+    if (!template) {
       return NextResponse.json(
-        { error: "Schrijfwijzer niet gevonden." },
+        { error: "Sjabloon niet gevonden of niet verwijderbaar." },
         { status: 404 }
       );
     }
 
-    await schrijfwijzer.deleteOne();
+    await template.deleteOne();
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Schrijfwijzer DELETE error:", error);
+    console.error("Template DELETE error:", error);
     return NextResponse.json(
-      { error: "Kon schrijfwijzer niet verwijderen." },
+      { error: "Kon sjabloon niet verwijderen." },
       { status: 500 }
     );
   }

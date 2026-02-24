@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Building2, CreditCard, Camera, Loader2, Trash2, BookOpen, ChevronRight, Bell } from "lucide-react";
-import Link from "next/link";
+import { User, Building2, CreditCard, Camera, Loader2, Trash2, Bell } from "lucide-react";
 
 export default function SettingsPage() {
   const { data: session, update } = useSession();
@@ -208,24 +207,6 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Schrijfwijzers */}
-      <Link href="/dashboard/settings/schrijfwijzers">
-        <Card className="transition-colors hover:bg-muted/50 cursor-pointer">
-          <CardContent className="flex items-center justify-between py-5">
-            <div className="flex items-center gap-3">
-              <BookOpen className="h-5 w-5 text-[#0062EB]" />
-              <div>
-                <p className="font-medium">Schrijfwijzers</p>
-                <p className="text-sm text-muted-foreground">
-                  Beheer de schrijfwijzers voor het herschrijven van documenten.
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </CardContent>
-        </Card>
-      </Link>
 
       {/* Notifications */}
       <Card>

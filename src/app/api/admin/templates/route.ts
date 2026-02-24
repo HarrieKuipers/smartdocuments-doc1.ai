@@ -14,7 +14,7 @@ export async function GET() {
   for (const id of TEMPLATE_IDS) {
     const exists = await Template.findOne({ templateId: id });
     if (!exists) {
-      await Template.create({ templateId: id, ...TEMPLATES[id] });
+      await Template.create({ templateId: id, ...TEMPLATES[id], isSystem: true });
     }
   }
 

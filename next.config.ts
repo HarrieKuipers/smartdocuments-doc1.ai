@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["pdf-parse", "mammoth", "mupdf"],
+  async redirects() {
+    return [
+      {
+        source: "/d/:slug",
+        destination: "/:slug",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

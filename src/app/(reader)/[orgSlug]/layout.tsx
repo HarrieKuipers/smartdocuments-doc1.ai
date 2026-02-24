@@ -7,16 +7,16 @@ import CookieBanner from "@/components/analytics/CookieBanner";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  params: Promise<{ shortId: string }>;
+  params: Promise<{ orgSlug: string }>;
   children: React.ReactNode;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { shortId } = await params;
+  const { orgSlug: slug } = await params;
   await connectDB();
 
   const doc = await DocumentModel.findOne({
-    $or: [{ shortId }, { customSlug: shortId }],
+    $or: [{ shortId: slug }, { customSlug: slug }],
     status: "ready",
   })
     .select("title description tags coverImageUrl organizationId")

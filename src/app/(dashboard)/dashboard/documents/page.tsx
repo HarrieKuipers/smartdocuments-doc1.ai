@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, Wand2, FolderOpen } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, FolderOpen } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -225,7 +225,7 @@ export default function DocumentsPage() {
                         <div className="truncate">
                           {doc.status === "ready" ? (
                             <Link
-                              href={`/d/${doc.shortId}`}
+                              href={`/${doc.shortId}`}
                               className="hover:underline"
                               style={{ color: "#0062EB" }}
                             >
@@ -268,20 +268,12 @@ export default function DocumentsPage() {
                           </Link>
                         </DropdownMenuItem>
                         {doc.status === "ready" && (
-                          <>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/d/${doc.shortId}`} target="_blank">
-                                <Eye className="mr-2 h-4 w-4" />
-                                Bekijken
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/documents/${doc._id}/rewrite`}>
-                                <Wand2 className="mr-2 h-4 w-4" />
-                                Herschrijven
-                              </Link>
-                            </DropdownMenuItem>
-                          </>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/${doc.shortId}`} target="_blank">
+                              <Eye className="mr-2 h-4 w-4" />
+                              Bekijken
+                            </Link>
+                          </DropdownMenuItem>
                         )}
                         {collections.length > 0 && (
                           <DropdownMenuSub>

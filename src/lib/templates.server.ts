@@ -6,15 +6,14 @@ import { getTemplate, TEMPLATES, type TemplateId, type TemplateConfig } from "./
 export async function getTemplateAsync(
   id: TemplateId | string | undefined
 ): Promise<TemplateConfig> {
-  const fallback = getTemplate(id);
-  if (!id || !(id in TEMPLATES)) return fallback;
+  if (!id) return getTemplate(id);
 
   try {
     await connectDB();
     const doc = await Template.findOne({ templateId: id }).lean();
     if (doc) {
       return {
-        id: id as TemplateId,
+        id: (id in TEMPLATES ? id : "doc1") as TemplateId,
         name: doc.name,
         primary: doc.primary,
         primaryDark: doc.primaryDark,
@@ -29,5 +28,5 @@ export async function getTemplateAsync(
   } catch {
     // DB unavailable — fall through to static
   }
-  return fallback;
+  return getTemplate(id);
 }

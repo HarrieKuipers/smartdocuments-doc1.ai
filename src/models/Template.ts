@@ -11,6 +11,8 @@ export interface ITemplate extends Document {
   showB1Button: boolean;
   showInfoBox: boolean;
   infoBoxLabel: string;
+  isSystem: boolean;
+  organizationId?: mongoose.Types.ObjectId;
   updatedAt: Date;
 }
 
@@ -30,6 +32,8 @@ const TemplateSchema = new Schema<ITemplate>(
     showB1Button: { type: Boolean, default: false },
     showInfoBox: { type: Boolean, default: false },
     infoBoxLabel: { type: String, default: "" },
+    isSystem: { type: Boolean, default: false },
+    organizationId: { type: Schema.Types.ObjectId, ref: "Organization" },
   },
   { timestamps: true }
 );

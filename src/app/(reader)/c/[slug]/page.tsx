@@ -337,7 +337,7 @@ export default function PublicCollectionPage() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredDocs.map((doc) => (
-              <Link key={doc._id} href={`/d/${doc.shortId}`}>
+              <Link key={doc._id} href={`/${doc.shortId}`}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border transition-all hover:shadow-lg">
                   {/* Cover image */}
                   {doc.coverImageUrl ? (

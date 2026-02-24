@@ -42,11 +42,8 @@ export interface IDocument extends MongoDocument {
     audience: string;
     isExternal: boolean;
   };
-  publicationTypes: ("smart" | "herziend")[];
-  schrijfwijzerIds: mongoose.Types.ObjectId[];
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
-  languageLevel?: "B1" | "B2" | "C1";
   brandOverride?: {
     primary?: string;
     logo?: string;
@@ -144,25 +141,14 @@ const DocumentSchema = new Schema<IDocument>(
       audience: { type: String },
       isExternal: { type: Boolean },
     },
-    publicationTypes: {
-      type: [{ type: String, enum: ["smart", "herziend"] }],
-      default: ["smart"],
-    },
-    schrijfwijzerIds: [{ type: Schema.Types.ObjectId, ref: "Schrijfwijzer" }],
     template: {
       type: String,
-      enum: ["doc1", "rijksoverheid", "amsterdam"],
       default: "doc1",
     },
     chatMode: {
       type: String,
       enum: ["terms-only", "terms-and-chat", "full"],
       default: "terms-only",
-    },
-    languageLevel: {
-      type: String,
-      enum: ["B1", "B2", "C1"],
-      default: "B1",
     },
     brandOverride: {
       primary: { type: String },

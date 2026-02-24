@@ -194,7 +194,7 @@ export default function ReaderPage() {
       const headers: Record<string, string> = {};
       if (password) headers["x-document-password"] = password;
 
-      const res = await fetch(`/api/reader/${params.shortId}?v=${Date.now()}`, {
+      const res = await fetch(`/api/reader/${params.orgSlug}?v=${Date.now()}`, {
         headers,
         cache: "no-store",
       });
@@ -238,7 +238,7 @@ export default function ReaderPage() {
 
   useEffect(() => {
     fetchDocument();
-  }, [params.shortId]);
+  }, [params.orgSlug]);
 
   if (loading) {
     return (

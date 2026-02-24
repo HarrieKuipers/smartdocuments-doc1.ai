@@ -16,7 +16,7 @@ export default function SEOReaderPage() {
         );
         if (res.ok) {
           const { shortId } = await res.json();
-          router.replace(`/d/${shortId}`);
+          router.replace(`/${shortId}`);
         } else {
           router.replace("/");
         }

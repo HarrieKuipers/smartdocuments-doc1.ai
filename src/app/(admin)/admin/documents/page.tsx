@@ -156,7 +156,7 @@ export default function AdminDocumentsPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          onClick={() => window.open(`/d/${d.shortId}`, "_blank")}
+                          onClick={() => window.open(`/${d.shortId}`, "_blank")}
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Button>

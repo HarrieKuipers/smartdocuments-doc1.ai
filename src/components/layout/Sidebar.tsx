@@ -13,7 +13,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  BookOpen,
+  Palette,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -44,9 +44,9 @@ const navItems = [
     icon: BarChart3,
   },
   {
-    label: "Schrijfwijzers",
-    href: "/dashboard/settings/schrijfwijzers",
-    icon: BookOpen,
+    label: "Sjablonen",
+    href: "/dashboard/settings/sjablonen",
+    icon: Palette,
   },
   {
     label: "Instellingen",

@@ -36,11 +36,18 @@ import {
   Plus,
   Settings,
   Trash2,
-  Wand2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { TEMPLATES, TEMPLATE_IDS, getTemplate, type TemplateId } from "@/lib/templates";
+import { getTemplate } from "@/lib/templates";
+
+interface TemplateOption {
+  templateId: string;
+  name: string;
+  primary: string;
+  headerStyle: "default" | "split-bar" | "inline-logo";
+  isSystem: boolean;
+}
 
 interface DocumentData {
   _id: string;
@@ -162,7 +169,8 @@ export default function DocumentEditPage() {
   const [accessType, setAccessType] = useState("public");
   const [accessPassword, setAccessPassword] = useState("");
   const [summary, setSummary] = useState("");
-  const [templateId, setTemplateId] = useState<TemplateId>("doc1");
+  const [templateId, setTemplateId] = useState("doc1");
+  const [templateOptions, setTemplateOptions] = useState<TemplateOption[]>([]);
   const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
   const [customSlug, setCustomSlug] = useState("");
   const [keyPoints, setKeyPoints] = useState<{ text: string; explanation?: string; linkedTerms: string[] }[]>([]);
@@ -174,6 +182,14 @@ export default function DocumentEditPage() {
 
   // Track content version for auto-save triggering
   const [contentVersion, setContentVersion] = useState(0);
+
+  // Load available templates
+  useEffect(() => {
+    fetch("/api/templates")
+      .then((r) => r.json())
+      .then(({ data }) => setTemplateOptions(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function fetchDoc() {
@@ -187,7 +203,7 @@ export default function DocumentEditPage() {
         setDescription(data.description || "");
         setAccessType(data.access?.type || "public");
         setSummary(data.content?.summary?.original || "");
-        setTemplateId((data.template as TemplateId) || "doc1");
+        setTemplateId(data.template || "doc1");
         setChatMode(data.chatMode || "terms-only");
         setCustomSlug(data.customSlug || "");
         setKeyPoints(data.content?.keyPoints || []);
@@ -222,7 +238,11 @@ export default function DocumentEditPage() {
           template: templateId,
           chatMode,
           customSlug: customSlug || null,
-          brandOverride: { primary: getTemplate(templateId).primary },
+          brandOverride: {
+            primary:
+              templateOptions.find((t) => t.templateId === templateId)?.primary ??
+              getTemplate(templateId).primary,
+          },
         }),
       });
       if (!res.ok) {
@@ -236,7 +256,7 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, templateId, chatMode, customSlug, keyPoints, findings, terms]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, templateId, templateOptions, chatMode, customSlug, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
@@ -350,20 +370,10 @@ export default function DocumentEditPage() {
             ) : null}
             {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Niet opgeslagen"}
           </span>
-          {doc.status === "ready" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/dashboard/documents/${params.id}/rewrite`)}
-            >
-              <Wand2 className="mr-1 h-4 w-4" />
-              Herschrijven
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/d/${doc.shortId}?v=${Date.now()}`, "_blank")}
+            onClick={() => window.open(`/${doc.shortId}?v=${Date.now()}`, "_blank")}
           >
             <Eye className="mr-1 h-4 w-4" />
             Voorbeeld
@@ -497,35 +507,32 @@ export default function DocumentEditPage() {
                     <div className="space-y-2">
                       <Label>Sjabloon</Label>
                       <div className="grid grid-cols-1 gap-2">
-                        {TEMPLATE_IDS.map((id) => {
-                          const tmpl = TEMPLATES[id];
-                          return (
-                            <button
-                              key={id}
-                              onClick={() => setTemplateId(id)}
-                              className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
-                                templateId === id
-                                  ? "border-primary ring-2 ring-primary/20"
-                                  : "hover:border-gray-400"
-                              }`}
-                            >
-                              <div
-                                className="h-8 w-8 flex-shrink-0 rounded"
-                                style={{ backgroundColor: tmpl.primary }}
-                              />
-                              <div>
-                                <div className="font-medium">{tmpl.name}</div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  {tmpl.headerStyle === "split-bar"
-                                    ? "Logo + titelbalk"
-                                    : tmpl.headerStyle === "inline-logo"
-                                    ? "Logo + titel inline"
-                                    : "Standaard header"}
-                                </div>
+                        {templateOptions.map((tmpl) => (
+                          <button
+                            key={tmpl.templateId}
+                            onClick={() => setTemplateId(tmpl.templateId)}
+                            className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
+                              templateId === tmpl.templateId
+                                ? "border-primary ring-2 ring-primary/20"
+                                : "hover:border-gray-400"
+                            }`}
+                          >
+                            <div
+                              className="h-8 w-8 flex-shrink-0 rounded"
+                              style={{ backgroundColor: tmpl.primary }}
+                            />
+                            <div>
+                              <div className="font-medium">{tmpl.name}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {tmpl.headerStyle === "split-bar"
+                                  ? "Logo + titelbalk"
+                                  : tmpl.headerStyle === "inline-logo"
+                                  ? "Logo + titel inline"
+                                  : "Standaard header"}
                               </div>
-                            </button>
-                          );
-                        })}
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -569,7 +576,7 @@ export default function DocumentEditPage() {
                     <div className="space-y-2">
                       <Label>Custom URL</Label>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">/d/</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">/</span>
                         <Input
                           value={customSlug}
                           onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
@@ -587,7 +594,7 @@ export default function DocumentEditPage() {
                       <div className="flex items-center gap-2">
                         <Input
                           readOnly
-                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/d/${customSlug || doc.shortId}`}
+                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/${customSlug || doc.shortId}`}
                           className="text-xs"
                         />
                         <Button
@@ -595,7 +602,7 @@ export default function DocumentEditPage() {
                           size="sm"
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              `${window.location.origin}/d/${customSlug || doc.shortId}`
+                              `${window.location.origin}/${customSlug || doc.shortId}`
                             );
                             toast.success("Link gekopieerd!");
                           }}
