@@ -62,8 +62,10 @@ export async function PUT(
 
     const template = await Template.findOne({
       templateId: id,
-      organizationId: session.user.organizationId,
-      isSystem: false,
+      $or: [
+        { isSystem: true },
+        { organizationId: session.user.organizationId },
+      ],
     });
 
     if (!template) {

@@ -259,10 +259,8 @@ export default function SjablonenPage() {
         {templates.map((t) => (
           <Card
             key={t.templateId}
-            className={`group rounded-2xl border-gray-100 overflow-hidden transition-shadow hover:shadow-md ${
-              !t.isSystem ? "cursor-pointer" : ""
-            }`}
-            onClick={() => !t.isSystem && openEditDialog(t)}
+            className="group cursor-pointer rounded-2xl border-gray-100 overflow-hidden transition-shadow hover:shadow-md"
+            onClick={() => openEditDialog(t)}
           >
             {/* Preview header */}
             <div
@@ -279,18 +277,17 @@ export default function SjablonenPage() {
                 )}
                 <span className="text-lg font-bold text-white">{t.name}</span>
               </div>
-              {t.isSystem ? (
+              {t.isSystem && (
                 <div className="absolute top-3 right-3">
                   <Badge className="bg-white/20 text-white border-0 text-[10px]">
                     <ShieldCheck className="mr-1 h-3 w-3" />
                     Systeem
                   </Badge>
                 </div>
-              ) : (
-                <div className="absolute top-3 right-3 rounded-full bg-white/20 p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Pencil className="h-3.5 w-3.5 text-white" />
-                </div>
               )}
+              <div className={`absolute ${t.isSystem ? "top-3 right-20" : "top-3 right-3"} rounded-full bg-white/20 p-1.5 opacity-0 transition-opacity group-hover:opacity-100`}>
+                <Pencil className="h-3.5 w-3.5 text-white" />
+              </div>
             </div>
 
             <CardContent className="p-5 space-y-4">
@@ -336,20 +333,20 @@ export default function SjablonenPage() {
                 )}
               </div>
 
-              {/* Actions for custom templates */}
-              {!t.isSystem && (
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditDialog(t);
-                    }}
-                  >
-                    <Pencil className="size-3.5 mr-1" />
-                    Bewerken
-                  </Button>
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditDialog(t);
+                  }}
+                >
+                  <Pencil className="size-3.5 mr-1" />
+                  Bewerken
+                </Button>
+                {!t.isSystem && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -362,8 +359,8 @@ export default function SjablonenPage() {
                     <Trash2 className="size-3.5 mr-1" />
                     Verwijderen
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}
