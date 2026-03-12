@@ -120,9 +120,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         } else if (token.userId) {
           await connectDB();
-          const dbUser = await User.findOne({ _id: token.userId }).select("isSuperAdmin").lean();
+          const dbUser = await User.findOne({ _id: token.userId }).select("isSuperAdmin organizationId role plan image").lean();
           if (dbUser) {
             token.isSuperAdmin = dbUser.isSuperAdmin || false;
+            token.organizationId = dbUser.organizationId?.toString();
+            token.role = dbUser.role;
+            token.plan = dbUser.plan;
+            token.picture = dbUser.image || token.picture;
           }
         }
       } catch (error) {
