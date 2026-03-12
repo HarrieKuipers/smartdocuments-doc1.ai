@@ -57,6 +57,11 @@ export async function PUT(
     delete updates.uploadedBy;
     delete updates.shortId;
 
+    // Validate language
+    if ("language" in updates && !["nl", "en"].includes(updates.language)) {
+      updates.language = "nl";
+    }
+
     // Hash password if access type is password
     if (updates.access?.type === "password" && updates.access?.password) {
       updates.access.password = await bcrypt.hash(updates.access.password, 12);

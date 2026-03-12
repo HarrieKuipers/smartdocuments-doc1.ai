@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardR
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookOpen, MessageSquare, X, Send, Loader2 } from "lucide-react";
+import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,6 +16,7 @@ interface ChatWidgetProps {
   brandPrimary?: string;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   terms?: { term: string; definition: string; occurrences: number }[];
+  language?: DocumentLanguage;
 }
 
 export interface ChatWidgetRef {
@@ -23,7 +25,7 @@ export interface ChatWidgetRef {
 }
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [] },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl" },
   ref
 ) {
   const [open, setOpen] = useState(false);
@@ -31,6 +33,8 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const L = getLangStrings(language).chat;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,13 +70,13 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, er is een fout opgetreden. Probeer het opnieuw.",
+          content: L.errorMessage,
         },
       ]);
     } finally {
       setLoading(false);
     }
-  }, [documentId, loading, messages]);
+  }, [documentId, loading, messages, L.errorMessage]);
 
   // Expose askQuestion and showTermDefinition to parent
   useImperativeHandle(ref, () => ({
@@ -84,14 +88,13 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
     },
     showTermDefinition(term: string, definition: string) {
       setOpen(true);
-      // Show the term as a user "click" and the definition as a predefined assistant response
       setMessages((prev) => [
         ...prev,
-        { role: "user", content: `Wat betekent "${term}"?` },
+        { role: "user", content: L.whatDoesItMean(term) },
         { role: "assistant", content: definition },
       ]);
     },
-  }), [sendMessageText]);
+  }), [sendMessageText, L]);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -100,12 +103,6 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
     setInput("");
     await sendMessageText(messageText);
   }
-
-  const suggestedQuestions = [
-    "Wat is de belangrijkste conclusie?",
-    "Kun je de hoofdpunten samenvatten?",
-    "Wat zijn de financiële details?",
-  ];
 
   return (
     <>
@@ -141,20 +138,20 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
               <div className="h-10 w-10 overflow-hidden rounded-full shadow-sm">
                 <img
                   src="/chat_agent.png"
-                  alt="AI Assistent"
+                  alt="AI Assistant"
                   className="h-full w-full object-cover"
                 />
               </div>
               <div>
                 <p className="font-medium">
-                  {chatMode === "terms-only" ? "Begrippen" : "AI Assistent"}
+                  {chatMode === "terms-only" ? L.headerTitleTermsOnly : L.headerTitle}
                 </p>
                 <p className="text-xs opacity-80">
                   {chatMode === "terms-only"
-                    ? "Klik op een begrip in de tekst"
+                    ? L.subtitleTermsOnly
                     : chatMode === "terms-and-chat"
-                      ? "Begrippen & vragen"
-                      : "Altijd beschikbaar"}
+                      ? L.subtitleTermsAndChat
+                      : L.subtitleFull}
                 </p>
               </div>
             </div>
@@ -171,18 +168,18 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             {messages.length === 0 && chatMode === "terms-only" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
-                  Klik op een gemarkeerd begrip in de tekst om de definitie te zien
+                  {L.emptyTermsOnly}
                 </p>
                 {terms.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Begrippen in dit document</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{L.termsLabel}</p>
                     {terms.map((t, i) => (
                       <button
                         key={i}
                         onClick={() => {
                           setMessages((prev) => [
                             ...prev,
-                            { role: "user", content: `Wat betekent "${t.term}"?` },
+                            { role: "user", content: L.whatDoesItMean(t.term) },
                             { role: "assistant", content: t.definition },
                           ]);
                         }}
@@ -199,18 +196,18 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             {messages.length === 0 && chatMode === "terms-and-chat" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
-                  Klik op een begrip of stel een vraag over het document
+                  {L.emptyTermsAndChat}
                 </p>
                 {terms.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Begrippen in dit document</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{L.termsLabel}</p>
                     {terms.slice(0, 5).map((t, i) => (
                       <button
                         key={i}
                         onClick={() => {
                           setMessages((prev) => [
                             ...prev,
-                            { role: "user", content: `Wat betekent "${t.term}"?` },
+                            { role: "user", content: L.whatDoesItMean(t.term) },
                             { role: "assistant", content: t.definition },
                           ]);
                         }}
@@ -223,8 +220,8 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   </div>
                 )}
                 <div className="space-y-2 border-t pt-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Of stel een vraag</p>
-                  {suggestedQuestions.map((q, i) => (
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{L.orAskQuestion}</p>
+                  {L.suggestedQuestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => setInput(q)}
@@ -239,10 +236,10 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             {messages.length === 0 && chatMode === "full" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
-                  Stel een vraag over het document
+                  {L.emptyFull}
                 </p>
                 <div className="space-y-2">
-                  {suggestedQuestions.map((q, i) => (
+                  {L.suggestedQuestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => setInput(q)}
@@ -281,7 +278,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl bg-gray-100 px-4 py-2">
                   <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                  <span className="text-sm text-gray-500">Typen...</span>
+                  <span className="text-sm text-gray-500">{L.typing}</span>
                 </div>
               </div>
             )}
@@ -294,7 +291,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Stel een vraag over het document..."
+                  placeholder={L.inputPlaceholder}
                   className="flex-1"
                   disabled={loading}
                 />
@@ -311,7 +308,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
           ) : (
             <div className="border-t px-4 py-2.5">
               <p className="text-xs text-center text-muted-foreground">
-                Klik op een gemarkeerd woord in de tekst
+                {L.clickHighlightedWord}
               </p>
             </div>
           )}

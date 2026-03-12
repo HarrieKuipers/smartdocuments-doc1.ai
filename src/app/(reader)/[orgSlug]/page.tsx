@@ -15,8 +15,6 @@ import {
   BarChart3,
   Hash,
   Eye,
-  Building,
-  Users,
   ChevronDown,
   Loader2,
 } from "lucide-react";
@@ -545,26 +543,6 @@ export default function ReaderPage() {
               </Suspense>
             )}
 
-            {/* Audience Context Badges */}
-            {doc.audienceContext && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="gap-1.5 rounded-full border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
-                >
-                  <Building className="h-3.5 w-3.5 text-gray-400" />
-                  {doc.audienceContext.documentType}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="gap-1.5 rounded-full border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
-                >
-                  <Users className="h-3.5 w-3.5 text-gray-400" />
-                  {t.for}: {doc.audienceContext.audience}
-                </Badge>
-              </div>
-            )}
-
             {/* Summary */}
             <section id="samenvatting" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
@@ -728,6 +706,7 @@ export default function ReaderPage() {
         brandPrimary={brandPrimary}
         chatMode={doc.chatMode || "terms-only"}
         terms={doc.content.terms}
+        language={doc.language || "nl"}
       />
     </div>
   );

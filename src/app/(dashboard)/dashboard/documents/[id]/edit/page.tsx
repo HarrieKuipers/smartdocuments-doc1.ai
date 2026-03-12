@@ -77,6 +77,7 @@ interface DocumentData {
   customSlug?: string;
   coverImageUrl?: string;
   customCoverUrl?: string;
+  language?: "nl" | "en";
 }
 
 // -- Rich Text Toolbar --
@@ -180,6 +181,7 @@ export default function DocumentEditPage() {
   const [templateId, setTemplateId] = useState("doc1");
   const [templateOptions, setTemplateOptions] = useState<TemplateOption[]>([]);
   const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
+  const [language, setLanguage] = useState<"nl" | "en">("nl");
   const [customSlug, setCustomSlug] = useState("");
   const [keyPoints, setKeyPoints] = useState<{ text: string; explanation?: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
@@ -217,6 +219,7 @@ export default function DocumentEditPage() {
         setSummary(data.content?.summary?.original || "");
         setTemplateId(data.template || "doc1");
         setChatMode(data.chatMode || "terms-only");
+        setLanguage(data.language || "nl");
         setCustomSlug(data.customSlug || "");
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
@@ -252,6 +255,7 @@ export default function DocumentEditPage() {
           "content.keyPoints": cleanKeyPoints,
           "content.findings": cleanFindings,
           "content.terms": cleanTerms,
+          language,
           template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
@@ -273,14 +277,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, templateId, templateOptions, chatMode, customSlug, keyPoints, findings, terms]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, templateId, chatMode, customSlug, contentVersion, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, contentVersion, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -653,6 +657,25 @@ export default function DocumentEditPage() {
                   </div>
 
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Taal verwerking</Label>
+                      <div className="flex items-center gap-3">
+                        <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Select value={language} onValueChange={(v) => setLanguage(v as "nl" | "en")}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nl">Nederlands</SelectItem>
+                            <SelectItem value="en">Engels</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Wijzig de taal en herindexeer om opnieuw te verwerken
+                      </p>
+                    </div>
+
                     <div className="space-y-2">
                       <Label>Toegang</Label>
                       <Select value={accessType} onValueChange={setAccessType}>

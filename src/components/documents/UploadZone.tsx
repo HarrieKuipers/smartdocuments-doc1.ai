@@ -2,17 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileText, X, Loader2, Globe } from "lucide-react";
+import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const ACCEPTED_TYPES = [
   "application/pdf",
@@ -24,7 +17,6 @@ export default function UploadZone() {
   const router = useRouter();
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [language, setLanguage] = useState<"nl" | "en">("nl");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -82,7 +74,6 @@ export default function UploadZone() {
           mimeType: file.type,
           sizeBytes: file.size,
           storageKey: key,
-          language,
         }),
       });
       if (!docRes.ok) {
@@ -190,19 +181,7 @@ export default function UploadZone() {
           )}
 
           {!uploading && (
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                <Select value={language} onValueChange={(v) => setLanguage(v as "nl" | "en")}>
-                  <SelectTrigger className="w-full" onClick={(e) => e.stopPropagation()}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="nl">Nederlands — verwerking in het Nederlands</SelectItem>
-                    <SelectItem value="en">Engels — processing in English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="mt-4">
               <Button
                 className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
                 onClick={(e) => {

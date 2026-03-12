@@ -10,8 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   ArrowRight,
+  Globe,
   Loader2,
   X,
   Sparkles,
@@ -26,6 +34,7 @@ interface DocumentData {
   version?: string;
   tags: string[];
   description?: string;
+  language?: "nl" | "en";
   sourceFile: { filename: string };
 }
 
@@ -46,6 +55,7 @@ export default function MetadataPage() {
   const [version, setVersion] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [description, setDescription] = useState("");
+  const [language, setLanguage] = useState<"nl" | "en">("nl");
 
   useEffect(() => {
     async function fetchData() {
@@ -65,6 +75,7 @@ export default function MetadataPage() {
         setVersion(data.version || "");
         setTags(data.tags || []);
         setDescription(data.description || "");
+        setLanguage(data.language || "nl");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -109,6 +120,7 @@ export default function MetadataPage() {
           version: version || undefined,
           tags,
           description,
+          language,
         }),
       });
       if (!res.ok) throw new Error();
@@ -265,6 +277,25 @@ export default function MetadataPage() {
               placeholder="Korte beschrijving van het document"
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Taal verwerking</Label>
+            <div className="flex items-center gap-3">
+              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={language} onValueChange={(v) => setLanguage(v as "nl" | "en")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nl">Nederlands — verwerking in het Nederlands</SelectItem>
+                  <SelectItem value="en">Engels — processing in English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              De taal waarin het document wordt verwerkt en geanalyseerd
+            </p>
           </div>
         </CardContent>
       </Card>
