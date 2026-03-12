@@ -62,10 +62,23 @@ export async function PUT(
       updates.access.password = await bcrypt.hash(updates.access.password, 12);
     }
 
+    // Strip _id from subdocument arrays to prevent Mongoose conflicts
+    const arrayFields = ["content.keyPoints", "content.findings", "content.terms"];
+    for (const field of arrayFields) {
+      if (Array.isArray(updates[field])) {
+        updates[field] = updates[field].map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ({ _id, ...rest }: Record<string, unknown>) => rest
+        );
+      }
+    }
+
     // Validate and slugify customSlug
+    let unsetSlug = false;
     if ("customSlug" in updates) {
       if (updates.customSlug === "" || updates.customSlug === null) {
-        updates.customSlug = null;
+        delete updates.customSlug;
+        unsetSlug = true;
       } else {
         const slugified = generateSlug(updates.customSlug);
         if (slugified.length < 3) {
@@ -89,9 +102,14 @@ export async function PUT(
       }
     }
 
+    const updateOp: Record<string, unknown> = { $set: updates };
+    if (unsetSlug) {
+      updateOp.$unset = { customSlug: "" };
+    }
+
     const doc = await DocumentModel.findOneAndUpdate(
       { _id: id, organizationId: session.user.organizationId },
-      { $set: updates },
+      updateOp,
       { new: true }
     ).lean();
 
@@ -110,9 +128,14 @@ export async function PUT(
 
     return NextResponse.json({ data: doc });
   } catch (error) {
-    console.error("Document PUT error:", error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Document PUT error:", {
+      message: err.message,
+      name: err.name,
+      stack: err.stack,
+    });
     return NextResponse.json(
-      { error: "Kon document niet bijwerken." },
+      { error: `Kon document niet bijwerken: ${err.message}` },
       { status: 500 }
     );
   }

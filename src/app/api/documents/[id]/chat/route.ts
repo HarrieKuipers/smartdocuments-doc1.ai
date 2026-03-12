@@ -4,6 +4,7 @@ import DocumentModel from "@/models/Document";
 import ChatMessage from "@/models/ChatMessage";
 import ChatQuestion from "@/models/ChatQuestion";
 import anthropic, { MODELS } from "@/lib/ai/client";
+import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import { nanoid } from "nanoid";
 
 export async function POST(
@@ -25,7 +26,7 @@ export async function POST(
 
     // Get document for context
     const doc = await DocumentModel.findById(id)
-      .select("title chatMode content.originalText content.summary.original")
+      .select("title chatMode language content.originalText content.summary.original")
       .lean();
 
     if (!doc) {
@@ -53,16 +54,16 @@ export async function POST(
       })
     );
 
+    const lang: DocumentLanguage = (doc.language as DocumentLanguage) || "nl";
+    const L = getLangStrings(lang);
+
     const chatStartTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODELS.chat,
       max_tokens: 1024,
-      system: `Je bent een behulpzame AI-assistent die vragen beantwoordt over het document "${doc.title}".
-Beantwoord vragen uitsluitend op basis van de inhoud van het document.
-Als het antwoord niet in het document staat, zeg dat dan eerlijk.
-Antwoord altijd in het Nederlands. Wees beknopt maar informatief.
+      system: `${L.chatSystemPrompt(doc.title)}
 
-Documentinhoud:
+${lang === "nl" ? "Documentinhoud" : "Document content"}:
 ${docContext}`,
       messages: [
         ...conversationHistory,

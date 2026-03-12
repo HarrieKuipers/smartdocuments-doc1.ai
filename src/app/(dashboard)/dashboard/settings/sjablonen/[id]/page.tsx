@@ -59,6 +59,7 @@ interface TemplateData {
   fontBody?: string;
   headerStyle: "default" | "split-bar" | "inline-logo";
   cornerRadius?: "none" | "small" | "medium" | "large";
+  logoPosition?: "left" | "center" | "right";
   showB1Button: boolean;
   showInfoBox: boolean;
   infoBoxLabel: string;
@@ -86,31 +87,30 @@ const FONT_OPTIONS = [
   { value: "IBM Plex Sans", label: "IBM Plex Sans" },
 ];
 
-const RADIUS_OPTIONS = [
-  { value: "none", label: "Geen", css: "rounded-none" },
-  { value: "small", label: "Klein", css: "rounded" },
-  { value: "medium", label: "Medium", css: "rounded-lg" },
-  { value: "large", label: "Groot", css: "rounded-2xl" },
+const LOGO_POSITION_OPTIONS = [
+  { value: "left", label: "Links" },
+  { value: "center", label: "Midden" },
+  { value: "right", label: "Rechts" },
 ];
 
 // Mock data for preview
 const MOCK = {
-  title: "Belastingdienst – Visie op AI",
-  displayTitle: "Hoe de Belastingdienst AI wil gebruiken om u beter te helpen",
-  organization: "Belastingdienst",
-  author: "Ministerie van Financiën",
+  title: "Voorbeelddocument",
+  displayTitle: "Uw document wordt hier weergegeven met de gekozen stijl",
+  organization: "Mijn organisatie",
+  author: "Jan de Vries",
   date: "12 maart 2026",
-  version: "2.1",
-  tags: ["AI", "Overheid", "Belastingdienst"],
-  summary: "De Belastingdienst zet in op kunstmatige intelligentie om de dienstverlening te verbeteren en werkdruk te verlagen. Het doel is om routinetaken te automatiseren, zodat medewerkers meer tijd hebben voor complexe zaken. De nadruk ligt op verantwoord gebruik van AI, waarbij menselijke controle centraal blijft staan.",
+  version: "1.0",
+  tags: ["Voorbeeld", "Preview", "Sjabloon"],
+  summary: "Dit is een voorbeeldtekst om te laten zien hoe uw documenten eruit zullen zien met dit sjabloon. De opmaak, kleuren en typografie worden direct toegepast zodat u het resultaat kunt beoordelen voordat u het sjabloon opslaat.",
   keyPoints: [
-    { text: "AI moet personeelstekorten en werkdruk oplossen door routinetaken over te nemen", num: 1 },
-    { text: "Medewerkers blijven centraal – AI ondersteunt maar vervangt geen menselijke besluitvorming", num: 2 },
-    { text: "Transparantie en uitlegbaarheid zijn kernwaarden bij het inzetten van AI-systemen", num: 3 },
+    { text: "Hier verschijnt het eerste hoofdpunt van het document", num: 1 },
+    { text: "Het tweede hoofdpunt wordt op dezelfde manier weergegeven", num: 2 },
+    { text: "Elk hoofdpunt kan worden uitgevouwen voor meer uitleg", num: 3 },
   ],
   findings: [
-    { category: "De regels op een rij", title: "Europese AI-verordening is leidend", content: "Alle AI-toepassingen moeten voldoen aan de Europese regels. Dit betekent extra controles bij hoog-risico toepassingen." },
-    { category: "Wat levert het op?", title: "40% snellere verwerking verwacht", content: "Door automatisering van routinecontroles kan de verwerktijd fors omlaag. Burgers krijgen sneller uitsluitsel." },
+    { category: "Categorie A", title: "Eerste bevinding", content: "Een korte beschrijving van de bevinding. Dit geeft lezers snel inzicht in de belangrijkste conclusies." },
+    { category: "Categorie B", title: "Tweede bevinding", content: "Nog een samenvatting van een bevinding uit het document. De lay-out past zich aan aan uw sjablooninstellingen." },
   ],
 };
 
@@ -125,12 +125,15 @@ export default function TemplateEditPage() {
   const [formData, setFormData] = useState<FormData | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [dirty, setDirty] = useState(false);
 
   // Load template
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/templates/${params.id}`);
+        const res = await fetch(`/api/templates/${params.id}`, {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error();
         const { data } = await res.json();
         setTemplate(data);
@@ -147,6 +150,7 @@ export default function TemplateEditPage() {
           fontBody: data.fontBody || "",
           headerStyle: data.headerStyle,
           cornerRadius: data.cornerRadius || "medium",
+          logoPosition: data.logoPosition || "center",
           showB1Button: data.showB1Button,
           showInfoBox: data.showInfoBox,
           infoBoxLabel: data.infoBoxLabel,
@@ -165,33 +169,35 @@ export default function TemplateEditPage() {
     load();
   }, [params.id, router]);
 
-  // Auto-save
-  const saveRef = useRef<NodeJS.Timeout>(undefined);
-  useEffect(() => {
-    if (!template || !formData || loading) return;
-    setSaved(false);
-    clearTimeout(saveRef.current);
-    saveRef.current = setTimeout(async () => {
-      setSaving(true);
-      try {
-        const res = await fetch(`/api/templates/${template.templateId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
-        if (!res.ok) throw new Error();
-        setSaved(true);
-      } catch {
-        toast.error("Opslaan mislukt.");
-      } finally {
-        setSaving(false);
+  // Explicit save function
+  async function handleSave() {
+    if (!template || !formData) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/templates/${template.templateId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        toast.error(errorData.error || "Opslaan mislukt.");
+        return;
       }
-    }, 1500);
-    return () => clearTimeout(saveRef.current);
-  }, [formData, template, loading]);
+      setSaved(true);
+      setDirty(false);
+      toast.success("Sjabloon opgeslagen!");
+    } catch {
+      toast.error("Opslaan mislukt.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const updateForm = useCallback((updates: Partial<FormData>) => {
     setFormData((prev) => (prev ? { ...prev, ...updates } : prev));
+    setDirty(true);
+    setSaved(false);
   }, []);
 
   const handleLogoUpload = useCallback(async (file: File) => {
@@ -246,7 +252,7 @@ export default function TemplateEditPage() {
     );
   }
 
-  const radiusCss = RADIUS_OPTIONS.find((r) => r.value === formData.cornerRadius)?.css || "rounded-lg";
+  const radiusCss = { none: "rounded-none", small: "rounded", medium: "rounded-lg", large: "rounded-2xl" }[formData.cornerRadius || "medium"] || "rounded-lg";
 
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col">
@@ -263,14 +269,27 @@ export default function TemplateEditPage() {
             <Badge variant="secondary" className="text-[10px]">Systeem</Badge>
           )}
         </div>
-        <span className="flex items-center gap-1 text-sm text-muted-foreground">
-          {saving ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : saved ? (
-            <Check className="h-3 w-3 text-green-500" />
-          ) : null}
-          {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Niet opgeslagen"}
-        </span>
+        <div className="flex items-center gap-2">
+          {saved && !dirty && (
+            <span className="flex items-center gap-1 text-xs text-green-600">
+              <Check className="h-3 w-3" />
+              Opgeslagen
+            </span>
+          )}
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            className="bg-[#0062EB] hover:bg-[#0050C0]"
+          >
+            {saving ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {saving ? "Opslaan..." : "Opslaan"}
+          </Button>
+        </div>
       </div>
 
       {/* Split view */}
@@ -427,12 +446,16 @@ export default function TemplateEditPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Hoekafronding</Label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {RADIUS_OPTIONS.map((opt) => (
-                    <button key={opt.value} type="button" onClick={() => updateForm({ cornerRadius: opt.value as FormData["cornerRadius"] })}
-                      className={`flex flex-col items-center gap-1 rounded border p-2 text-[10px] transition-all ${formData.cornerRadius === opt.value ? "border-primary ring-1 ring-primary/20" : "hover:border-gray-400"}`}>
-                      <div className={`h-5 w-8 border-2 ${opt.css}`} style={{ borderColor: formData.primary }} />
+                <Label className="text-xs">Positie logo</Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {LOGO_POSITION_OPTIONS.map((opt) => (
+                    <button key={opt.value} type="button" onClick={() => updateForm({ logoPosition: opt.value as FormData["logoPosition"] })}
+                      className={`flex flex-col items-center gap-1 rounded border p-2.5 text-[10px] transition-all ${formData.logoPosition === opt.value ? "border-primary ring-1 ring-primary/20" : "hover:border-gray-400"}`}>
+                      <div className="flex h-5 w-full items-center px-1">
+                        <div
+                          className={`h-3 w-6 rounded-sm bg-gray-400 ${opt.value === "left" ? "mr-auto" : opt.value === "center" ? "mx-auto" : "ml-auto"}`}
+                        />
+                      </div>
                       {opt.label}
                     </button>
                   ))}
@@ -473,8 +496,8 @@ export default function TemplateEditPage() {
             {/* Header preview */}
             {formData.headerStyle === "split-bar" && formData.logo ? (
               <header>
-                <div className="border-b border-gray-200 bg-white px-3 pb-4 pt-2 text-center">
-                  <img src={formData.logo} alt="" className="mx-auto h-[50px]" />
+                <div className={`border-b border-gray-200 bg-white px-3 pb-4 pt-2 ${formData.logoPosition === "left" ? "text-left" : formData.logoPosition === "right" ? "text-right" : "text-center"}`}>
+                  <img src={formData.logo} alt="" className={`h-[50px] ${formData.logoPosition === "left" ? "" : formData.logoPosition === "right" ? "ml-auto" : "mx-auto"}`} />
                 </div>
                 <div className="px-4 py-3" style={{ backgroundColor: formData.primary }}>
                   <h1 className="text-base font-normal text-white" style={{ fontFamily: formData.fontHeading || undefined }}>
@@ -483,15 +506,18 @@ export default function TemplateEditPage() {
                 </div>
               </header>
             ) : formData.headerStyle === "inline-logo" && formData.logo ? (
-              <header className="flex items-center gap-4 px-6 py-3" style={{ backgroundColor: formData.primary }}>
+              <header className={`flex items-center gap-4 px-6 py-3 ${formData.logoPosition === "right" ? "flex-row-reverse" : ""}`} style={{ backgroundColor: formData.primary }}>
                 <img src={formData.logo} alt="" className="h-8 bg-white/20 p-1 rounded" />
-                <h1 className="text-base font-bold text-white" style={{ fontFamily: formData.fontHeading || undefined }}>
+                <h1 className={`text-base font-bold text-white ${formData.logoPosition === "center" ? "flex-1 text-center" : "flex-1"}`} style={{ fontFamily: formData.fontHeading || undefined }}>
                   {MOCK.displayTitle}
                 </h1>
               </header>
             ) : (
               <header className="sticky top-0 z-10 border-b bg-white shadow-sm">
-                <div className="flex items-center justify-between px-6 py-3">
+                <div className={`flex items-center px-6 py-3 ${formData.logo ? "gap-3" : ""} ${formData.logoPosition === "right" ? "flex-row-reverse" : formData.logoPosition === "center" ? "justify-center" : "justify-between"}`}>
+                  {formData.logo && (
+                    <img src={formData.logo} alt="" className="h-6" />
+                  )}
                   <h1 className="text-base font-semibold text-gray-900" style={{ fontFamily: formData.fontHeading || undefined }}>
                     {MOCK.displayTitle}
                   </h1>

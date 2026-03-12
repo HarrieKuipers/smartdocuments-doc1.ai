@@ -31,6 +31,7 @@ interface RecentDocument {
   createdAt: string;
   analytics: { totalViews: number };
   coverImageUrl?: string;
+  customCoverUrl?: string;
 }
 
 export default function DashboardPage() {
@@ -257,10 +258,10 @@ export default function DashboardPage() {
                 href={`/dashboard/documents/${doc._id}/edit`}
               >
                 <Card className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md">
-                  {doc.coverImageUrl ? (
+                  {(doc.customCoverUrl || doc.coverImageUrl) ? (
                     <div className="aspect-[1200/630] w-full overflow-hidden bg-gray-100">
                       <img
-                        src={doc.coverImageUrl}
+                        src={doc.customCoverUrl || doc.coverImageUrl}
                         alt={doc.title}
                         className="h-full w-full object-cover"
                       />

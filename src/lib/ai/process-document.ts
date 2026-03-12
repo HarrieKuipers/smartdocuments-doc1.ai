@@ -8,6 +8,7 @@ import { generateLanguageLevelSummaries } from "./generate-summary";
 import { extractTerms } from "./extract-terms";
 import { generateAndUploadCover } from "./generate-cover";
 import { generateDisplayTitle } from "./generate-display-title";
+import type { DocumentLanguage } from "./language";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
 
@@ -19,6 +20,8 @@ export async function processDocument(
 
   const doc = await DocumentModel.findById(documentId);
   if (!doc) throw new Error("Document not found");
+
+  const lang: DocumentLanguage = doc.language || "nl";
 
   try {
     // Update status
@@ -51,7 +54,7 @@ export async function processDocument(
 
     let audienceContext: AudienceAnalysis | undefined;
     try {
-      audienceContext = await analyzeAudience(text);
+      audienceContext = await analyzeAudience(text, lang);
       doc.audienceContext = {
         documentType: audienceContext.documentType,
         audience: audienceContext.audience,
@@ -67,7 +70,7 @@ export async function processDocument(
     doc.processingProgress = { step: "content-analysis", percentage: 30 };
     await doc.save();
 
-    const analysis = await analyzeContent(text, audienceContext);
+    const analysis = await analyzeContent(text, audienceContext, lang);
     doc.content.summary = {
       original: analysis.summary,
       B1: "",
@@ -88,7 +91,8 @@ export async function processDocument(
       try {
         const displayTitle = await generateDisplayTitle(
           doc.title,
-          analysis.summary
+          analysis.summary,
+          lang
         );
         doc.displayTitle = displayTitle;
         await doc.save();
@@ -104,7 +108,8 @@ export async function processDocument(
 
     const levelSummaries = await generateLanguageLevelSummaries(
       analysis.summary,
-      audienceContext
+      audienceContext,
+      lang
     );
     doc.content.summary.B1 = levelSummaries.B1;
     doc.content.summary.B2 = levelSummaries.B2;
@@ -116,7 +121,7 @@ export async function processDocument(
     doc.processingProgress = { step: "term-extraction", percentage: 80 };
     await doc.save();
 
-    const terms = await extractTerms(text);
+    const terms = await extractTerms(text, lang);
     doc.content.terms = terms;
     await doc.save();
 

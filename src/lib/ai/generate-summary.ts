@@ -1,5 +1,6 @@
 import anthropic, { MODELS } from "./client";
 import type { AudienceAnalysis } from "./analyze-audience";
+import { type DocumentLanguage, getLangStrings } from "./language";
 
 interface LanguageLevelSummaries {
   B1: string;
@@ -9,12 +10,14 @@ interface LanguageLevelSummaries {
 
 export async function generateLanguageLevelSummaries(
   originalSummary: string,
-  audienceContext?: AudienceAnalysis
+  audienceContext?: AudienceAnalysis,
+  lang: DocumentLanguage = "nl"
 ): Promise<LanguageLevelSummaries> {
+  const L = getLangStrings(lang);
   const isInternal = audienceContext && !audienceContext.isExternal;
 
   const perspectiveInstruction = isInternal
-    ? `\nBELANGRIJK: Dit is een intern document bedoeld voor ${audienceContext.audience}. Herschrijf naar een helder en overzichtelijk format speciaal voor ${audienceContext.audience}. Behoud het instructieve karakter. Spreek de lezer direct aan (je/jij) en vertel wat zij moeten doen. Vermijd het uitleggen van de organisatie zelf alsof de lezer een buitenstaander is. Focus op actiegerichte stappen en heldere interne procedures.`
+    ? L.summaryPerspectiveInternal(audienceContext.audience)
     : "";
 
   const response = await anthropic.messages.create({
@@ -23,21 +26,19 @@ export async function generateLanguageLevelSummaries(
     messages: [
       {
         role: "user",
-        content: `Herschrijf de volgende samenvatting op drie verschillende taalniveaus. Alle output in het Nederlands.
+        content: `${L.summaryPrompt} ${L.outputLanguage}.
 ${perspectiveInstruction}
-Originele samenvatting:
+
+${lang === "nl" ? "Originele samenvatting" : "Original summary"}:
 ${originalSummary}
 
-Taalniveaus:
-- B1: Eenvoudig Nederlands. Korte zinnen, dagelijkse woorden, geen vakjargon. Geschikt voor mensen met basiskennis van het Nederlands.
-- B2: Gemiddeld niveau. Duidelijke zinnen, beperkt vakjargon met uitleg, geschikt voor het algemene publiek.
-- C1: Geavanceerd/academisch niveau. Complexere zinsstructuren, vakjargon toegestaan, geschikt voor professionals.
+${L.summaryLevels}
 
 Geef het resultaat als JSON (geen markdown, alleen JSON):
 {
-  "B1": "samenvatting op B1 niveau...",
-  "B2": "samenvatting op B2 niveau...",
-  "C1": "samenvatting op C1 niveau..."
+  "B1": "${lang === "nl" ? "samenvatting op B1 niveau" : "summary at B1 level"}...",
+  "B2": "${lang === "nl" ? "samenvatting op B2 niveau" : "summary at B2 level"}...",
+  "C1": "${lang === "nl" ? "samenvatting op C1 niveau" : "summary at C1 level"}..."
 }`,
       },
     ],

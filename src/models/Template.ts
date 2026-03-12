@@ -18,6 +18,7 @@ export interface ITemplate extends Document {
   // Layout
   headerStyle: "default" | "split-bar" | "inline-logo";
   cornerRadius?: "none" | "small" | "medium" | "large";
+  logoPosition?: "left" | "center" | "right";
   // Features
   showB1Button: boolean;
   showInfoBox: boolean;
@@ -59,6 +60,11 @@ const TemplateSchema = new Schema<ITemplate>(
       type: String,
       enum: ["none", "small", "medium", "large"],
       default: "medium",
+    },
+    logoPosition: {
+      type: String,
+      enum: ["left", "center", "right"],
+      default: "center",
     },
     // Features
     showB1Button: { type: Boolean, default: false },

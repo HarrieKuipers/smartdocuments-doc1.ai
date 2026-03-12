@@ -34,7 +34,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ data: template });
+    return NextResponse.json({ data: template }, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     console.error("Template GET error:", error);
     return NextResponse.json(
@@ -87,6 +89,7 @@ export async function PUT(
       "fontBody",
       "headerStyle",
       "cornerRadius",
+      "logoPosition",
       "showB1Button",
       "showInfoBox",
       "infoBoxLabel",

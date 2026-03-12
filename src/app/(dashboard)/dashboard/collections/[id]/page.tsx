@@ -55,6 +55,8 @@ interface Document {
   authors: string[];
   createdAt: string;
   collectionId?: string;
+  coverImageUrl?: string;
+  customCoverUrl?: string;
 }
 
 export default function CollectionDetailPage() {
@@ -511,9 +513,20 @@ export default function CollectionDetailPage() {
           {docs.map((doc) => (
             <Card
               key={doc._id}
-              className="group relative transition-shadow hover:shadow-md"
+              className="group relative overflow-hidden transition-shadow hover:shadow-md"
             >
-              <CardContent className="p-6">
+              {(doc.customCoverUrl || doc.coverImageUrl) && (
+                <Link href={`/dashboard/documents/${doc._id}/edit`}>
+                  <div className="h-32 overflow-hidden bg-gray-100">
+                    <img
+                      src={doc.customCoverUrl || doc.coverImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                </Link>
+              )}
+              <CardContent className={`p-4 ${!(doc.customCoverUrl || doc.coverImageUrl) ? "pt-6" : ""}`}>
                 <Link href={`/dashboard/documents/${doc._id}/edit`}>
                   <h3 className="mb-2 font-medium line-clamp-2 cursor-pointer hover:text-[#0062EB]">
                     {doc.title}

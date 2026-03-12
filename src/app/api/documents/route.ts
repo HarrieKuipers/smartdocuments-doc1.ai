@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { filename, mimeType, sizeBytes, storageKey } = await req.json();
+    const { filename, mimeType, sizeBytes, storageKey, language } = await req.json();
 
     const title = filename.replace(/\.[^.]+$/, "");
     const shortId = generateShortId();
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       organizationId: session.user.organizationId,
       uploadedBy: session.user.id,
       title,
+      language: language === "en" ? "en" : "nl",
       sourceFile: {
         url: getFileUrl(storageKey),
         filename,

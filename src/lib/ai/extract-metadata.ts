@@ -1,4 +1,5 @@
 import anthropic, { MODELS } from "./client";
+import { type DocumentLanguage, getLangStrings } from "./language";
 
 interface ExtractedMetadata {
   title: string;
@@ -11,10 +12,12 @@ interface ExtractedMetadata {
 }
 
 export async function extractMetadata(
-  text: string
+  text: string,
+  lang: DocumentLanguage = "nl"
 ): Promise<ExtractedMetadata> {
   // Use first ~4000 chars for metadata extraction
   const excerpt = text.slice(0, 4000);
+  const L = getLangStrings(lang);
 
   const response = await anthropic.messages.create({
     model: MODELS.processing,
@@ -22,20 +25,20 @@ export async function extractMetadata(
     messages: [
       {
         role: "user",
-        content: `Analyseer de volgende tekst en extraheer metadata. Geef het resultaat als JSON.
+        content: `${L.metadataPrompt} ${lang === "nl" ? "Geef het resultaat als JSON." : "Provide the result as JSON."}
 
-Tekst:
+${lang === "nl" ? "Tekst" : "Text"}:
 ${excerpt}
 
-Geef een JSON object met exact deze structuur (geen markdown, alleen JSON):
+${lang === "nl" ? "Geef een JSON object met exact deze structuur (geen markdown, alleen JSON):" : "Provide a JSON object with exactly this structure (no markdown, only JSON):"}
 {
-  "title": "de titel van het document",
-  "displayTitle": "een korte, communicatieve titel die de kern van het document duidelijk maakt voor de lezer (max 15 woorden, B1 niveau, geen jargon)",
-  "authors": ["auteur1", "auteur2"],
-  "publicationDate": "YYYY-MM-DD of null",
-  "version": "versienummer of null",
+  "title": "${lang === "nl" ? "de titel van het document" : "the title of the document"}",
+  "displayTitle": "${L.metadataDisplayTitle}",
+  "authors": ["${lang === "nl" ? "auteur1" : "author1"}", "${lang === "nl" ? "auteur2" : "author2"}"],
+  "publicationDate": "YYYY-MM-DD ${lang === "nl" ? "of" : "or"} null",
+  "version": "${lang === "nl" ? "versienummer of" : "version number or"} null",
   "tags": ["tag1", "tag2", "tag3"],
-  "description": "korte beschrijving van het document in 1-2 zinnen"
+  "description": "${lang === "nl" ? "korte beschrijving van het document in 1-2 zinnen" : "short description of the document in 1-2 sentences"}"
 }`,
       },
     ],

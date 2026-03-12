@@ -8,10 +8,15 @@ export interface TemplateConfig {
   primaryDark: string;
   primaryLight: string;
   logo?: string;
+  logoPosition?: "left" | "center" | "right";
   headerStyle: "default" | "split-bar" | "inline-logo";
   showB1Button: boolean;
   showInfoBox: boolean;
   infoBoxLabel: string;
+  showChatWidget?: boolean;
+  showTableOfContents?: boolean;
+  footerText?: string;
+  footerLink?: string;
 }
 
 export const TEMPLATES: Record<TemplateId, TemplateConfig> = {

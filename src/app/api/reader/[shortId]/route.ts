@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
+import { getTemplateAsync } from "@/lib/templates.server";
 
 export async function GET(
   req: NextRequest,
@@ -63,12 +64,16 @@ export async function GET(
       terms: content.terms,
     };
 
+    // Resolve full template config (DB custom templates + static fallback)
+    const templateConfig = await getTemplateAsync(doc.template);
+
     return NextResponse.json(
       {
         data: {
           ...docData,
           content: publicContent,
           organization: org,
+          templateConfig,
         },
       },
       {

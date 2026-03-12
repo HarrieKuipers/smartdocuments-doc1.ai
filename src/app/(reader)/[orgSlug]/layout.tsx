@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     $or: [{ shortId: slug }, { customSlug: slug }],
     status: "ready",
   })
-    .select("title description tags coverImageUrl organizationId")
+    .select("title description tags coverImageUrl customCoverUrl organizationId")
     .lean();
 
   if (!doc) {
@@ -34,6 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${doc.title} | ${orgName}`;
   const description =
     doc.description || doc.tags?.join(", ") || "Document op doc1.ai";
+  const coverImage = (doc as { customCoverUrl?: string }).customCoverUrl || doc.coverImageUrl;
 
   return {
     title,
@@ -42,10 +43,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: doc.title,
       description,
       type: "article",
-      images: doc.coverImageUrl
+      images: coverImage
         ? [
             {
-              url: doc.coverImageUrl,
+              url: coverImage,
               width: 1200,
               height: 630,
               alt: doc.title,
@@ -57,7 +58,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: doc.title,
       description,
-      images: doc.coverImageUrl ? [doc.coverImageUrl] : [],
+      images: coverImage ? [coverImage] : [],
     },
   };
 }

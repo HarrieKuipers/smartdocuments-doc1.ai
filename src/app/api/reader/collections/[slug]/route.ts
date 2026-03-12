@@ -72,7 +72,7 @@ export async function GET(
       status: "ready",
     })
       .select(
-        "title shortId slug authors description coverImageUrl publicationDate tags pageCount createdAt"
+        "title shortId slug authors description coverImageUrl customCoverUrl publicationDate tags pageCount createdAt"
       )
       .sort({ createdAt: -1 })
       .lean();

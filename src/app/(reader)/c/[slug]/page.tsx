@@ -29,6 +29,7 @@ interface CollectionDocument {
   authors: string[];
   description?: string;
   coverImageUrl?: string;
+  customCoverUrl?: string;
   publicationDate?: string;
   tags: string[];
   pageCount?: number;
@@ -340,10 +341,10 @@ export default function PublicCollectionPage() {
               <Link key={doc._id} href={`/${doc.shortId}`}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border transition-all hover:shadow-lg">
                   {/* Cover image */}
-                  {doc.coverImageUrl ? (
+                  {(doc.customCoverUrl || doc.coverImageUrl) ? (
                     <div className="aspect-[16/10] overflow-hidden bg-gray-100">
                       <img
-                        src={doc.coverImageUrl}
+                        src={doc.customCoverUrl || doc.coverImageUrl}
                         alt={doc.title}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       />

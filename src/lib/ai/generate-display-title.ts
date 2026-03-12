@@ -1,28 +1,27 @@
 import anthropic, { MODELS } from "./client";
+import { type DocumentLanguage, getLangStrings } from "./language";
 
 export async function generateDisplayTitle(
   title: string,
-  summary: string
+  summary: string,
+  lang: DocumentLanguage = "nl"
 ): Promise<string> {
+  const L = getLangStrings(lang);
+
   const response = await anthropic.messages.create({
     model: MODELS.processing,
     max_tokens: 256,
     messages: [
       {
         role: "user",
-        content: `Je bent een communicatie-expert. Gegeven de originele documenttitel en een samenvatting, genereer een communicatieve, toegankelijke titel die de kern van het document direct duidelijk maakt voor de lezer.
+        content: `${L.displayTitlePrompt}
 
-Originele titel: ${title}
-Samenvatting: ${summary.slice(0, 2000)}
+${lang === "nl" ? "Originele titel" : "Original title"}: ${title}
+${lang === "nl" ? "Samenvatting" : "Summary"}: ${summary.slice(0, 2000)}
 
-Regels:
-- De titel moet kort zijn (max 10-15 woorden)
-- Gebruik begrijpelijke taal (B1 niveau)
-- Maak het concreet: wat leert de lezer of waar gaat het document over?
-- Geen afkortingen of jargon tenzij zeer bekend
-- Geen aanhalingstekens om de titel
+${L.displayTitleRules}
 
-Geef alleen de titel terug, geen uitleg of extra tekst.`,
+${lang === "nl" ? "Geef alleen de titel terug, geen uitleg of extra tekst." : "Return only the title, no explanation or extra text."}`,
       },
     ],
   });

@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import PasswordGate from "@/components/reader/PasswordGate";
 import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
-import { getTemplate } from "@/lib/templates";
+import { getTemplate, type TemplateConfig } from "@/lib/templates";
+import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import DefaultHeader from "@/components/reader/headers/DefaultHeader";
 import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader";
 import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
@@ -56,10 +57,13 @@ interface ReaderDocument {
     audience: string;
     isExternal: boolean;
   };
+  language?: DocumentLanguage;
   template?: string;
+  templateConfig?: TemplateConfig;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   languageLevel?: "B1" | "B2" | "C1";
   coverImageUrl?: string;
+  customCoverUrl?: string;
   brandOverride?: { primary?: string };
   organization: {
     name: string;
@@ -116,7 +120,7 @@ export default function ReaderPage() {
         setFindingExplanations((prev) => ({ ...prev, [index]: data.response }));
       }
     } catch {
-      const fallback = "Kon geen uitleg ophalen. Probeer het later opnieuw.";
+      const fallback = getLangStrings(doc?.language || "nl").reader.couldNotLoad;
       if (type === "keypoint") {
         setKeyPointExplanations((prev) => ({ ...prev, [index]: fallback }));
       } else {
@@ -142,12 +146,10 @@ export default function ReaderPage() {
       if (kp.explanation) {
         setKeyPointExplanations((prev) => ({ ...prev, [index]: kp.explanation! }));
       } else {
-        fetchExplanation(
-          doc._id,
-          `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`,
-          "keypoint",
-          index,
-        );
+        const kpPrompt = doc.language === "en"
+          ? `Explain the following key point from the document "${doc.title}" in 2-3 sentences. Provide more context and background. Key point: "${kp.text}"`
+          : `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`;
+        fetchExplanation(doc._id, kpPrompt, "keypoint", index);
       }
     }
   }, [expandedKeyPoint, keyPointExplanations, doc, fetchExplanation]);
@@ -160,12 +162,10 @@ export default function ReaderPage() {
     setExpandedFinding(index);
     if (!findingExplanations[index] && doc) {
       const f = doc.content.findings[index];
-      fetchExplanation(
-        doc._id,
-        `Geef meer context en uitleg over de volgende bevinding uit het document "${doc.title}" in 2-3 zinnen. Categorie: "${f.category}". Titel: "${f.title}". Inhoud: "${f.content}"`,
-        "finding",
-        index,
-      );
+      const fPrompt = doc.language === "en"
+        ? `Provide more context and explanation about the following finding from the document "${doc.title}" in 2-3 sentences. Category: "${f.category}". Title: "${f.title}". Content: "${f.content}"`
+        : `Geef meer context en uitleg over de volgende bevinding uit het document "${doc.title}" in 2-3 zinnen. Categorie: "${f.category}". Titel: "${f.title}". Inhoud: "${f.content}"`;
+      fetchExplanation(doc._id, fPrompt, "finding", index);
     }
   }, [expandedFinding, findingExplanations, doc, fetchExplanation]);
 
@@ -179,9 +179,10 @@ export default function ReaderPage() {
 
       if (doc?.chatMode === "full") {
         // Full AI mode: ask AI for contextual explanation
-        chatRef.current?.askQuestion(
-          `Kun je uitleggen wat "${term}" betekent in de context van dit document?`
-        );
+        const termQ = doc.language === "en"
+          ? `Can you explain what "${term}" means in the context of this document?`
+          : `Kun je uitleggen wat "${term}" betekent in de context van dit document?`;
+        chatRef.current?.askQuestion(termQ);
       } else {
         // terms-only and terms-and-chat: show predefined definition directly - no AI call
         chatRef.current?.showTermDefinition(term, definition);
@@ -291,7 +292,7 @@ export default function ReaderPage() {
   }
 
   if (needsPassword) {
-    return <PasswordGate onUnlock={(pw) => fetchDocument(pw)} />;
+    return <PasswordGate onUnlock={(pw) => fetchDocument(pw)} lang="nl" />;
   }
 
   if (error || !doc) {
@@ -307,9 +308,11 @@ export default function ReaderPage() {
     );
   }
 
-  const template = getTemplate(doc.template);
+  const template = doc.templateConfig || getTemplate(doc.template);
   const brandPrimary = doc.brandOverride?.primary || template.primary;
   const primaryLight = template.primaryLight;
+  const t = getLangStrings(doc.language || "nl").reader;
+  const docLang = doc.language || "nl";
 
   const languageLevel: LanguageLevel = doc.languageLevel || "original";
 
@@ -383,10 +386,10 @@ export default function ReaderPage() {
                 </div>
 
                 {/* Cover Image */}
-                {doc.coverImageUrl && (
+                {(doc.customCoverUrl || doc.coverImageUrl) && (
                   <div className="mb-4 overflow-hidden rounded-xl bg-gray-100">
                     <img
-                      src={doc.coverImageUrl}
+                      src={doc.customCoverUrl || doc.coverImageUrl}
                       alt={doc.title}
                       className="w-full h-auto block"
                     />
@@ -397,7 +400,7 @@ export default function ReaderPage() {
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
                   <FileText className="h-3.5 w-3.5 text-gray-400" />
                   {doc.pageCount && (
-                    <span>{doc.pageCount} pagina&apos;s</span>
+                    <span>{doc.pageCount} {t.pages}</span>
                   )}
                 </div>
 
@@ -407,11 +410,11 @@ export default function ReaderPage() {
                     className="flex-1 rounded-xl"
                     onClick={() => {
                       analytics.trackDownload();
-                      window.open(doc.sourceFile.url, "_blank");
+                      window.open(`/api/reader/${doc.shortId}/pdf?download=true`, "_blank");
                     }}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Download PDF
+                    {t.downloadPdf}
                   </Button>
                   <Button
                     variant={showPdfViewer ? "default" : "outline"}
@@ -432,7 +435,7 @@ export default function ReaderPage() {
                         <User className="h-3.5 w-3.5 text-gray-400" />
                       </div>
                       <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Auteur</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{t.author}</p>
                         <p className="text-sm text-gray-700">{doc.authors.join(", ")}</p>
                       </div>
                     </div>
@@ -443,8 +446,8 @@ export default function ReaderPage() {
                         <Calendar className="h-3.5 w-3.5 text-gray-400" />
                       </div>
                       <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Datum</p>
-                        <p className="text-sm text-gray-700">{new Date(doc.publicationDate).toLocaleDateString("nl-NL")}</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{t.date}</p>
+                        <p className="text-sm text-gray-700">{new Date(doc.publicationDate).toLocaleDateString(docLang === "en" ? "en-GB" : "nl-NL")}</p>
                       </div>
                     </div>
                   )}
@@ -454,7 +457,7 @@ export default function ReaderPage() {
                         <Hash className="h-3.5 w-3.5 text-gray-400" />
                       </div>
                       <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Versie</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{t.version}</p>
                         <p className="text-sm text-gray-700">{doc.version}</p>
                       </div>
                     </div>
@@ -480,12 +483,12 @@ export default function ReaderPage() {
               {/* Language Level Meter */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <p className="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Taalniveau
+                  {t.languageLevel}
                 </p>
 
                 {(() => {
                   const levels = ["B1", "B2", "C1", "original"] as const;
-                  const labels = ["B1", "B2", "C1", "Origineel"];
+                  const labels = ["B1", "B2", "C1", t.original];
                   const activeIndex = levels.indexOf(languageLevel as typeof levels[number]);
                   const fillPercent = activeIndex >= 0 ? ((activeIndex + 1) / levels.length) * 100 : 100;
 
@@ -557,7 +560,7 @@ export default function ReaderPage() {
                   className="gap-1.5 rounded-full border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
                 >
                   <Users className="h-3.5 w-3.5 text-gray-400" />
-                  Voor: {doc.audienceContext.audience}
+                  {t.for}: {doc.audienceContext.audience}
                 </Badge>
               </div>
             )}
@@ -566,10 +569,10 @@ export default function ReaderPage() {
             <section id="samenvatting" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                 <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                Samenvatting
+                {t.summary}
                 {languageLevel !== "original" && (
                   <Badge style={{ backgroundColor: brandPrimary, color: "white" }}>
-                    {languageLevel} Taalniveau
+                    {t.levelBadge(languageLevel)}
                   </Badge>
                 )}
               </h2>
@@ -587,7 +590,7 @@ export default function ReaderPage() {
               <section id="hoofdpunten" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                   <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                  Hoofdpunten
+                  {t.keyPoints}
                 </h2>
                 <div className="space-y-3" onClick={handleTermClick}>
                   {doc.content.keyPoints.map((kp, i) => (
@@ -628,7 +631,7 @@ export default function ReaderPage() {
                           {loadingKeyPoint === i ? (
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Uitleg laden...</span>
+                              <span>{t.loadingExplanation}</span>
                             </div>
                           ) : keyPointExplanations[i] ? (
                             <p className="text-sm leading-relaxed text-gray-600">
@@ -648,7 +651,7 @@ export default function ReaderPage() {
               <section id="bevindingen" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                   <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                  Belangrijke Bevindingen
+                  {t.findings}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {doc.content.findings.map((f, i) => (
@@ -687,7 +690,7 @@ export default function ReaderPage() {
                           {loadingFinding === i ? (
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Meer context laden...</span>
+                              <span>{t.loadingContext}</span>
                             </div>
                           ) : findingExplanations[i] ? (
                             <p className="text-sm leading-relaxed text-gray-600">
@@ -708,6 +711,7 @@ export default function ReaderPage() {
                 brandPrimary={brandPrimary}
                 primaryLight={primaryLight}
                 label={template.infoBoxLabel}
+                lang={docLang}
               />
             )}
           </main>

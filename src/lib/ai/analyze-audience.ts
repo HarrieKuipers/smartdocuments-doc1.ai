@@ -1,4 +1,5 @@
 import anthropic, { MODELS } from "./client";
+import { type DocumentLanguage, getLangStrings } from "./language";
 
 export interface AudienceAnalysis {
   documentType: string;
@@ -6,9 +7,13 @@ export interface AudienceAnalysis {
   isExternal: boolean;
 }
 
-export async function analyzeAudience(text: string): Promise<AudienceAnalysis> {
+export async function analyzeAudience(
+  text: string,
+  lang: DocumentLanguage = "nl"
+): Promise<AudienceAnalysis> {
   // Use first ~20k chars — enough to determine audience without wasting tokens
   const textSample = text.slice(0, 20000);
+  const L = getLangStrings(lang);
 
   const response = await anthropic.messages.create({
     model: MODELS.processing,
@@ -16,24 +21,13 @@ export async function analyzeAudience(text: string): Promise<AudienceAnalysis> {
     messages: [
       {
         role: "user",
-        content: `Analyseer het volgende brondocument en bepaal de primaire doelgroep en het documenttype.
+        content: `${L.audiencePrompt}
 
-Let op specifieke zinsneden zoals:
-- "voor intern gebruik", "werkinstructie", "handleiding", "protocol", "werkwijze", "dienstverband"
-- "interne medewerkers", "inspecteurs", "behandelaars", "adviseurs"
-- Instructieve of procedurele taal gericht op medewerkers
-
-Bepaal of het document gericht is op een EXTERN publiek (burgers, klanten, het algemene publiek) of een INTERN publiek (medewerkers, inspecteurs, behandelaars).
-
-Tekst:
+${lang === "nl" ? "Tekst" : "Text"}:
 ${textSample}
 
-Geef het resultaat als JSON (geen markdown, alleen JSON):
-{
-  "documentType": "kort type, bijv. 'Interne werkinstructie', 'Beleidsdocument', 'Jaarverslag', 'Publieksfolder'",
-  "audience": "beschrijving van de doelgroep, bijv. 'Interne medewerkers / inspecteurs', 'Burgers en bedrijven', 'Algemeen publiek'",
-  "isExternal": true of false
-}`,
+${lang === "nl" ? "Geef het resultaat als JSON (geen markdown, alleen JSON):" : "Provide the result as JSON (no markdown, only JSON):"}
+${L.audienceJsonExample}`,
       },
     ],
   });

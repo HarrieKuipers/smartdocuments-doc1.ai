@@ -38,7 +38,9 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
+  Upload,
   X,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getTemplate } from "@/lib/templates";
@@ -73,6 +75,8 @@ interface DocumentData {
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: { primary?: string };
   customSlug?: string;
+  coverImageUrl?: string;
+  customCoverUrl?: string;
 }
 
 // -- Rich Text Toolbar --
@@ -181,6 +185,10 @@ export default function DocumentEditPage() {
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
 
+  // Cover image
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+
   // Textarea refs for rich text toolbar
   const summaryRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -227,6 +235,11 @@ export default function DocumentEditPage() {
     if (!doc) return;
     setSaving(true);
     try {
+      // Strip _id from subdocument arrays to avoid Mongoose conflicts
+      const cleanKeyPoints = keyPoints.map(({ text, explanation, linkedTerms }) => ({ text, explanation, linkedTerms }));
+      const cleanFindings = findings.map(({ category, title: t, content }) => ({ category, title: t, content }));
+      const cleanTerms = terms.map(({ term, definition, occurrences }) => ({ term, definition, occurrences }));
+
       const res = await fetch(`/api/documents/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -236,10 +249,10 @@ export default function DocumentEditPage() {
           description,
           access: { type: accessType, ...(accessType === "password" && accessPassword ? { password: accessPassword } : {}) },
           "content.summary.original": summary,
-          "content.keyPoints": keyPoints,
-          "content.findings": findings,
-          "content.terms": terms,
-          template: templateId,
+          "content.keyPoints": cleanKeyPoints,
+          "content.findings": cleanFindings,
+          "content.terms": cleanTerms,
+          template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
           brandOverride: {
@@ -361,6 +374,52 @@ export default function DocumentEditPage() {
       toast.error("Herindexeren mislukt.");
       setReprocessing(false);
       setReprocessProgress("");
+    }
+  }
+
+  // -- Cover Image --
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !params.id) return;
+    setCoverUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/documents/${params.id}/cover`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        toast.error(error || "Upload mislukt.");
+        return;
+      }
+      const { data } = await res.json();
+      setDoc((prev) => prev ? { ...prev, customCoverUrl: data.customCoverUrl } : prev);
+      toast.success("Coverafbeelding geüpload!");
+    } catch {
+      toast.error("Kon coverafbeelding niet uploaden.");
+    } finally {
+      setCoverUploading(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  }
+
+  async function handleCoverRemove() {
+    if (!params.id) return;
+    setCoverUploading(true);
+    try {
+      const res = await fetch(`/api/documents/${params.id}/cover`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Kon coverafbeelding niet verwijderen.");
+        return;
+      }
+      setDoc((prev) => prev ? { ...prev, customCoverUrl: undefined } : prev);
+      toast.success("Standaard cover hersteld.");
+    } catch {
+      toast.error("Kon coverafbeelding niet verwijderen.");
+    } finally {
+      setCoverUploading(false);
     }
   }
 
@@ -516,7 +575,7 @@ export default function DocumentEditPage() {
       </div>
 
       {/* Tab-based layout */}
-      <Tabs defaultValue="samenvatting" className="w-full">
+      <Tabs defaultValue="intelligentie" className="w-full">
         <TabsList variant="line" className="w-full justify-start border-b px-0">
           <TabsTrigger value="intelligentie" className="gap-1.5">
             <Settings className="h-3.5 w-3.5" />
@@ -740,6 +799,72 @@ export default function DocumentEditPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Cover Image */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  Coverafbeelding
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Current cover preview */}
+                  <div className="overflow-hidden rounded-lg border bg-gray-50">
+                    {(doc.customCoverUrl || doc.coverImageUrl) ? (
+                      <img
+                        src={doc.customCoverUrl || doc.coverImageUrl}
+                        alt="Cover"
+                        className="w-full h-auto max-h-[300px] object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                        Geen cover beschikbaar
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleCoverUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => coverInputRef.current?.click()}
+                      disabled={coverUploading}
+                    >
+                      {coverUploading ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="mr-1 h-3.5 w-3.5" />
+                      )}
+                      {doc.customCoverUrl ? "Cover vervangen" : "Custom cover uploaden"}
+                    </Button>
+                    {doc.customCoverUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCoverRemove}
+                        disabled={coverUploading}
+                        className="text-muted-foreground hover:text-red-500"
+                      >
+                        <X className="mr-1 h-3.5 w-3.5" />
+                        Standaard herstellen
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Upload een JPG, PNG of WebP (max 5MB). Zonder custom cover wordt de eerste pagina van de PDF gebruikt.
+                  </p>
                 </div>
               </CardContent>
             </Card>

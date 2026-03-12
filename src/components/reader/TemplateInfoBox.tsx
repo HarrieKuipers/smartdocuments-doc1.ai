@@ -1,12 +1,16 @@
 import { Info } from "lucide-react";
+import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 
 interface TemplateInfoBoxProps {
   brandPrimary: string;
   primaryLight: string;
   label: string;
+  lang?: DocumentLanguage;
 }
 
-export default function TemplateInfoBox({ brandPrimary, primaryLight, label }: TemplateInfoBoxProps) {
+export default function TemplateInfoBox({ brandPrimary, primaryLight, label, lang = "nl" }: TemplateInfoBoxProps) {
+  const t = getLangStrings(lang).reader;
+
   return (
     <div
       className="mt-8 rounded-lg border-l-4 p-6"
@@ -20,7 +24,7 @@ export default function TemplateInfoBox({ brandPrimary, primaryLight, label }: T
         {label}
       </h3>
       <p className="leading-relaxed text-gray-700">
-        Voor volledige details en uitvoeringsplannen, zie het oorspronkelijke document.
+        {t.infoBoxText}
       </p>
     </div>
   );

@@ -42,6 +42,7 @@ export interface IDocument extends MongoDocument {
     audience: string;
     isExternal: boolean;
   };
+  language: "nl" | "en";
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: {
@@ -141,6 +142,11 @@ const DocumentSchema = new Schema<IDocument>(
       documentType: { type: String },
       audience: { type: String },
       isExternal: { type: Boolean },
+    },
+    language: {
+      type: String,
+      enum: ["nl", "en"],
+      default: "nl",
     },
     template: {
       type: String,

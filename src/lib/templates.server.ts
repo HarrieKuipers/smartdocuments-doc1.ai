@@ -19,10 +19,15 @@ export async function getTemplateAsync(
         primaryDark: doc.primaryDark,
         primaryLight: doc.primaryLight,
         logo: doc.logo,
+        logoPosition: doc.logoPosition,
         headerStyle: doc.headerStyle,
         showB1Button: doc.showB1Button,
         showInfoBox: doc.showInfoBox,
         infoBoxLabel: doc.infoBoxLabel ?? "",
+        showChatWidget: doc.showChatWidget,
+        showTableOfContents: doc.showTableOfContents,
+        footerText: doc.footerText,
+        footerLink: doc.footerLink,
       };
     }
   } catch {

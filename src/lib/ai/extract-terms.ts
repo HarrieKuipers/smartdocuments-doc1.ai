@@ -1,4 +1,5 @@
 import anthropic, { MODELS } from "./client";
+import { type DocumentLanguage, getLangStrings } from "./language";
 
 interface ExtractedTerm {
   term: string;
@@ -6,8 +7,12 @@ interface ExtractedTerm {
   occurrences: number;
 }
 
-export async function extractTerms(text: string): Promise<ExtractedTerm[]> {
+export async function extractTerms(
+  text: string,
+  lang: DocumentLanguage = "nl"
+): Promise<ExtractedTerm[]> {
   const textToAnalyze = text.slice(0, 80000);
+  const L = getLangStrings(lang);
 
   const response = await anthropic.messages.create({
     model: MODELS.processing,
@@ -15,14 +20,16 @@ export async function extractTerms(text: string): Promise<ExtractedTerm[]> {
     messages: [
       {
         role: "user",
-        content: `Identificeer de belangrijkste vakbegrippen en termen in de volgende tekst. Geef voor elk begrip een uitgebreide, duidelijke definitie van 2-4 zinnen die het begrip volledig uitlegt in de context van dit document. De definitie moet begrijpelijk zijn voor iemand zonder vakkennis en moet uitleggen waarom het begrip relevant is in dit document. Tel ook hoe vaak de term voorkomt. Alle output in het Nederlands.
+        content: `${L.termsPrompt} ${L.outputLanguage}.
 
-Tekst:
+${lang === "nl" ? "Tekst" : "Text"}:
 ${textToAnalyze}
 
-Geef de 10-20 belangrijkste termen als JSON array (geen markdown, alleen JSON):
+${lang === "nl"
+  ? "Geef de 10-20 belangrijkste termen als JSON array (geen markdown, alleen JSON):"
+  : "Provide the 10-20 most important terms as a JSON array (no markdown, only JSON):"}
 [
-  {"term": "begrip", "definition": "Uitgebreide definitie van 2-4 zinnen die het begrip uitlegt in de context van het document.", "occurrences": 5}
+  {"term": "${lang === "nl" ? "begrip" : "term"}", "definition": "${lang === "nl" ? "Uitgebreide definitie van 2-4 zinnen die het begrip uitlegt in de context van het document." : "Comprehensive definition of 2-4 sentences explaining the term in the context of the document."}", "occurrences": 5}
 ]`,
       },
     ],

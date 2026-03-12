@@ -46,7 +46,7 @@ export async function POST(
     }
 
     // Extract metadata with AI
-    const metadata = await extractMetadata(text);
+    const metadata = await extractMetadata(text, doc.language || "nl");
 
     return NextResponse.json({ data: metadata });
   } catch (error) {

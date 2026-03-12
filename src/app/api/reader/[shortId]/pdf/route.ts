@@ -47,10 +47,16 @@ export async function GET(
 
     const pdfBuffer = await pdfResponse.arrayBuffer();
 
+    const isDownload = req.nextUrl.searchParams.get("download") === "true";
+    const filename = doc.sourceFile.filename || "document.pdf";
+    const disposition = isDownload
+      ? `attachment; filename="${filename}"`
+      : "inline";
+
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "inline",
+        "Content-Disposition": disposition,
         "Cache-Control": "private, max-age=3600",
       },
     });

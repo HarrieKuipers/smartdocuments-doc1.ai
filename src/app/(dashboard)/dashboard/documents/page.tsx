@@ -42,6 +42,7 @@ interface Document {
   analytics: { totalViews: number };
   shortId: string;
   coverImageUrl?: string;
+  customCoverUrl?: string;
   collectionId?: string;
 }
 
@@ -210,9 +211,9 @@ export default function DocumentsPage() {
                 <TableRow key={doc._id}>
                   <TableCell className="font-medium max-w-[300px]">
                     <div className="flex items-center gap-3">
-                      {doc.coverImageUrl ? (
+                      {(doc.customCoverUrl || doc.coverImageUrl) ? (
                         <img
-                          src={doc.coverImageUrl}
+                          src={doc.customCoverUrl || doc.coverImageUrl}
                           alt=""
                           className="hidden sm:block h-8 w-12 flex-shrink-0 rounded object-cover"
                         />
