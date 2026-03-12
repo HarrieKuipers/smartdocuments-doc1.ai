@@ -81,10 +81,19 @@ export async function PUT(
       "primary",
       "primaryDark",
       "primaryLight",
+      "accentColor",
+      "backgroundColor",
+      "fontHeading",
+      "fontBody",
       "headerStyle",
+      "cornerRadius",
       "showB1Button",
       "showInfoBox",
       "infoBoxLabel",
+      "showChatWidget",
+      "showTableOfContents",
+      "footerText",
+      "footerLink",
     ];
 
     for (const key of allowedFields) {
