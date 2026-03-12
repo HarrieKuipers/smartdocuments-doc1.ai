@@ -35,6 +35,8 @@ import {
   Pencil,
   Plus,
   Settings,
+  RefreshCw,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -161,6 +163,8 @@ export default function DocumentEditPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessProgress, setReprocessProgress] = useState("");
 
   // Editable fields
   const [title, setTitle] = useState("");
@@ -287,7 +291,115 @@ export default function DocumentEditPage() {
     }
   }
 
+  const STEP_LABELS: Record<string, string> = {
+    "text-extraction": "Tekst extraheren...",
+    "audience-analysis": "Doelgroep analyseren...",
+    "content-analysis": "Inhoud analyseren...",
+    "summary-generation": "Samenvatting genereren...",
+    "term-extraction": "Begrippen extraheren...",
+    "cover-generation": "Cover genereren...",
+    "finalizing": "Afronden...",
+  };
+
+  async function handleReprocess() {
+    if (!params.id) return;
+    if (!confirm("Weet je zeker dat je het document opnieuw wilt verwerken? Dit overschrijft de huidige samenvatting, hoofdpunten, bevindingen en begrippen.")) return;
+
+    setReprocessing(true);
+    setReprocessProgress("Starten...");
+
+    try {
+      const res = await fetch(`/api/documents/${params.id}/process`, { method: "POST" });
+      if (!res.ok) {
+        const { error } = await res.json();
+        toast.error(error || "Herindexeren mislukt.");
+        setReprocessing(false);
+        setReprocessProgress("");
+        return;
+      }
+
+      // Listen for progress via SSE
+      const eventSource = new EventSource(`/api/documents/${params.id}/progress`);
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          toast.error(data.error);
+          eventSource.close();
+          setReprocessing(false);
+          setReprocessProgress("");
+          return;
+        }
+        setReprocessProgress(STEP_LABELS[data.step] || `${data.percentage}%`);
+        if (data.status === "ready") {
+          eventSource.close();
+          setReprocessing(false);
+          setReprocessProgress("");
+          toast.success("Document opnieuw verwerkt!");
+          // Reload document data
+          fetch(`/api/documents/${params.id}`)
+            .then((r) => r.json())
+            .then(({ data }) => {
+              setDoc(data);
+              setSummary(data.content?.summary?.original || "");
+              setKeyPoints(data.content?.keyPoints || []);
+              setFindings(data.content?.findings || []);
+              setTerms(data.content?.terms || []);
+            });
+        } else if (data.status === "error") {
+          eventSource.close();
+          setReprocessing(false);
+          setReprocessProgress("");
+          toast.error("Verwerking mislukt.");
+        }
+      };
+      eventSource.onerror = () => {
+        eventSource.close();
+        setReprocessing(false);
+        setReprocessProgress("");
+      };
+    } catch {
+      toast.error("Herindexeren mislukt.");
+      setReprocessing(false);
+      setReprocessProgress("");
+    }
+  }
+
   // -- Key Points CRUD --
+  const [generatingExplanation, setGeneratingExplanation] = useState<Record<number, boolean>>({});
+
+  async function generateExplanation(index: number) {
+    const kp = keyPoints[index];
+    if (!kp?.text || !params.id) return;
+    setGeneratingExplanation((prev) => ({ ...prev, [index]: true }));
+    try {
+      const res = await fetch(`/api/documents/${params.id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `Geef een korte uitleg van 2-3 zinnen die meer context en achtergrond geeft over het volgende hoofdpunt uit het document: "${kp.text}". Geef alleen de uitleg, geen inleiding of herhaling van het hoofdpunt.`,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const { data } = await res.json();
+      if (data?.response) {
+        updateKeyPoint(index, "explanation", data.response);
+      }
+    } catch {
+      toast.error("Kon uitleg niet genereren.");
+    } finally {
+      setGeneratingExplanation((prev) => ({ ...prev, [index]: false }));
+    }
+  }
+
+  async function generateAllExplanations() {
+    const indices = keyPoints
+      .map((kp, i) => (!kp.explanation && kp.text ? i : -1))
+      .filter((i) => i !== -1);
+    for (const i of indices) {
+      await generateExplanation(i);
+    }
+  }
+
   function updateKeyPoint(index: number, field: "text" | "explanation", value: string) {
     setKeyPoints((prev) => prev.map((kp, i) => (i === index ? { ...kp, [field]: value } : kp)));
     markChanged();
@@ -370,6 +482,19 @@ export default function DocumentEditPage() {
             ) : null}
             {saving ? "Opslaan..." : saved ? "Opgeslagen" : "Niet opgeslagen"}
           </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReprocess}
+            disabled={reprocessing}
+          >
+            {reprocessing ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-4 w-4" />
+            )}
+            {reprocessing ? reprocessProgress : "Herindexeren"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -507,6 +632,9 @@ export default function DocumentEditPage() {
                     <div className="space-y-2">
                       <Label>Sjabloon</Label>
                       <div className="grid grid-cols-1 gap-2">
+                        {templateOptions.length === 0 && (
+                          <p className="text-[10px] text-muted-foreground">Sjablonen laden...</p>
+                        )}
                         {templateOptions.map((tmpl) => (
                           <button
                             key={tmpl.templateId}
@@ -649,15 +777,27 @@ export default function DocumentEditPage() {
                     <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                     Hoofdpunten
                   </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addKeyPoint}
-                    className="h-7 text-xs"
-                  >
-                    <Plus className="mr-1 h-3 w-3" />
-                    Toevoegen
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={generateAllExplanations}
+                      className="h-7 text-xs"
+                      disabled={keyPoints.every((kp) => kp.explanation || !kp.text)}
+                    >
+                      <Sparkles className="mr-1 h-3 w-3" />
+                      Genereer uitleg
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={addKeyPoint}
+                      className="h-7 text-xs"
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Toevoegen
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -681,14 +821,28 @@ export default function DocumentEditPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                      <div className="pl-6">
+                      <div className="pl-6 flex gap-2">
                         <Textarea
                           value={kp.explanation || ""}
                           onChange={(e) => updateKeyPoint(i, "explanation", e.target.value)}
                           placeholder="Uitleg (2-3 zinnen met meer context)..."
-                          className="text-xs min-h-[3rem] resize-none"
+                          className="text-xs min-h-[3rem] resize-none flex-1"
                           rows={2}
                         />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-primary"
+                          onClick={() => generateExplanation(i)}
+                          disabled={generatingExplanation[i] || !kp.text}
+                          title="Genereer uitleg met AI"
+                        >
+                          {generatingExplanation[i] ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
                       </div>
                     </li>
                   ))}
