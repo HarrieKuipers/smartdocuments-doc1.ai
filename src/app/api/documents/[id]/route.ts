@@ -99,10 +99,10 @@ export async function PUT(
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }
 
-    // Regenerate cover if cover-affecting fields changed
+    // Regenerate cover if cover-affecting fields changed (only if no custom cover)
     const coverFields = ["title", "tags", "brandOverride"];
     const shouldRegenerateCover = coverFields.some((field) => field in updates);
-    if (shouldRegenerateCover && doc.status === "ready") {
+    if (shouldRegenerateCover && doc.status === "ready" && !doc.customCoverUrl) {
       generateAndUploadCover(id).catch((err) =>
         console.error("Cover regeneration failed:", err)
       );

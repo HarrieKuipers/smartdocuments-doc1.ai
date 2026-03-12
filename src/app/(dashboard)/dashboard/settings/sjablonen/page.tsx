@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ const RADIUS_OPTIONS = [
 ];
 
 export default function SjablonenPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -324,7 +326,7 @@ export default function SjablonenPage() {
           <Card
             key={t.templateId}
             className="group cursor-pointer rounded-2xl border-gray-100 overflow-hidden transition-shadow hover:shadow-md"
-            onClick={() => openEditDialog(t)}
+            onClick={() => router.push(`/dashboard/settings/sjablonen/${t.templateId}`)}
           >
             {/* Preview header */}
             <div
@@ -410,7 +412,7 @@ export default function SjablonenPage() {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openEditDialog(t);
+                    router.push(`/dashboard/settings/sjablonen/${t.templateId}`);
                   }}
                 >
                   <Pencil className="size-3.5 mr-1" />
