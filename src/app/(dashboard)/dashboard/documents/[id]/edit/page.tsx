@@ -555,7 +555,7 @@ export default function DocumentEditPage() {
             Dashboard
           </Button>
           <Separator orientation="vertical" className="h-6" />
-          <span className="font-medium">Document Bewerken</span>
+          <span className="font-medium">Document bewerken</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1 text-sm text-muted-foreground">

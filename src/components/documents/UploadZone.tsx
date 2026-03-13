@@ -190,7 +190,7 @@ export default function UploadZone() {
                 }}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Document Uploaden
+                Document uploaden
               </Button>
             </div>
           )}
