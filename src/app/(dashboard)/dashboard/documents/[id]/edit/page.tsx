@@ -41,6 +41,7 @@ import {
   Upload,
   X,
   ImageIcon,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getTemplate } from "@/lib/templates";
@@ -188,6 +189,10 @@ export default function DocumentEditPage() {
   const [keyPoints, setKeyPoints] = useState<{ text: string; explanation?: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [newAuthor, setNewAuthor] = useState("");
+  const [newTag, setNewTag] = useState("");
 
   // Cover image
   const [coverUploading, setCoverUploading] = useState(false);
@@ -228,6 +233,8 @@ export default function DocumentEditPage() {
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
         setTerms(data.content?.terms || []);
+        setAuthors(data.authors || []);
+        setTags(data.tags || []);
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -260,6 +267,8 @@ export default function DocumentEditPage() {
           "content.findings": cleanFindings,
           "content.terms": cleanTerms,
           language,
+          authors,
+          tags,
           template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
@@ -283,14 +292,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -642,22 +651,90 @@ export default function DocumentEditPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Auteur(s)</Label>
-                      <div className="flex flex-wrap gap-1">
-                        {doc.authors?.map((a, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
+                      <div className="flex flex-wrap gap-1.5">
+                        {authors.map((a, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs flex items-center gap-1">
                             {a}
+                            <button
+                              type="button"
+                              onClick={() => setAuthors(authors.filter((_, j) => j !== i))}
+                              className="ml-0.5 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
                           </Badge>
                         ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newAuthor}
+                          onChange={(e) => setNewAuthor(e.target.value)}
+                          placeholder="Naam toevoegen..."
+                          className="text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newAuthor.trim()) {
+                              e.preventDefault();
+                              setAuthors([...authors, newAuthor.trim()]);
+                              setNewAuthor("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!newAuthor.trim()}
+                          onClick={() => {
+                            setAuthors([...authors, newAuthor.trim()]);
+                            setNewAuthor("");
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Tags</Label>
-                      <div className="flex flex-wrap gap-1">
-                        {doc.tags?.map((t, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t, i) => (
+                          <Badge key={i} variant="outline" className="text-xs flex items-center gap-1">
                             {t}
+                            <button
+                              type="button"
+                              onClick={() => setTags(tags.filter((_, j) => j !== i))}
+                              className="ml-0.5 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
                           </Badge>
                         ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          placeholder="Tag toevoegen..."
+                          className="text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newTag.trim()) {
+                              e.preventDefault();
+                              setTags([...tags, newTag.trim()]);
+                              setNewTag("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!newTag.trim()}
+                          onClick={() => {
+                            setTags([...tags, newTag.trim()]);
+                            setNewTag("");
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -826,6 +903,33 @@ export default function DocumentEditPage() {
                           Kopieer
                         </Button>
                       </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5">
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                        Informatiebox
+                      </Label>
+                      <Input
+                        value={infoBoxLabel}
+                        onChange={(e) => setInfoBoxLabel(e.target.value)}
+                        placeholder="Meer informatie"
+                        className="text-xs"
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Koptekst van de informatiebox onderaan de pagina. Laat leeg om te verbergen.
+                      </p>
+                      {infoBoxLabel && (
+                        <Textarea
+                          value={infoBoxText}
+                          onChange={(e) => setInfoBoxText(e.target.value)}
+                          placeholder="Voor volledige details en uitvoeringsplannen, zie het oorspronkelijke document."
+                          rows={2}
+                          className="text-xs"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
