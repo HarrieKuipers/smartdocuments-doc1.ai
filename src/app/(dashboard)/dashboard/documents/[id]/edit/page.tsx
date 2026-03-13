@@ -45,9 +45,11 @@ import {
   X,
   ImageIcon,
   Info,
+  GitBranch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getTemplate } from "@/lib/templates";
+import VersionHistory from "@/components/documents/VersionHistory";
 
 interface TemplateOption {
   templateId: string;
@@ -652,6 +654,10 @@ export default function DocumentEditPage() {
               Insluiten
             </TabsTrigger>
           )}
+          <TabsTrigger value="versies" className="gap-1.5">
+            <GitBranch className="h-3.5 w-3.5" />
+            Versies
+          </TabsTrigger>
         </TabsList>
 
         {/* Intelligentie Tab */}
@@ -1390,6 +1396,13 @@ export default function DocumentEditPage() {
             <EmbedTabContent doc={doc} />
           </TabsContent>
         )}
+
+        {/* Versies Tab */}
+        <TabsContent value="versies">
+          <div className="mx-auto max-w-4xl py-6">
+            <VersionHistory documentId={doc._id} />
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );

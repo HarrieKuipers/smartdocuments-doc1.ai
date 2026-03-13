@@ -16,6 +16,7 @@ import {
   Eye,
   ChevronDown,
   Loader2,
+  GitBranch,
 } from "lucide-react";
 import PasswordGate from "@/components/reader/PasswordGate";
 import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
@@ -28,6 +29,8 @@ import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
 import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
 import TableOfContents, { type TocSection } from "@/components/reader/TableOfContents";
+import AnnotationBadge from "@/components/reader/AnnotationBadge";
+import AnnotationPanel from "@/components/reader/AnnotationPanel";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
 
@@ -67,6 +70,8 @@ interface ReaderDocument {
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   coverImageUrl?: string;
   customCoverUrl?: string;
+  currentVersion?: number;
+  totalVersions?: number;
   brandOverride?: { primary?: string };
   organization: {
     name: string;
@@ -101,6 +106,11 @@ export default function ReaderPage() {
   const [findingExplanations, setFindingExplanations] = useState<Record<number, string>>({});
   const [loadingFinding, setLoadingFinding] = useState<number | null>(null);
   const [coverIsLandscape, setCoverIsLandscape] = useState<boolean | null>(null);
+  const [annotationCounts, setAnnotationCounts] = useState<Record<string, number>>({});
+  const [openAnnotation, setOpenAnnotation] = useState<{ sectionType: string; sectionIndex?: number; sectionTitle: string } | null>(null);
+  const [versions, setVersions] = useState<{ versionNumber: number; versionLabel?: string; createdAt: string }[]>([]);
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+  const [versionContent, setVersionContent] = useState<ReaderDocument["content"] | null>(null);
   const chatRef = useRef<ChatWidgetRef>(null);
   const analytics = useDocumentAnalytics(doc?._id || "");
 
@@ -262,6 +272,60 @@ export default function ReaderPage() {
     img.src = coverUrl;
   }, [doc?.customCoverUrl, doc?.coverImageUrl]);
 
+  // Fetch annotation counts
+  useEffect(() => {
+    if (!doc?.shortId) return;
+    fetch(`/api/reader/${doc.shortId}/annotations`)
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data?.counts) {
+          const counts: Record<string, number> = {};
+          for (const c of data.counts) {
+            const key = c._id.sectionIndex !== undefined
+              ? `${c._id.sectionType}-${c._id.sectionIndex}`
+              : c._id.sectionType;
+            counts[key] = c.count;
+          }
+          setAnnotationCounts(counts);
+        }
+      })
+      .catch(() => {});
+  }, [doc?.shortId]);
+
+  // Fetch versions if document has multiple
+  useEffect(() => {
+    if (!doc?.shortId || (doc.totalVersions || 1) <= 1) return;
+    fetch(`/api/reader/${doc.shortId}/versions`)
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data?.versions) setVersions(data.versions);
+      })
+      .catch(() => {});
+  }, [doc?.shortId, doc?.totalVersions]);
+
+  // Load a specific version's content
+  const loadVersion = useCallback(async (versionNumber: number) => {
+    if (!doc?.shortId) return;
+    try {
+      const res = await fetch(`/api/reader/${doc.shortId}/versions/${versionNumber}`);
+      if (!res.ok) return;
+      const { data } = await res.json();
+      setVersionContent(data.content);
+      setViewingVersion(versionNumber);
+    } catch {
+      // ignore
+    }
+  }, [doc?.shortId]);
+
+  // Switch back to current version
+  const showCurrentVersion = useCallback(() => {
+    setViewingVersion(null);
+    setVersionContent(null);
+  }, []);
+
+  // Determine which content to display (current or a specific version)
+  const displayContent = versionContent || doc?.content;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA]">
@@ -341,28 +405,35 @@ export default function ReaderPage() {
   const displayLevel: LanguageLevel = doc.targetCEFRLevel || doc.languageLevel || "original";
 
   const summaryKey = displayLevel !== "original" && displayLevel !== "C2" ? displayLevel : null;
+  const activeContent = displayContent || doc.content;
   const currentSummary = summaryKey
-    ? doc.content.summary[summaryKey] || doc.content.summary.original
-    : doc.content.summary.original;
+    ? activeContent.summary[summaryKey] || activeContent.summary.original
+    : activeContent.summary.original;
+
+  // Helper to get annotation count for a section
+  const getAnnotationCount = (sectionType: string, sectionIndex?: number) => {
+    const key = sectionIndex !== undefined ? `${sectionType}-${sectionIndex}` : sectionType;
+    return annotationCounts[key] || 0;
+  };
 
   // Build TOC sections from document content
   const tocSections: TocSection[] = [];
   tocSections.push({ id: "samenvatting", label: t.summary });
-  if (doc.content.keyPoints?.length > 0) {
+  if (activeContent.keyPoints?.length > 0) {
     tocSections.push({
       id: "hoofdpunten",
       label: t.keyPoints,
-      children: doc.content.keyPoints.map((kp, i) => ({
+      children: activeContent.keyPoints.map((kp, i) => ({
         id: `hoofdpunt-${i}`,
         label: kp.text.length > 60 ? kp.text.slice(0, 60) + "…" : kp.text,
       })),
     });
   }
-  if (doc.content.findings?.length > 0) {
+  if (activeContent.findings?.length > 0) {
     tocSections.push({
       id: "bevindingen",
       label: t.findings,
-      children: doc.content.findings.map((f, i) => ({
+      children: activeContent.findings.map((f, i) => ({
         id: `bevinding-${i}`,
         label: f.title,
       })),
@@ -380,14 +451,14 @@ export default function ReaderPage() {
   }
 
   function highlightTerms(text: string) {
-    if (!doc?.content.terms?.length) return formatParagraphs(text);
+    if (!activeContent.terms?.length) return formatParagraphs(text);
 
     // Build a lookup map and a single combined regex to avoid sequential replacement issues
     const termMap = new Map<string, { term: string; definition: string }>();
     const escapedTerms: string[] = [];
 
     // Sort by length descending so longer terms match first (e.g. "arbeidsovereenkomst" before "arbeid")
-    const sorted = [...doc.content.terms].sort((a, b) => b.term.length - a.term.length);
+    const sorted = [...activeContent.terms].sort((a, b) => b.term.length - a.term.length);
 
     for (const t of sorted) {
       const escaped = t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -617,6 +688,43 @@ export default function ReaderPage() {
                 onTocClick={(id, label) => analytics.trackTocClick(id, label)}
               />
 
+              {/* Version selector */}
+              {(doc.totalVersions || 1) > 1 && versions.length > 0 && (
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GitBranch className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-700">Versies</span>
+                  </div>
+                  <div className="space-y-1">
+                    {versions.map((v) => (
+                      <button
+                        key={v.versionNumber}
+                        type="button"
+                        onClick={() => v.versionNumber === doc.currentVersion ? showCurrentVersion() : loadVersion(v.versionNumber)}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                          (viewingVersion === null && v.versionNumber === doc.currentVersion) || viewingVersion === v.versionNumber
+                            ? "font-medium"
+                            : "text-gray-600 hover:bg-gray-50"
+                        }`}
+                        style={
+                          (viewingVersion === null && v.versionNumber === doc.currentVersion) || viewingVersion === v.versionNumber
+                            ? { backgroundColor: `${brandPrimary}10`, color: brandPrimary }
+                            : undefined
+                        }
+                      >
+                        <span>
+                          {v.versionLabel || `Versie ${v.versionNumber}`}
+                          {v.versionNumber === doc.currentVersion && " (huidig)"}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(v.createdAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Cluster 2: Metadata */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 {/* Author */}
@@ -689,6 +797,22 @@ export default function ReaderPage() {
 
           {/* Main content */}
           <main className="order-1 space-y-6 lg:order-2">
+            {/* Old version banner */}
+            {viewingVersion !== null && (
+              <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm text-amber-800">
+                  <GitBranch className="h-4 w-4" />
+                  <span>
+                    Je bekijkt{" "}
+                    <strong>{versions.find((v) => v.versionNumber === viewingVersion)?.versionLabel || `versie ${viewingVersion}`}</strong>
+                  </span>
+                </div>
+                <Button variant="outline" size="sm" onClick={showCurrentVersion} className="text-xs">
+                  Terug naar huidige versie
+                </Button>
+              </div>
+            )}
+
             {/* PDF Viewer */}
             {showPdfViewer && (
               <Suspense
@@ -712,13 +836,33 @@ export default function ReaderPage() {
                   <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                   {t.summary}
                 </h2>
-                <SectionFeedbackButton
-                  shortId={doc.shortId}
-                  sectionType="summary"
-                  sectionTitle={t.summary}
-                  sessionId={analytics.sessionId}
-                />
+                <div className="flex items-center gap-1">
+                  <AnnotationBadge
+                    count={getAnnotationCount("summary")}
+                    brandPrimary={brandPrimary}
+                    onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "summary" ? null : { sectionType: "summary", sectionTitle: t.summary })}
+                  />
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="summary"
+                    sectionTitle={t.summary}
+                    sessionId={analytics.sessionId}
+                  />
+                </div>
               </div>
+              {openAnnotation?.sectionType === "summary" && (
+                <div className="mb-4">
+                  <AnnotationPanel
+                    shortId={doc.shortId}
+                    sectionType="summary"
+                    sectionTitle={t.summary}
+                    brandPrimary={brandPrimary}
+                    sessionId={analytics.sessionId}
+                    onClose={() => setOpenAnnotation(null)}
+                    onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, summary: count }))}
+                  />
+                </div>
+              )}
               <div onClick={handleTermClick}>
                 <div
                   className="prose max-w-none text-gray-700"
@@ -729,22 +873,42 @@ export default function ReaderPage() {
             </section>
 
             {/* Key Points */}
-            {doc.content.keyPoints?.length > 0 && (
+            {activeContent.keyPoints?.length > 0 && (
               <section id="hoofdpunten" className="scroll-mt-24 group rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                     <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                     {t.keyPoints}
                   </h2>
-                  <SectionFeedbackButton
-                    shortId={doc.shortId}
-                    sectionType="keyPoint"
-                    sectionTitle={t.keyPoints}
-                    sessionId={analytics.sessionId}
-                  />
+                  <div className="flex items-center gap-1">
+                    <AnnotationBadge
+                      count={getAnnotationCount("keyPoint")}
+                      brandPrimary={brandPrimary}
+                      onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "keyPoint" && openAnnotation.sectionIndex === undefined ? null : { sectionType: "keyPoint", sectionTitle: t.keyPoints })}
+                    />
+                    <SectionFeedbackButton
+                      shortId={doc.shortId}
+                      sectionType="keyPoint"
+                      sectionTitle={t.keyPoints}
+                      sessionId={analytics.sessionId}
+                    />
+                  </div>
                 </div>
+                {openAnnotation?.sectionType === "keyPoint" && openAnnotation.sectionIndex === undefined && (
+                  <div className="mb-4">
+                    <AnnotationPanel
+                      shortId={doc.shortId}
+                      sectionType="keyPoint"
+                      sectionTitle={t.keyPoints}
+                      brandPrimary={brandPrimary}
+                      sessionId={analytics.sessionId}
+                      onClose={() => setOpenAnnotation(null)}
+                      onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, keyPoint: count }))}
+                    />
+                  </div>
+                )}
                 <div className="space-y-3" onClick={handleTermClick}>
-                  {doc.content.keyPoints.map((kp, i) => (
+                  {activeContent.keyPoints.map((kp, i) => (
                     <div
                       key={i}
                       id={`hoofdpunt-${i}`}
@@ -800,22 +964,42 @@ export default function ReaderPage() {
             )}
 
             {/* Findings */}
-            {doc.content.findings?.length > 0 && (
+            {activeContent.findings?.length > 0 && (
               <section id="bevindingen" className="scroll-mt-24 group rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                     <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                     {t.findings}
                   </h2>
-                  <SectionFeedbackButton
-                    shortId={doc.shortId}
-                    sectionType="finding"
-                    sectionTitle={t.findings}
-                    sessionId={analytics.sessionId}
-                  />
+                  <div className="flex items-center gap-1">
+                    <AnnotationBadge
+                      count={getAnnotationCount("finding")}
+                      brandPrimary={brandPrimary}
+                      onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "finding" && openAnnotation.sectionIndex === undefined ? null : { sectionType: "finding", sectionTitle: t.findings })}
+                    />
+                    <SectionFeedbackButton
+                      shortId={doc.shortId}
+                      sectionType="finding"
+                      sectionTitle={t.findings}
+                      sessionId={analytics.sessionId}
+                    />
+                  </div>
                 </div>
+                {openAnnotation?.sectionType === "finding" && openAnnotation.sectionIndex === undefined && (
+                  <div className="mb-4">
+                    <AnnotationPanel
+                      shortId={doc.shortId}
+                      sectionType="finding"
+                      sectionTitle={t.findings}
+                      brandPrimary={brandPrimary}
+                      sessionId={analytics.sessionId}
+                      onClose={() => setOpenAnnotation(null)}
+                      onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, finding: count }))}
+                    />
+                  </div>
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {doc.content.findings.map((f, i) => (
+                  {activeContent.findings.map((f, i) => (
                     <button
                       type="button"
                       key={i}
@@ -893,7 +1077,7 @@ export default function ReaderPage() {
         documentId={doc._id}
         brandPrimary={brandPrimary}
         chatMode={doc.chatMode || "terms-only"}
-        terms={doc.content.terms}
+        terms={activeContent.terms}
         language={doc.language || "nl"}
       />
     </div>
