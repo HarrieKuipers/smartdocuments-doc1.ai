@@ -44,6 +44,7 @@ export interface IDocument extends MongoDocument {
   };
   language: "nl" | "en";
   languageLevel?: "B1" | "B2" | "C1" | "C2";
+  targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: {
@@ -152,6 +153,10 @@ const DocumentSchema = new Schema<IDocument>(
       default: "nl",
     },
     languageLevel: {
+      type: String,
+      enum: ["B1", "B2", "C1", "C2"],
+    },
+    targetCEFRLevel: {
       type: String,
       enum: ["B1", "B2", "C1", "C2"],
     },

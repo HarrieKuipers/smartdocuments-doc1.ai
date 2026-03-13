@@ -9,10 +9,17 @@ interface ExtractedTerm {
 
 export async function extractTerms(
   text: string,
-  lang: DocumentLanguage = "nl"
+  lang: DocumentLanguage = "nl",
+  targetLevel?: "B1" | "B2" | "C1" | "C2"
 ): Promise<ExtractedTerm[]> {
   const textToAnalyze = text.slice(0, 80000);
   const L = getLangStrings(lang);
+
+  const targetLevelInstruction = targetLevel
+    ? lang === "nl"
+      ? ` Schrijf de definities op CEFR taalniveau ${targetLevel}. ${targetLevel === "B1" ? "Gebruik korte zinnen en dagelijkse woorden." : targetLevel === "B2" ? "Gebruik duidelijke taal met beperkt vakjargon." : ""}`
+      : ` Write definitions at CEFR level ${targetLevel}. ${targetLevel === "B1" ? "Use short sentences and everyday words." : targetLevel === "B2" ? "Use clear language with limited jargon." : ""}`
+    : "";
 
   const response = await anthropic.messages.create({
     model: MODELS.processing,
@@ -20,7 +27,7 @@ export async function extractTerms(
     messages: [
       {
         role: "user",
-        content: `${L.termsPrompt} ${L.outputLanguage}.
+        content: `${L.termsPrompt}${targetLevelInstruction} ${L.outputLanguage}.
 
 ${lang === "nl" ? "Tekst" : "Text"}:
 ${textToAnalyze}

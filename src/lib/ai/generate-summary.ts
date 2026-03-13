@@ -11,13 +11,20 @@ interface LanguageLevelSummaries {
 export async function generateLanguageLevelSummaries(
   originalSummary: string,
   audienceContext?: AudienceAnalysis,
-  lang: DocumentLanguage = "nl"
+  lang: DocumentLanguage = "nl",
+  targetLevel?: "B1" | "B2" | "C1" | "C2"
 ): Promise<LanguageLevelSummaries> {
   const L = getLangStrings(lang);
   const isInternal = audienceContext && !audienceContext.isExternal;
 
   const perspectiveInstruction = isInternal
     ? L.summaryPerspectiveInternal(audienceContext.audience)
+    : "";
+
+  const targetHint = targetLevel
+    ? lang === "nl"
+      ? `\nHet gewenste doelniveau is ${targetLevel}. Besteed extra aandacht aan de kwaliteit van de ${targetLevel}-versie.`
+      : `\nThe desired target level is ${targetLevel}. Pay extra attention to the quality of the ${targetLevel} version.`
     : "";
 
   const response = await anthropic.messages.create({
@@ -27,7 +34,7 @@ export async function generateLanguageLevelSummaries(
       {
         role: "user",
         content: `${L.summaryPrompt} ${L.outputLanguage}.
-${perspectiveInstruction}
+${perspectiveInstruction}${targetHint}
 
 ${lang === "nl" ? "Originele samenvatting" : "Original summary"}:
 ${originalSummary}

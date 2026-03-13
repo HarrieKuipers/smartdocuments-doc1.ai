@@ -22,6 +22,7 @@ export async function processDocument(
   if (!doc) throw new Error("Document not found");
 
   const lang: DocumentLanguage = doc.language || "nl";
+  const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
 
   try {
     // Update status
@@ -70,7 +71,7 @@ export async function processDocument(
     doc.processingProgress = { step: "content-analysis", percentage: 30 };
     await doc.save();
 
-    const analysis = await analyzeContent(text, audienceContext, lang);
+    const analysis = await analyzeContent(text, audienceContext, lang, targetLevel);
     doc.content.summary = {
       original: analysis.summary,
       B1: "",
@@ -112,7 +113,8 @@ export async function processDocument(
     const levelSummaries = await generateLanguageLevelSummaries(
       analysis.summary,
       audienceContext,
-      lang
+      lang,
+      targetLevel
     );
     doc.content.summary.B1 = levelSummaries.B1;
     doc.content.summary.B2 = levelSummaries.B2;
@@ -124,7 +126,7 @@ export async function processDocument(
     doc.processingProgress = { step: "term-extraction", percentage: 80 };
     await doc.save();
 
-    const terms = await extractTerms(text, lang);
+    const terms = await extractTerms(text, lang, targetLevel);
     doc.content.terms = terms;
     await doc.save();
 

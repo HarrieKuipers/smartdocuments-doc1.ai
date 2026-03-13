@@ -79,6 +79,9 @@ interface DocumentData {
   coverImageUrl?: string;
   customCoverUrl?: string;
   language?: "nl" | "en";
+  languageLevel?: "B1" | "B2" | "C1" | "C2";
+  targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
+  pageCount?: number;
 }
 
 // -- Rich Text Toolbar --
@@ -193,6 +196,7 @@ export default function DocumentEditPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [newAuthor, setNewAuthor] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [targetCEFRLevel, setTargetCEFRLevel] = useState<"B1" | "B2" | "C1" | "C2" | "">("");
 
   // Cover image
   const [coverUploading, setCoverUploading] = useState(false);
@@ -235,6 +239,7 @@ export default function DocumentEditPage() {
         setTerms(data.content?.terms || []);
         setAuthors(data.authors || []);
         setTags(data.tags || []);
+        setTargetCEFRLevel(data.targetCEFRLevel || "");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -269,6 +274,7 @@ export default function DocumentEditPage() {
           language,
           authors,
           tags,
+          targetCEFRLevel: targetCEFRLevel || null,
           template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
@@ -292,14 +298,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -598,7 +604,7 @@ export default function DocumentEditPage() {
         <TabsList variant="line" className="w-full justify-start border-b px-0">
           <TabsTrigger value="intelligentie" className="gap-1.5">
             <Settings className="h-3.5 w-3.5" />
-            Intelligentie
+            Instellingen
           </TabsTrigger>
           <TabsTrigger value="samenvatting" className="gap-1.5">
             <Pencil className="h-3.5 w-3.5" />
@@ -606,7 +612,7 @@ export default function DocumentEditPage() {
           </TabsTrigger>
           <TabsTrigger value="definities" className="gap-1.5">
             <BookOpen className="h-3.5 w-3.5" />
-            Begrippen & Definities
+            Begrippen & definities
           </TabsTrigger>
         </TabsList>
 
@@ -649,6 +655,23 @@ export default function DocumentEditPage() {
                         rows={3}
                       />
                     </div>
+                    {(doc.publicationDate || doc.pageCount || doc.languageLevel) && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {doc.publicationDate && (
+                          <span>
+                            {new Date(doc.publicationDate).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}
+                          </span>
+                        )}
+                        {doc.publicationDate && doc.pageCount && <span>·</span>}
+                        {doc.pageCount && <span>{doc.pageCount} pag.</span>}
+                        {(doc.publicationDate || doc.pageCount) && doc.languageLevel && <span>·</span>}
+                        {doc.languageLevel && (
+                          <Badge variant="secondary" className="text-[10px] font-medium">
+                            CEFR {doc.languageLevel}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Auteur(s)</Label>
                       <div className="flex flex-wrap gap-1.5">
@@ -756,6 +779,25 @@ export default function DocumentEditPage() {
                       </div>
                       <p className="text-[10px] text-muted-foreground">
                         Wijzig de taal en herindexeer om opnieuw te verwerken
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Doelniveau (CEFR)</Label>
+                      <Select value={targetCEFRLevel || "auto"} onValueChange={(v) => setTargetCEFRLevel(v === "auto" ? "" : v as "B1" | "B2" | "C1" | "C2")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Automatisch</SelectItem>
+                          <SelectItem value="B1">B1 — Eenvoudig</SelectItem>
+                          <SelectItem value="B2">B2 — Gemiddeld</SelectItem>
+                          <SelectItem value="C1">C1 — Geavanceerd</SelectItem>
+                          <SelectItem value="C2">C2 — Academisch</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        Op welk taalniveau moeten de samenvatting, begrippen en bevindingen worden geschreven? Herindexeer na wijziging.
                       </p>
                     </div>
 
@@ -1176,7 +1218,7 @@ export default function DocumentEditPage() {
           </div>
         </TabsContent>
 
-        {/* Begrippen & Definities Tab */}
+        {/* Begrippen & definities Tab */}
         <TabsContent value="definities">
           <div className="mx-auto max-w-5xl py-6">
             <Card>
@@ -1184,7 +1226,7 @@ export default function DocumentEditPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                    Begrippen & Definities
+                    Begrippen & definities
                   </CardTitle>
                   <Button
                     variant="outline"
