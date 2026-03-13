@@ -25,24 +25,117 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
 
     const collectionId = searchParams.get("collectionId");
+    const sortBy = searchParams.get("sortBy") || (search ? "relevance" : "newest");
+    const tag = searchParams.get("tag");
 
     const filter: Record<string, unknown> = {
       organizationId: session.user.organizationId,
     };
     if (status) filter.status = status;
     if (collectionId) filter.collectionId = collectionId;
+    if (tag) filter.tags = tag;
+
+    let useTextSearch = false;
+
     if (search) {
-      filter.title = { $regex: search, $options: "i" };
+      // Try full-text search first
+      filter.$text = { $search: search };
+      useTextSearch = true;
     }
 
-    const [docs, total] = await Promise.all([
-      DocumentModel.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      DocumentModel.countDocuments(filter),
-    ]);
+    // Build sort object
+    type SortValue = 1 | -1 | { $meta: "textScore" };
+    let sort: Record<string, SortValue> = { createdAt: -1 };
+    const projection: Record<string, unknown> = {};
+
+    if (useTextSearch) {
+      projection.score = { $meta: "textScore" };
+    }
+
+    switch (sortBy) {
+      case "relevance":
+        if (useTextSearch) {
+          sort = { score: { $meta: "textScore" } };
+        }
+        break;
+      case "newest":
+        sort = { createdAt: -1 };
+        break;
+      case "oldest":
+        sort = { createdAt: 1 };
+        break;
+      case "most-viewed":
+        sort = { "analytics.totalViews": -1 };
+        break;
+      case "title":
+        sort = { title: 1 };
+        break;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let docs: any[];
+    let total: number;
+
+    try {
+      const query = useTextSearch
+        ? DocumentModel.find(filter, projection)
+        : DocumentModel.find(filter);
+
+      [docs, total] = await Promise.all([
+        query
+          .sort(sort)
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(),
+        DocumentModel.countDocuments(filter),
+      ]);
+    } catch {
+      // Text search may fail if index not yet created; fall back
+      docs = [];
+      total = 0;
+    }
+
+    // Fallback to regex search if text search returned no results
+    if (search && total === 0) {
+      delete filter.$text;
+      useTextSearch = false;
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { displayTitle: { $regex: search, $options: "i" } },
+        { tags: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { authors: { $regex: search, $options: "i" } },
+      ];
+
+      const fallbackSort: Record<string, 1 | -1> =
+        sortBy === "most-viewed"
+          ? { "analytics.totalViews": -1 }
+          : sortBy === "oldest"
+            ? { createdAt: 1 }
+            : sortBy === "title"
+              ? { title: 1 }
+              : { createdAt: -1 };
+
+      [docs, total] = await Promise.all([
+        DocumentModel.find(filter)
+          .sort(fallbackSort)
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(),
+        DocumentModel.countDocuments(filter),
+      ]);
+    }
+
+    // Collect unique tags from the fetched documents for filter chips
+    const allTags: string[] = [];
+    for (const doc of docs) {
+      const d = doc as Record<string, unknown>;
+      if (Array.isArray(d.tags)) {
+        for (const t of d.tags as string[]) {
+          if (t && !allTags.includes(t)) allTags.push(t);
+        }
+      }
+    }
 
     return NextResponse.json({
       data: docs,
@@ -50,6 +143,7 @@ export async function GET(req: NextRequest) {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      tags: allTags,
     });
   } catch (error) {
     console.error("Documents GET error:", error);

@@ -78,6 +78,14 @@ export async function PUT(
       }
     }
 
+    // Handle isDraft / scheduledPublishAt logic
+    if ("scheduledPublishAt" in updates && updates.scheduledPublishAt) {
+      updates.isDraft = true;
+    }
+    if ("isDraft" in updates && updates.isDraft === false) {
+      updates.scheduledPublishAt = null;
+    }
+
     // Validate and slugify customSlug
     let unsetSlug = false;
     if ("customSlug" in updates) {
@@ -107,9 +115,19 @@ export async function PUT(
       }
     }
 
-    const updateOp: Record<string, unknown> = { $set: updates };
+    // Build $unset for fields that need to be removed
+    const unsetFields: Record<string, string> = {};
     if (unsetSlug) {
-      updateOp.$unset = { customSlug: "" };
+      unsetFields.customSlug = "";
+    }
+    if ("isDraft" in updates && updates.isDraft === false) {
+      delete updates.scheduledPublishAt;
+      unsetFields.scheduledPublishAt = "";
+    }
+
+    const updateOp: Record<string, unknown> = { $set: updates };
+    if (Object.keys(unsetFields).length > 0) {
+      updateOp.$unset = unsetFields;
     }
 
     const doc = await DocumentModel.findOneAndUpdate(

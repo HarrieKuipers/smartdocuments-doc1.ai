@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, FolderOpen } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, FolderOpen, ArrowUpDown, X, Clock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,9 @@ interface Document {
   coverImageUrl?: string;
   customCoverUrl?: string;
   collectionId?: string;
+  tags?: string[];
+  isDraft?: boolean;
+  scheduledPublishAt?: string;
 }
 
 interface Collection {
@@ -70,18 +73,28 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   async function fetchDocs() {
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (statusFilter !== "all") params.set("status", statusFilter);
+      if (search && sortBy === "newest") {
+        params.set("sortBy", "relevance");
+      } else {
+        params.set("sortBy", sortBy);
+      }
+      if (selectedTag) params.set("tag", selectedTag);
 
       const res = await fetch(`/api/documents?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setDocs(data.data || []);
+        if (data.tags) setAvailableTags(data.tags);
       }
     } catch {
       toast.error("Kon documenten niet laden.");
@@ -93,7 +106,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetchDocs();
     fetchCollections();
-  }, [statusFilter]);
+  }, [statusFilter, sortBy, selectedTag]);
 
   async function fetchCollections() {
     try {
@@ -162,12 +175,26 @@ export default function DocumentsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Zoeken op titel..."
+            placeholder="Zoeken in documenten..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
           />
         </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-48">
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4" />
+              <SelectValue placeholder="Sorteren" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Nieuwste</SelectItem>
+            <SelectItem value="oldest">Oudste</SelectItem>
+            <SelectItem value="most-viewed">Meest bekeken</SelectItem>
+            <SelectItem value="title">Titel A-Z</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />
@@ -181,6 +208,28 @@ export default function DocumentsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Tag filter chips */}
+      {availableTags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {availableTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() =>
+                setSelectedTag(selectedTag === tag ? null : tag)
+              }
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm transition-colors ${
+                selectedTag === tag
+                  ? "bg-[#0062EB] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {tag}
+              {selectedTag === tag && <X className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (
@@ -249,9 +298,20 @@ export default function DocumentsPage() {
                     {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
                   </TableCell>
                   <TableCell>
-                    <Badge className={statusColors[doc.status] || ""}>
-                      {statusLabels[doc.status] || doc.status}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge className={statusColors[doc.status] || ""}>
+                        {statusLabels[doc.status] || doc.status}
+                      </Badge>
+                      {doc.isDraft && doc.status === "ready" && !doc.scheduledPublishAt && (
+                        <Badge className="bg-gray-100 text-gray-600">Concept</Badge>
+                      )}
+                      {doc.isDraft && doc.scheduledPublishAt && (
+                        <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Gepland: {new Date(doc.scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">{doc.analytics?.totalViews || 0}</TableCell>
                   <TableCell>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +26,7 @@ import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader
 import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
+import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
 
@@ -60,7 +60,10 @@ interface ReaderDocument {
   template?: string;
   templateConfig?: TemplateConfig;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
+  infoBoxLabel?: string;
+  infoBoxText?: string;
   languageLevel?: "B1" | "B2" | "C1" | "C2";
+  targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   coverImageUrl?: string;
   customCoverUrl?: string;
   brandOverride?: { primary?: string };
@@ -73,6 +76,14 @@ interface ReaderDocument {
 }
 
 type LanguageLevel = "original" | "B1" | "B2" | "C1" | "C2";
+
+function formatShortDate(dateStr: string, lang: string): string {
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const month = d.toLocaleDateString(lang === "en" ? "en-GB" : "nl-NL", { month: "short" }).replace(".", "").toLowerCase();
+  const year = String(d.getFullYear()).slice(2);
+  return `${day} ${month} '${year}`;
+}
 
 export default function ReaderPage() {
   const params = useParams();
@@ -88,6 +99,7 @@ export default function ReaderPage() {
   const [expandedFinding, setExpandedFinding] = useState<number | null>(null);
   const [findingExplanations, setFindingExplanations] = useState<Record<number, string>>({});
   const [loadingFinding, setLoadingFinding] = useState<number | null>(null);
+  const [coverIsLandscape, setCoverIsLandscape] = useState<boolean | null>(null);
   const chatRef = useRef<ChatWidgetRef>(null);
   const analytics = useDocumentAnalytics(doc?._id || "");
 
@@ -240,6 +252,15 @@ export default function ReaderPage() {
     fetchDocument();
   }, [params.orgSlug]);
 
+  // Detect cover image orientation
+  useEffect(() => {
+    const coverUrl = doc?.customCoverUrl || doc?.coverImageUrl;
+    if (!coverUrl) return;
+    const img = new Image();
+    img.onload = () => setCoverIsLandscape(img.naturalWidth > img.naturalHeight);
+    img.src = coverUrl;
+  }, [doc?.customCoverUrl, doc?.coverImageUrl]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA]">
@@ -296,10 +317,10 @@ export default function ReaderPage() {
 
   if (error || !doc) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F5F7FA]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F7FA]" role="alert">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
-            <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
             <p className="font-medium">{error || "Document niet gevonden."}</p>
           </CardContent>
         </Card>
@@ -313,9 +334,12 @@ export default function ReaderPage() {
   const t = getLangStrings(doc.language || "nl").reader;
   const docLang = doc.language || "nl";
 
-  const languageLevel: LanguageLevel = doc.languageLevel || "original";
+  // targetCEFRLevel = the level the content was rewritten to (user-set)
+  // languageLevel = the detected level of the original PDF
+  // For display: show targetCEFRLevel if set, otherwise languageLevel
+  const displayLevel: LanguageLevel = doc.targetCEFRLevel || doc.languageLevel || "original";
 
-  const summaryKey = languageLevel !== "original" && languageLevel !== "C2" ? languageLevel : null;
+  const summaryKey = displayLevel !== "original" && displayLevel !== "C2" ? displayLevel : null;
   const currentSummary = summaryKey
     ? doc.content.summary[summaryKey] || doc.content.summary.original
     : doc.content.summary.original;
@@ -362,7 +386,12 @@ export default function ReaderPage() {
     <div
       className="brand-themed min-h-screen bg-[#F5F7FA]"
       style={{ "--doc-brand-primary": brandPrimary } as React.CSSProperties}
+      lang={docLang === "en" ? "en" : "nl"}
     >
+      {/* WCAG: Skip navigation link */}
+      <a href="#samenvatting" className="skip-link">
+        {docLang === "en" ? "Skip to main content" : "Ga naar hoofdinhoud"}
+      </a>
       {/* Header — show displayTitle (communicative) or fall back to title */}
       {(() => {
         const headerTitle = doc.displayTitle || doc.title;
@@ -380,48 +409,141 @@ export default function ReaderPage() {
         {/* Cluster 1: Title, Cover, Download/View — mobile only (above content) */}
         <div className="mb-6 lg:hidden">
           <div className="rounded-2xl bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-gray-900 leading-snug">
-              {doc.title}
-            </h2>
+            {coverIsLandscape && (doc.customCoverUrl || doc.coverImageUrl) ? (
+              /* Landscape cover: full-width image, then title + meta + buttons below */
+              <>
+                <div className="mb-4 overflow-hidden rounded-xl bg-gray-100">
+                  <img
+                    src={doc.customCoverUrl || doc.coverImageUrl}
+                    alt={doc.title}
+                    className="h-auto w-full block"
+                  />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-3">
+                  {doc.title}
+                </h2>
+                <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                  {doc.authors?.[0] && (
+                    <div className="flex items-center gap-1">
+                      <User className="h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+                      <span className="truncate">{doc.authors.join(", ")}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {doc.pageCount && (
+                      <span className="flex items-center gap-1">
+                        <FileText className="h-3 w-3 text-gray-400" aria-hidden="true" />
+                        {doc.pageCount} pag.
+                      </span>
+                    )}
+                    {doc.publicationDate && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-gray-400" aria-hidden="true" />
+                        {formatShortDate(doc.publicationDate, docLang)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-xl text-xs"
+                    onClick={() => {
+                      analytics.trackDownload();
+                      window.open(`/api/reader/${doc.shortId}/pdf?download=true`, "_blank");
+                    }}
+                  >
+                    <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    {t.downloadPdf}
+                  </Button>
+                  <Button
+                    variant={showPdfViewer ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-xl"
+                    style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                    onClick={() => setShowPdfViewer(!showPdfViewer)}
+                    title="PDF bekijken"
+                  >
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              /* Portrait cover (or no cover): thumbnail left, info right */
+              <div className="flex gap-4">
+                {(doc.customCoverUrl || doc.coverImageUrl) && (
+                  <div className="shrink-0 w-28 overflow-hidden rounded-lg bg-gray-100">
+                    <img
+                      src={doc.customCoverUrl || doc.coverImageUrl}
+                      alt={doc.title}
+                      className="h-auto w-full object-cover"
+                    />
+                  </div>
+                )}
 
-            {(doc.customCoverUrl || doc.coverImageUrl) && (
-              <div className="mb-4 overflow-hidden rounded-xl bg-gray-100">
-                <img
-                  src={doc.customCoverUrl || doc.coverImageUrl}
-                  alt={doc.title}
-                  className="w-full h-auto block"
-                />
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-3">
+                      {doc.title}
+                    </h2>
+                    <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                      {doc.authors?.[0] && (
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+                          <span className="truncate">{doc.authors.join(", ")}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {doc.pageCount && (
+                          <span className="flex items-center gap-1">
+                            <FileText className="h-3 w-3 text-gray-400" aria-hidden="true" />
+                            {doc.pageCount} pag.
+                          </span>
+                        )}
+                        {doc.publicationDate && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-gray-400" aria-hidden="true" />
+                            {formatShortDate(doc.publicationDate, docLang)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 rounded-xl text-xs"
+                      onClick={() => {
+                        analytics.trackDownload();
+                        window.open(`/api/reader/${doc.shortId}/pdf?download=true`, "_blank");
+                      }}
+                    >
+                      <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      {t.downloadPdf}
+                    </Button>
+                    <Button
+                      variant={showPdfViewer ? "default" : "outline"}
+                      size="sm"
+                      className="rounded-xl"
+                      style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                      onClick={() => setShowPdfViewer(!showPdfViewer)}
+                      title="PDF bekijken"
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1 rounded-xl"
-                onClick={() => {
-                  analytics.trackDownload();
-                  window.open(`/api/reader/${doc.shortId}/pdf?download=true`, "_blank");
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {t.downloadPdf}
-              </Button>
-              <Button
-                variant={showPdfViewer ? "default" : "outline"}
-                className="rounded-xl"
-                style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
-                onClick={() => setShowPdfViewer(!showPdfViewer)}
-                title="PDF bekijken"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
           {/* Sidebar */}
-          <aside className="order-2 lg:order-1">
+          <aside className="order-2 lg:order-1" aria-label={docLang === "en" ? "Document information" : "Documentinformatie"}>
             <div className="sticky top-[80px] space-y-4">
               {/* Cluster 1: Title, Cover, Download/View — desktop only */}
               <div className="hidden lg:block rounded-2xl bg-white p-5 shadow-sm">
@@ -434,7 +556,7 @@ export default function ReaderPage() {
                     <img
                       src={doc.customCoverUrl || doc.coverImageUrl}
                       alt={doc.title}
-                      className="w-full h-auto block"
+                      className="w-full h-auto max-h-80 object-contain block"
                     />
                   </div>
                 )}
@@ -448,7 +570,7 @@ export default function ReaderPage() {
                       window.open(`/api/reader/${doc.shortId}/pdf?download=true`, "_blank");
                     }}
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                     {t.downloadPdf}
                   </Button>
                   <Button
@@ -458,20 +580,28 @@ export default function ReaderPage() {
                     onClick={() => setShowPdfViewer(!showPdfViewer)}
                     title="PDF bekijken"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
               </div>
 
-              {/* Cluster 2: Metadata + Language Level */}
+              {/* Cluster 2: Metadata */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
-                {/* Compact date + pages row */}
-                {(doc.publicationDate || doc.pageCount) && (
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                {/* Author */}
+                {doc.authors?.[0] && (
+                  <div className="flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                    <span className="text-sm text-gray-600">{doc.authors.join(", ")}</span>
+                  </div>
+                )}
+
+                {/* Compact date + pages + level row */}
+                {(doc.publicationDate || doc.pageCount || displayLevel !== "original") && (
+                  <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500${doc.authors?.[0] ? " mt-2" : ""}`}>
                     {doc.publicationDate && (
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{new Date(doc.publicationDate).toLocaleDateString(docLang === "en" ? "en-GB" : "nl-NL", { day: "numeric", month: "long", year: "numeric" })}</span>
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                        <span>{formatShortDate(doc.publicationDate, docLang)}</span>
                       </div>
                     )}
                     {doc.publicationDate && doc.pageCount && (
@@ -479,25 +609,30 @@ export default function ReaderPage() {
                     )}
                     {doc.pageCount && (
                       <div className="flex items-center gap-1.5">
-                        <FileText className="h-3.5 w-3.5 text-gray-400" />
+                        <FileText className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
                         <span>{doc.pageCount} pag.</span>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Author */}
-                {doc.authors?.[0] && (
-                  <div className="flex items-center gap-2 mt-3">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="text-sm text-gray-600">{doc.authors.join(", ")}</span>
+                    {displayLevel !== "original" && (
+                      <>
+                        {(doc.publicationDate || doc.pageCount) && (
+                          <span className="text-gray-300">·</span>
+                        )}
+                        <span
+                          className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold text-white"
+                          style={{ backgroundColor: brandPrimary }}
+                        >
+                          {displayLevel}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
 
                 {/* Version */}
                 {doc.version && (
                   <div className="flex items-center gap-2 mt-2">
-                    <Hash className="h-3.5 w-3.5 text-gray-400" />
+                    <Hash className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
                     <span className="text-sm text-gray-500">{t.version} {doc.version}</span>
                   </div>
                 )}
@@ -514,57 +649,6 @@ export default function ReaderPage() {
                         {tag}
                       </span>
                     ))}
-                  </div>
-                )}
-
-                {/* Language Level */}
-                {doc.languageLevel && (
-                  <div className="mt-4 border-t border-gray-100 pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                        {t.languageLevel}
-                      </span>
-                      <span
-                        className="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold text-white"
-                        style={{ backgroundColor: brandPrimary }}
-                      >
-                        {doc.languageLevel}
-                      </span>
-                    </div>
-                    {(() => {
-                      const levels = ["B1", "B2", "C1", "C2"] as const;
-                      const activeIndex = levels.indexOf(doc.languageLevel as typeof levels[number]);
-                      const fillPercent = activeIndex >= 0 ? ((activeIndex + 1) / levels.length) * 100 : 0;
-
-                      return (
-                        <div className="mt-2">
-                          <div className="relative h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${fillPercent}%`,
-                                background: `linear-gradient(90deg, ${brandPrimary}66, ${brandPrimary})`,
-                              }}
-                            />
-                          </div>
-                          <div className="mt-1.5 flex justify-between">
-                            {levels.map((level) => (
-                              <span
-                                key={level}
-                                className={`text-[10px] ${
-                                  level === doc.languageLevel
-                                    ? "font-bold"
-                                    : "text-gray-300"
-                                }`}
-                                style={level === doc.languageLevel ? { color: brandPrimary } : undefined}
-                              >
-                                {level}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
               </div>
@@ -590,16 +674,19 @@ export default function ReaderPage() {
             )}
 
             {/* Summary */}
-            <section id="samenvatting" className="rounded-xl bg-white p-6 shadow-sm md:p-8 lg:pr-16 xl:pr-24">
-              <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
-                <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                {t.summary}
-                {languageLevel !== "original" && (
-                  <Badge style={{ backgroundColor: brandPrimary, color: "white" }}>
-                    {t.levelBadge(languageLevel)}
-                  </Badge>
-                )}
-              </h2>
+            <section id="samenvatting" className="group rounded-xl bg-white p-6 shadow-sm md:p-8 lg:pr-16 xl:pr-24">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                  <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
+                  {t.summary}
+                </h2>
+                <SectionFeedbackButton
+                  shortId={doc.shortId}
+                  sectionType="summary"
+                  sectionTitle={t.summary}
+                  sessionId={analytics.sessionId}
+                />
+              </div>
               <div onClick={handleTermClick}>
                 <div
                   className="prose max-w-none text-gray-700"
@@ -611,11 +698,19 @@ export default function ReaderPage() {
 
             {/* Key Points */}
             {doc.content.keyPoints?.length > 0 && (
-              <section id="hoofdpunten" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
-                <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
-                  <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                  {t.keyPoints}
-                </h2>
+              <section id="hoofdpunten" className="group rounded-xl bg-white p-6 shadow-sm md:p-8">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                    <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
+                    {t.keyPoints}
+                  </h2>
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="keyPoint"
+                    sectionTitle={t.keyPoints}
+                    sessionId={analytics.sessionId}
+                  />
+                </div>
                 <div className="space-y-3" onClick={handleTermClick}>
                   {doc.content.keyPoints.map((kp, i) => (
                     <div
@@ -648,13 +743,14 @@ export default function ReaderPage() {
                           className={`h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200 ${
                             expandedKeyPoint === i ? "rotate-180" : ""
                           }`}
+                          aria-hidden="true"
                         />
                       </button>
                       {expandedKeyPoint === i && (
                         <div className="border-t border-gray-100 px-5 pb-5 pt-4 pl-[4.25rem]">
                           {loadingKeyPoint === i ? (
                             <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                               <span>{t.loadingExplanation}</span>
                             </div>
                           ) : keyPointExplanations[i] ? (
@@ -672,21 +768,31 @@ export default function ReaderPage() {
 
             {/* Findings */}
             {doc.content.findings?.length > 0 && (
-              <section id="bevindingen" className="rounded-xl bg-white p-6 shadow-sm md:p-8">
-                <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
-                  <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} />
-                  {t.findings}
-                </h2>
+              <section id="bevindingen" className="group rounded-xl bg-white p-6 shadow-sm md:p-8">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
+                    <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
+                    {t.findings}
+                  </h2>
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="finding"
+                    sectionTitle={t.findings}
+                    sessionId={analytics.sessionId}
+                  />
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {doc.content.findings.map((f, i) => (
-                    <div
+                    <button
+                      type="button"
                       key={i}
-                      className={`rounded-2xl border bg-white transition-all cursor-pointer ${
+                      className={`rounded-2xl border bg-white transition-all cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0062EB] ${
                         expandedFinding === i
                           ? "border-gray-200 shadow-md sm:col-span-2"
                           : "border-gray-100 hover:border-gray-200 hover:shadow-md"
                       }`}
                       onClick={() => toggleFinding(i)}
+                      aria-expanded={expandedFinding === i}
                     >
                       <div className="p-6">
                         <div className="flex items-start justify-between gap-2">
@@ -700,6 +806,7 @@ export default function ReaderPage() {
                             className={`h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200 ${
                               expandedFinding === i ? "rotate-180" : ""
                             }`}
+                            aria-hidden="true"
                           />
                         </div>
                         <h3 className="mb-2 text-base font-semibold text-gray-900 leading-snug">
@@ -713,7 +820,7 @@ export default function ReaderPage() {
                         <div className="border-t border-gray-100 px-6 pb-6 pt-4">
                           {loadingFinding === i ? (
                             <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                               <span>{t.loadingContext}</span>
                             </div>
                           ) : findingExplanations[i] ? (
@@ -723,18 +830,19 @@ export default function ReaderPage() {
                           ) : null}
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Template info box */}
-            {template.showInfoBox && (
+            {/* Info box — document-level overrides template-level */}
+            {(doc.infoBoxLabel || template.showInfoBox) && (
               <TemplateInfoBox
                 brandPrimary={brandPrimary}
                 primaryLight={primaryLight}
-                label={template.infoBoxLabel}
+                label={doc.infoBoxLabel || template.infoBoxLabel}
+                text={doc.infoBoxText}
                 lang={docLang}
               />
             )}

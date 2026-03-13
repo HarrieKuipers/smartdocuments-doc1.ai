@@ -23,7 +23,10 @@ import {
   Bold,
   BookOpen,
   Check,
+  Code,
+  Copy,
   Eye,
+  ExternalLink,
   Globe,
   Italic,
   Link2,
@@ -82,6 +85,9 @@ interface DocumentData {
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   pageCount?: number;
+  isDraft?: boolean;
+  scheduledPublishAt?: string;
+  publishedAt?: string;
 }
 
 // -- Rich Text Toolbar --
@@ -174,6 +180,7 @@ export default function DocumentEditPage() {
   const [publishing, setPublishing] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessProgress, setReprocessProgress] = useState("");
+  const initialLoadRef = useRef(true);
 
   // Editable fields
   const [title, setTitle] = useState("");
@@ -197,6 +204,8 @@ export default function DocumentEditPage() {
   const [newAuthor, setNewAuthor] = useState("");
   const [newTag, setNewTag] = useState("");
   const [targetCEFRLevel, setTargetCEFRLevel] = useState<"B1" | "B2" | "C1" | "C2" | "">("");
+  const [isDraft, setIsDraft] = useState(false);
+  const [scheduledPublishAt, setScheduledPublishAt] = useState("");
 
   // Cover image
   const [coverUploading, setCoverUploading] = useState(false);
@@ -240,6 +249,8 @@ export default function DocumentEditPage() {
         setAuthors(data.authors || []);
         setTags(data.tags || []);
         setTargetCEFRLevel(data.targetCEFRLevel || "");
+        setIsDraft(data.isDraft || false);
+        setScheduledPublishAt(data.scheduledPublishAt ? new Date(data.scheduledPublishAt).toISOString().slice(0, 16) : "");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -259,10 +270,7 @@ export default function DocumentEditPage() {
       const cleanFindings = findings.map(({ category, title: t, content }) => ({ category, title: t, content }));
       const cleanTerms = terms.map(({ term, definition, occurrences }) => ({ term, definition, occurrences }));
 
-      const res = await fetch(`/api/documents/${params.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
           title,
           displayTitle,
           description,
@@ -278,6 +286,8 @@ export default function DocumentEditPage() {
           template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
+          isDraft,
+          scheduledPublishAt: scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null,
           infoBoxLabel: infoBoxLabel || null,
           infoBoxText: infoBoxText || null,
           brandOverride: {
@@ -285,7 +295,11 @@ export default function DocumentEditPage() {
               templateOptions.find((t) => t.templateId === templateId)?.primary ??
               getTemplate(templateId).primary,
           },
-        }),
+        };
+      const res = await fetch(`/api/documents/${params.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const { error } = await res.json();
@@ -298,14 +312,30 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt]);
 
   useEffect(() => {
     if (!doc) return;
+    // Skip auto-save on initial data load
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      return;
+    }
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt, saveChanges, doc]);
+
+  // Warn user if they try to leave with unsaved changes
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!saved) {
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [saved]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {
@@ -318,10 +348,12 @@ export default function DocumentEditPage() {
       await fetch(`/api/documents/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "ready", publishedAt: new Date() }),
+        body: JSON.stringify({ status: "ready", publishedAt: new Date(), isDraft: false }),
       });
       toast.success("Document gepubliceerd!");
-      if (doc) setDoc({ ...doc, status: "ready" });
+      setIsDraft(false);
+      setScheduledPublishAt("");
+      if (doc) setDoc({ ...doc, status: "ready", isDraft: false, scheduledPublishAt: undefined });
     } catch {
       toast.error("Publiceren mislukt.");
     } finally {
@@ -614,6 +646,12 @@ export default function DocumentEditPage() {
             <BookOpen className="h-3.5 w-3.5" />
             Begrippen & definities
           </TabsTrigger>
+          {doc.status === "ready" && (
+            <TabsTrigger value="insluiten" className="gap-1.5">
+              <Code className="h-3.5 w-3.5" />
+              Insluiten
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Intelligentie Tab */}
@@ -834,6 +872,65 @@ export default function DocumentEditPage() {
                           className="mt-2"
                         />
                       )}
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-3">
+                      <Label>Publicatie</Label>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Concept</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Als concept is het document niet publiek zichtbaar
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isDraft}
+                          onClick={() => {
+                            const newVal = !isDraft;
+                            setIsDraft(newVal);
+                            if (!newVal) setScheduledPublishAt("");
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                            isDraft ? "bg-primary" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                              isDraft ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      {isDraft && (
+                        <div className="space-y-2">
+                          <Label>Geplande publicatie</Label>
+                          <input
+                            type="datetime-local"
+                            value={scheduledPublishAt}
+                            onChange={(e) => setScheduledPublishAt(e.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Optioneel. Het document wordt automatisch gepubliceerd op dit moment.
+                          </p>
+                        </div>
+                      )}
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Status: </span>
+                        {isDraft && scheduledPublishAt ? (
+                          <span className="text-purple-600 font-medium">
+                            Gepland op {new Date(scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        ) : isDraft ? (
+                          <span className="text-gray-600 font-medium">Concept</span>
+                        ) : (
+                          <span className="text-green-600 font-medium">Gepubliceerd</span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -1286,7 +1383,240 @@ export default function DocumentEditPage() {
             </Card>
           </div>
         </TabsContent>
+
+        {/* Insluiten Tab */}
+        {doc.status === "ready" && (
+          <TabsContent value="insluiten">
+            <EmbedTabContent doc={doc} />
+          </TabsContent>
+        )}
       </Tabs>
+    </div>
+  );
+}
+
+// -- Embed Tab Component --
+function EmbedTabContent({ doc }: { doc: DocumentData }) {
+  const [embedTheme, setEmbedTheme] = useState<"light" | "dark">("light");
+  const [embedCompact, setEmbedCompact] = useState(false);
+  const [embedWidth, setEmbedWidth] = useState("100%");
+  const [embedHeight, setEmbedHeight] = useState("600");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doc1.ai";
+
+  const embedParams = new URLSearchParams();
+  if (embedTheme === "dark") embedParams.set("theme", "dark");
+  if (embedCompact) embedParams.set("compact", "true");
+  const queryString = embedParams.toString();
+  const embedUrl = `${siteUrl}/embed/${doc.shortId}${queryString ? `?${queryString}` : ""}`;
+
+  const widthAttr = embedWidth.includes("%") ? embedWidth : `${embedWidth}px`;
+  const iframeCode = `<iframe src="${embedUrl}" width="${widthAttr}" height="${embedHeight}" style="border: 1px solid #e5e7eb; border-radius: 8px;" frameborder="0" allowfullscreen></iframe>`;
+
+  const scriptCode = `<div id="doc1-embed-${doc.shortId}"></div>
+<script>
+(function() {
+  var c = document.getElementById('doc1-embed-${doc.shortId}');
+  var f = document.createElement('iframe');
+  f.src = '${embedUrl}';
+  f.style.width = '${widthAttr}';
+  f.style.height = '${embedHeight}px';
+  f.style.border = '1px solid #e5e7eb';
+  f.style.borderRadius = '8px';
+  f.frameBorder = '0';
+  f.allowFullscreen = true;
+  c.appendChild(f);
+})();
+</script>`;
+
+  async function copyToClipboard(text: string, field: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast.success("Gekopieerd naar klembord");
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      toast.error("Kon niet kopieren");
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6 py-6">
+      {/* Options */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Embed instellingen
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Thema</Label>
+              <Select
+                value={embedTheme}
+                onValueChange={(v) => setEmbedTheme(v as "light" | "dark")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Licht</SelectItem>
+                  <SelectItem value="dark">Donker</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Weergave</Label>
+              <Select
+                value={embedCompact ? "compact" : "full"}
+                onValueChange={(v) => setEmbedCompact(v === "compact")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Volledig (samenvatting, hoofdpunten, begrippen)</SelectItem>
+                  <SelectItem value="compact">Compact (alleen samenvatting)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Breedte</Label>
+              <Input
+                value={embedWidth}
+                onChange={(e) => setEmbedWidth(e.target.value)}
+                placeholder="100% of 600"
+              />
+              <p className="text-xs text-muted-foreground">
+                Gebruik % of pixels (bijv. 100%, 800)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Hoogte (px)</Label>
+              <Input
+                value={embedHeight}
+                onChange={(e) => setEmbedHeight(e.target.value)}
+                placeholder="600"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Iframe Code */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Code className="h-4 w-4" />
+            iFrame code
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="relative">
+            <pre className="overflow-x-auto rounded-lg border bg-gray-50 p-4 text-xs text-gray-700">
+              <code>{iframeCode}</code>
+            </pre>
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute right-2 top-2"
+              onClick={() => copyToClipboard(iframeCode, "iframe")}
+            >
+              {copiedField === "iframe" ? (
+                <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+              ) : (
+                <Copy className="mr-1 h-3.5 w-3.5" />
+              )}
+              {copiedField === "iframe" ? "Gekopieerd" : "Kopieren"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* JavaScript Code */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Code className="h-4 w-4" />
+            JavaScript snippet
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="relative">
+            <pre className="overflow-x-auto rounded-lg border bg-gray-50 p-4 text-xs text-gray-700">
+              <code>{scriptCode}</code>
+            </pre>
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute right-2 top-2"
+              onClick={() => copyToClipboard(scriptCode, "script")}
+            >
+              {copiedField === "script" ? (
+                <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+              ) : (
+                <Copy className="mr-1 h-3.5 w-3.5" />
+              )}
+              {copiedField === "script" ? "Gekopieerd" : "Kopieren"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Direct URL */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ExternalLink className="h-4 w-4" />
+            Directe URL
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <Input value={embedUrl} readOnly className="font-mono text-xs" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(embedUrl, "url")}
+              className="shrink-0"
+            >
+              {copiedField === "url" ? (
+                <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+              ) : (
+                <Copy className="mr-1 h-3.5 w-3.5" />
+              )}
+              {copiedField === "url" ? "Gekopieerd" : "Kopieren"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Eye className="h-4 w-4" />
+            Voorbeeld
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            className="overflow-hidden rounded-lg border"
+            style={{ height: `${Math.min(Number(embedHeight) || 600, 700)}px` }}
+          >
+            <iframe
+              src={embedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: "none" }}
+              title="Embed voorbeeld"
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

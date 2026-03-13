@@ -208,6 +208,7 @@ export function useDocumentAnalytics(documentId: string) {
   }, [documentId, queueEvent, flushEvents]);
 
   return {
+    sessionId: sessionId.current,
     trackTermClick: (term: string, definition?: string) =>
       queueEvent("term_click", { term, termDefinition: definition }),
     trackSectionView: (sectionId: string, sectionTitle: string) =>

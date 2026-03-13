@@ -36,6 +36,7 @@ import AIInsightCard, {
   type Insight,
 } from "@/components/analytics/insights/AIInsightCard";
 import LiveViewers from "@/components/analytics/LiveViewers";
+import FeedbackOverview from "@/components/analytics/FeedbackOverview";
 import { CHART_COLORS, type Period } from "@/lib/analytics/constants";
 import { formatDuration } from "@/lib/analytics/helpers";
 
@@ -387,6 +388,7 @@ export default function DocumentAnalyticsPage() {
           <TabsTrigger value="chat">AI Chat</TabsTrigger>
           <TabsTrigger value="begrippen">Begrippen</TabsTrigger>
           <TabsTrigger value="bezoekers">Bezoekers</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
         </TabsList>
 
         {/* TAB: OVERZICHT */}
@@ -925,6 +927,20 @@ export default function DocumentAnalyticsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* TAB: FEEDBACK */}
+        <TabsContent value="feedback" className="space-y-6">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">
+                Lezer Feedback
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FeedbackOverview documentId={documentId} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

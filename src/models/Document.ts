@@ -70,6 +70,8 @@ export interface IDocument extends MongoDocument {
   coverImageUrl?: string;
   customCoverUrl?: string;
   publishedAt?: Date;
+  scheduledPublishAt?: Date;
+  isDraft: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -196,12 +198,34 @@ const DocumentSchema = new Schema<IDocument>(
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },
     publishedAt: { type: Date },
+    scheduledPublishAt: { type: Date },
+    isDraft: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
 DocumentSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+DocumentSchema.index({ scheduledPublishAt: 1, isDraft: 1, status: 1 });
 DocumentSchema.index({ organizationId: 1, slug: 1 }, { unique: true });
+DocumentSchema.index(
+  {
+    title: "text",
+    displayTitle: "text",
+    description: "text",
+    tags: "text",
+    "content.summary.original": "text",
+  },
+  {
+    weights: {
+      title: 10,
+      displayTitle: 8,
+      tags: 5,
+      description: 3,
+      "content.summary.original": 1,
+    },
+    name: "document_text_search",
+  }
+);
 
 const DocumentModel: Model<IDocument> =
   mongoose.models.Document ||

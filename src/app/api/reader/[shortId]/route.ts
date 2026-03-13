@@ -27,6 +27,13 @@ export async function GET(
       );
     }
 
+    if (doc.isDraft) {
+      return NextResponse.json(
+        { error: "Dit document is nog niet gepubliceerd." },
+        { status: 404 }
+      );
+    }
+
     // Check access
     if (doc.access?.type === "password") {
       const password = req.headers.get("x-document-password");
