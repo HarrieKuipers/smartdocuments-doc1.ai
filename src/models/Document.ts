@@ -71,6 +71,8 @@ export interface IDocument extends MongoDocument {
   customCoverUrl?: string;
   publishedAt?: Date;
   scheduledPublishAt?: Date;
+  currentVersion: number;
+  totalVersions: number;
   isDraft: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -199,6 +201,8 @@ const DocumentSchema = new Schema<IDocument>(
     customCoverUrl: { type: String },
     publishedAt: { type: Date },
     scheduledPublishAt: { type: Date },
+    currentVersion: { type: Number, default: 1 },
+    totalVersions: { type: Number, default: 1 },
     isDraft: { type: Boolean, default: false },
   },
   { timestamps: true }

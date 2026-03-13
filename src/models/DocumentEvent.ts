@@ -28,6 +28,10 @@ export const EVENT_TYPES = [
   // Navigation
   "language_switch",
   "reading_mode_toggle",
+  // Annotations
+  "annotation_create",
+  "annotation_reply",
+  "annotation_resolve",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

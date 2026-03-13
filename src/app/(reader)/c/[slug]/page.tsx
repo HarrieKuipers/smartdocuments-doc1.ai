@@ -20,6 +20,7 @@ import {
   Loader2,
 } from "lucide-react";
 import DocFooter from "@/components/reader/DocFooter";
+import ChatWidget from "@/components/chat/ChatWidget";
 
 interface CollectionDocument {
   _id: string;
@@ -428,6 +429,17 @@ export default function PublicCollectionPage() {
 
       {/* Footer */}
       <DocFooter brandPrimary={brandPrimary} />
+
+      {/* Collection Chat Widget */}
+      {collection.documents.length > 0 && (
+        <ChatWidget
+          documentId=""
+          brandPrimary={brandPrimary}
+          chatMode="full"
+          language="nl"
+          collectionSlug={collection.slug}
+        />
+      )}
     </div>
   );
 }

@@ -33,3 +33,20 @@ export function canEditContent(plan: PlanType): boolean {
 export function getMaxTeamMembers(plan: PlanType): number {
   return PLANS[plan].maxTeamMembers;
 }
+
+export function canUseVersioning(plan: PlanType): boolean {
+  return plan !== "free";
+}
+
+export function canUseTeamAnnotations(plan: PlanType): boolean {
+  return plan !== "free";
+}
+
+export function getMaxPublicAnnotations(plan: PlanType): number {
+  if (plan === "free") return 10;
+  return Infinity;
+}
+
+export function canUseCollectionChat(plan: PlanType): boolean {
+  return plan !== "free";
+}

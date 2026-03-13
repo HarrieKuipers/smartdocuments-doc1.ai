@@ -27,6 +27,7 @@ import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
 import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
+import TableOfContents, { type TocSection } from "@/components/reader/TableOfContents";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
 
@@ -344,6 +345,30 @@ export default function ReaderPage() {
     ? doc.content.summary[summaryKey] || doc.content.summary.original
     : doc.content.summary.original;
 
+  // Build TOC sections from document content
+  const tocSections: TocSection[] = [];
+  tocSections.push({ id: "samenvatting", label: t.summary });
+  if (doc.content.keyPoints?.length > 0) {
+    tocSections.push({
+      id: "hoofdpunten",
+      label: t.keyPoints,
+      children: doc.content.keyPoints.map((kp, i) => ({
+        id: `hoofdpunt-${i}`,
+        label: kp.text.length > 60 ? kp.text.slice(0, 60) + "…" : kp.text,
+      })),
+    });
+  }
+  if (doc.content.findings?.length > 0) {
+    tocSections.push({
+      id: "bevindingen",
+      label: t.findings,
+      children: doc.content.findings.map((f, i) => ({
+        id: `bevinding-${i}`,
+        label: f.title,
+      })),
+    });
+  }
+
   function formatParagraphs(html: string): string {
     // Split on double newlines and wrap each paragraph in <p> tags
     return html
@@ -585,6 +610,13 @@ export default function ReaderPage() {
                 </div>
               </div>
 
+              {/* Table of Contents */}
+              <TableOfContents
+                sections={tocSections}
+                brandPrimary={brandPrimary}
+                onTocClick={(id, label) => analytics.trackTocClick(id, label)}
+              />
+
               {/* Cluster 2: Metadata */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 {/* Author */}
@@ -674,7 +706,7 @@ export default function ReaderPage() {
             )}
 
             {/* Summary */}
-            <section id="samenvatting" className="group rounded-xl bg-white p-6 shadow-sm md:p-8 lg:pr-16 xl:pr-24">
+            <section id="samenvatting" className="scroll-mt-24 group rounded-xl bg-white p-6 shadow-sm md:p-8 lg:pr-16 xl:pr-24">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                   <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
@@ -698,7 +730,7 @@ export default function ReaderPage() {
 
             {/* Key Points */}
             {doc.content.keyPoints?.length > 0 && (
-              <section id="hoofdpunten" className="group rounded-xl bg-white p-6 shadow-sm md:p-8">
+              <section id="hoofdpunten" className="scroll-mt-24 group rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                     <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
@@ -715,7 +747,8 @@ export default function ReaderPage() {
                   {doc.content.keyPoints.map((kp, i) => (
                     <div
                       key={i}
-                      className={`rounded-2xl border bg-white transition-all ${
+                      id={`hoofdpunt-${i}`}
+                      className={`scroll-mt-24 rounded-2xl border bg-white transition-all ${
                         expandedKeyPoint === i
                           ? "border-gray-200 shadow-md"
                           : "border-gray-100 hover:border-gray-200 hover:shadow-md"
@@ -768,7 +801,7 @@ export default function ReaderPage() {
 
             {/* Findings */}
             {doc.content.findings?.length > 0 && (
-              <section id="bevindingen" className="group rounded-xl bg-white p-6 shadow-sm md:p-8">
+              <section id="bevindingen" className="scroll-mt-24 group rounded-xl bg-white p-6 shadow-sm md:p-8">
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 md:text-2xl">
                     <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
@@ -786,7 +819,8 @@ export default function ReaderPage() {
                     <button
                       type="button"
                       key={i}
-                      className={`rounded-2xl border bg-white transition-all cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0062EB] ${
+                      id={`bevinding-${i}`}
+                      className={`scroll-mt-24 rounded-2xl border bg-white transition-all cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0062EB] ${
                         expandedFinding === i
                           ? "border-gray-200 shadow-md sm:col-span-2"
                           : "border-gray-100 hover:border-gray-200 hover:shadow-md"
