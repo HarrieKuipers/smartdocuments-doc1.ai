@@ -56,6 +56,7 @@ export default function MetadataPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState<"nl" | "en">("nl");
+  const [targetCEFRLevel, setTargetCEFRLevel] = useState<"" | "B1" | "B2" | "C1">("");
 
   useEffect(() => {
     async function fetchData() {
@@ -76,6 +77,7 @@ export default function MetadataPage() {
         setTags(data.tags || []);
         setDescription(data.description || "");
         setLanguage(data.language || "nl");
+        setTargetCEFRLevel(data.targetCEFRLevel || "");
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -121,6 +123,7 @@ export default function MetadataPage() {
           tags,
           description,
           language,
+          targetCEFRLevel: targetCEFRLevel || undefined,
         }),
       });
       if (!res.ok) throw new Error();
@@ -295,6 +298,24 @@ export default function MetadataPage() {
             </div>
             <p className="text-[10px] text-muted-foreground">
               De taal waarin het document wordt verwerkt en geanalyseerd
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Taalniveau (optioneel)</Label>
+            <Select value={targetCEFRLevel} onValueChange={(v) => setTargetCEFRLevel(v as "" | "B1" | "B2" | "C1")}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Origineel niveau behouden" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Origineel — geen herschrijving</SelectItem>
+                <SelectItem value="B1">B1 — Eenvoudig, voor iedereen begrijpelijk</SelectItem>
+                <SelectItem value="B2">B2 — Toegankelijk, helder taalgebruik</SelectItem>
+                <SelectItem value="C1">C1 — Formeel, met vakjargon</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              De samenvatting wordt herschreven naar dit taalniveau. Kies leeg om het originele niveau te behouden.
             </p>
           </div>
         </CardContent>
