@@ -13,9 +13,10 @@ const LANG = {
 
     // analyze-content
     analyzePrompt: `Je bent een expert document-analist. Analyseer de volgende tekst en genereer:
-1. Een uitgebreide samenvatting (managementniveau)
+1. Een korte samenvatting van maximaal 3 alinea's. Elke alinea bevat 2–3 zinnen. Gebruik witregels (dubbele newline \\n\\n) tussen alinea's. Gebruik GEEN bullets, geen opsommingen en geen kopjes. De samenvatting geeft alleen context en hoofdlijn — details, cijfers en specifieke bevindingen horen in de secties eronder.
 2. De belangrijkste hoofdpunten (5-10 punten) met per punt een korte uitleg van 2-3 zinnen die meer context en achtergrond geeft
-3. Belangrijke bevindingen (4-6 stuks)`,
+3. Belangrijke bevindingen (4-6 stuks)
+4. Het taalniveau van de ORIGINELE brontekst (niet van jouw samenvatting) volgens het Europees Referentiekader (CEFR): B1 (eenvoudig), B2 (gemiddeld), C1 (geavanceerd/vakjargon), of C2 (zeer complex/wetenschappelijk). Beoordeel op basis van zinslengte, woordenschat, abstractie en vakjargon.`,
     findingsInstruction: `BELANGRIJK voor de bevindingen (findings):
 - De "category" moet een korte, actiegerichte label zijn op taalniveau B1 — geen academische of abstracte termen.
 - Gebruik vragen of duidelijke actietaal die de lezer direct begrijpt.
@@ -39,11 +40,12 @@ const LANG = {
   ],
   "findings": [
     {"category": "De regels op een rij", "title": "korte, duidelijke titel", "content": "beschrijving in eenvoudige taal"}
-  ]
+  ],
+  "languageLevel": "C1"
 }`,
 
     // generate-summary
-    summaryPrompt: "Herschrijf de volgende samenvatting op drie verschillende taalniveaus.",
+    summaryPrompt: "Herschrijf de volgende samenvatting op drie verschillende taalniveaus. Behoud de structuur: maximaal 3 korte alinea's, 2–3 zinnen per alinea, gescheiden door witregels. Geen bullets, geen opsommingen, geen kopjes.",
     summaryLevels: `Taalniveaus:
 - B1: Eenvoudig Nederlands. Korte zinnen, dagelijkse woorden, geen vakjargon. Geschikt voor mensen met basiskennis van het Nederlands.
 - B2: Gemiddeld niveau. Duidelijke zinnen, beperkt vakjargon met uitleg, geschikt voor het algemene publiek.
@@ -87,13 +89,19 @@ Bepaal of het document gericht is op een EXTERN publiek (burgers, klanten, het a
       `Je bent een behulpzame AI-assistent die vragen beantwoordt over het document "${title}".
 Beantwoord vragen uitsluitend op basis van de inhoud van het document.
 Als het antwoord niet in het document staat, zeg dat dan eerlijk.
-Antwoord altijd in het Nederlands. Wees beknopt maar informatief.`,
+Antwoord altijd in het Nederlands. Wees beknopt maar informatief.
+
+Opmaakregels:
+- Gebruik markdown voor structuur: **vetgedrukt** voor kopjes, opsommingstekens (- of •) voor lijsten.
+- Zet altijd een witregel tussen alinea's en voor/na een lijst.
+- Gebruik opsommingstekens wanneer je meerdere punten, oorzaken, voorbeelden of aanbevelingen noemt.
+- Houd het overzichtelijk: korte alinea's, duidelijke kopjes, logische structuur.`,
 
     // Reader UI labels
     reader: {
       summary: "Samenvatting",
       keyPoints: "Hoofdpunten",
-      findings: "Belangrijke Bevindingen",
+      findings: "Belangrijke bevindingen",
       languageLevel: "Taalniveau",
       author: "Auteur",
       date: "Datum",
@@ -144,9 +152,10 @@ Antwoord altijd in het Nederlands. Wees beknopt maar informatief.`,
     simpleLanguage: "Use clear, accessible language (B1 level)",
 
     analyzePrompt: `You are an expert document analyst. Analyze the following text and generate:
-1. A comprehensive summary (management level)
+1. A short summary of no more than 3 paragraphs. Each paragraph contains 2–3 sentences. Use blank lines (double newline \\n\\n) between paragraphs. Do NOT use bullets, lists, or headings. The summary provides only context and the main narrative — details, figures, and specific findings belong in the sections below.
 2. The most important key points (5-10 points) with a brief explanation of 2-3 sentences per point providing more context and background
-3. Important findings (4-6 items)`,
+3. Important findings (4-6 items)
+4. The language level of the ORIGINAL source text (not your summary) according to the Common European Framework (CEFR): B1 (simple), B2 (intermediate), C1 (advanced/jargon), or C2 (very complex/academic). Assess based on sentence length, vocabulary, abstraction, and use of jargon.`,
     findingsInstruction: `IMPORTANT for findings:
 - The "category" should be a short, action-oriented label at B1 reading level — no academic or abstract terms.
 - Use questions or clear action language that the reader immediately understands.
@@ -170,10 +179,11 @@ Antwoord altijd in het Nederlands. Wees beknopt maar informatief.`,
   ],
   "findings": [
     {"category": "The rules at a glance", "title": "short, clear title", "content": "description in simple language"}
-  ]
+  ],
+  "languageLevel": "C1"
 }`,
 
-    summaryPrompt: "Rewrite the following summary at three different reading levels.",
+    summaryPrompt: "Rewrite the following summary at three different reading levels. Keep the structure: no more than 3 short paragraphs, 2–3 sentences per paragraph, separated by blank lines. No bullets, no lists, no headings.",
     summaryLevels: `Reading levels:
 - B1: Simple English. Short sentences, everyday words, no jargon. Suitable for people with basic English knowledge.
 - B2: Intermediate level. Clear sentences, limited jargon with explanations, suitable for the general public.
@@ -212,7 +222,13 @@ Determine whether the document is aimed at an EXTERNAL audience (citizens, custo
       `You are a helpful AI assistant that answers questions about the document "${title}".
 Answer questions exclusively based on the content of the document.
 If the answer is not in the document, say so honestly.
-Always respond in English. Be concise but informative.`,
+Always respond in English. Be concise but informative.
+
+Formatting rules:
+- Use markdown for structure: **bold** for headings, bullet points (- or •) for lists.
+- Always add a blank line between paragraphs and before/after lists.
+- Use bullet points when listing multiple items, causes, examples, or recommendations.
+- Keep it scannable: short paragraphs, clear headings, logical structure.`,
 
     reader: {
       summary: "Summary",

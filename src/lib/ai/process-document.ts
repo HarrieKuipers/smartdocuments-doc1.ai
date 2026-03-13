@@ -79,6 +79,9 @@ export async function processDocument(
     };
     doc.content.keyPoints = analysis.keyPoints;
     doc.content.findings = analysis.findings;
+    if (analysis.languageLevel && ["B1", "B2", "C1", "C2"].includes(analysis.languageLevel)) {
+      doc.languageLevel = analysis.languageLevel;
+    }
     await doc.save();
 
     // Step 3: Summary generation (already done in analysis) + display title

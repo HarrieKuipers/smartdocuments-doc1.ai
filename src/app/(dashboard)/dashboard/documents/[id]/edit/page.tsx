@@ -183,6 +183,8 @@ export default function DocumentEditPage() {
   const [chatMode, setChatMode] = useState<"terms-only" | "terms-and-chat" | "full">("terms-only");
   const [language, setLanguage] = useState<"nl" | "en">("nl");
   const [customSlug, setCustomSlug] = useState("");
+  const [infoBoxLabel, setInfoBoxLabel] = useState("");
+  const [infoBoxText, setInfoBoxText] = useState("");
   const [keyPoints, setKeyPoints] = useState<{ text: string; explanation?: string; linkedTerms: string[] }[]>([]);
   const [findings, setFindings] = useState<{ category: string; title: string; content: string }[]>([]);
   const [terms, setTerms] = useState<{ term: string; definition: string; occurrences: number }[]>([]);
@@ -221,6 +223,8 @@ export default function DocumentEditPage() {
         setChatMode(data.chatMode || "terms-only");
         setLanguage(data.language || "nl");
         setCustomSlug(data.customSlug || "");
+        setInfoBoxLabel(data.infoBoxLabel || "");
+        setInfoBoxText(data.infoBoxText || "");
         setKeyPoints(data.content?.keyPoints || []);
         setFindings(data.content?.findings || []);
         setTerms(data.content?.terms || []);
@@ -259,6 +263,8 @@ export default function DocumentEditPage() {
           template: templateId || "doc1",
           chatMode,
           customSlug: customSlug || null,
+          infoBoxLabel: infoBoxLabel || null,
+          infoBoxText: infoBoxText || null,
           brandOverride: {
             primary:
               templateOptions.find((t) => t.templateId === templateId)?.primary ??
@@ -277,14 +283,14 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, keyPoints, findings, terms]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms]);
 
   useEffect(() => {
     if (!doc) return;
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, contentVersion, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, saveChanges, doc]);
 
   // Helper to mark content as changed (triggers auto-save for array fields)
   function markChanged() {

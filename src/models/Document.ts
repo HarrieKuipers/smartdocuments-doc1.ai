@@ -43,6 +43,7 @@ export interface IDocument extends MongoDocument {
     isExternal: boolean;
   };
   language: "nl" | "en";
+  languageLevel?: "B1" | "B2" | "C1" | "C2";
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
   brandOverride?: {
@@ -62,6 +63,8 @@ export interface IDocument extends MongoDocument {
     averageReadTime: number;
     chatInteractions: number;
   };
+  infoBoxLabel?: string;
+  infoBoxText?: string;
   customSlug?: string;
   coverImageUrl?: string;
   customCoverUrl?: string;
@@ -148,6 +151,10 @@ const DocumentSchema = new Schema<IDocument>(
       enum: ["nl", "en"],
       default: "nl",
     },
+    languageLevel: {
+      type: String,
+      enum: ["B1", "B2", "C1", "C2"],
+    },
     template: {
       type: String,
       default: "doc1",
@@ -178,6 +185,8 @@ const DocumentSchema = new Schema<IDocument>(
       averageReadTime: { type: Number, default: 0 },
       chatInteractions: { type: Number, default: 0 },
     },
+    infoBoxLabel: { type: String },
+    infoBoxText: { type: String },
     customSlug: { type: String, sparse: true, unique: true },
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },

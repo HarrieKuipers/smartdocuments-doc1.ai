@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BookOpen, MessageSquare, X, Send, Loader2 } from "lucide-react";
+import { BookOpen, MessageSquare, X, Send, Loader2, Maximize2, Minimize2, ArrowLeft } from "lucide-react";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -29,6 +30,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   ref
 ) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -128,13 +130,24 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-20 right-6 z-50 flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
+        <div className={`fixed bottom-20 right-6 z-50 flex flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl transition-all duration-300 ${
+          expanded ? "h-[80vh] w-[600px]" : "h-[500px] w-[380px]"
+        }`}>
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 text-white"
             style={{ background: `linear-gradient(135deg, ${brandPrimary}, ${brandPrimary}cc)` }}
           >
             <div className="flex items-center gap-3">
+              {messages.length > 0 && (
+                <button
+                  onClick={() => setMessages([])}
+                  className="rounded-full p-1 hover:bg-white/20"
+                  title={language === "en" ? "Back to overview" : "Terug naar overzicht"}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+              )}
               <div className="h-10 w-10 overflow-hidden rounded-full shadow-sm">
                 <img
                   src="/chat_agent.png"
@@ -155,12 +168,21 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded-full p-1 hover:bg-white/20"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="rounded-full p-1 hover:bg-white/20"
+                title={expanded ? "Kleiner" : "Groter"}
+              >
+                {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-full p-1 hover:bg-white/20"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -270,7 +292,13 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                       : undefined
                   }
                 >
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm prose-gray max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_p]:my-1 [&_h1]:text-base [&_h1]:font-bold [&_h1]:my-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:my-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:my-1 [&_strong]:font-semibold">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}

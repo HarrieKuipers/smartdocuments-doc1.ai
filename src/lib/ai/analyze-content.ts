@@ -6,6 +6,7 @@ interface ContentAnalysis {
   summary: string;
   keyPoints: { text: string; explanation: string; linkedTerms: string[] }[];
   findings: { category: string; title: string; content: string }[];
+  languageLevel?: "B1" | "B2" | "C1" | "C2";
 }
 
 export async function analyzeContent(
