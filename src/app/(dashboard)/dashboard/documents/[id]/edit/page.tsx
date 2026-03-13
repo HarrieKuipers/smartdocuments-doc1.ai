@@ -576,7 +576,7 @@ export default function DocumentEditPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/${doc.shortId}?v=${Date.now()}`, "_blank")}
+            onClick={() => window.open(`/${customSlug || doc.customSlug || doc.shortId}?v=${Date.now()}`, "_blank")}
           >
             <Eye className="mr-1 h-4 w-4" />
             Voorbeeld
