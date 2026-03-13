@@ -4,56 +4,50 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Brain,
-  Languages,
-  MessageSquare,
   ArrowRight,
-  CheckCircle,
-  Shield,
-  Zap,
-  Users,
+  // CheckCircle,
 } from "lucide-react";
 
 const features = [
   {
-    icon: Brain,
+    icon: "/icons_landingpages/ai-document.png",
     title: "AI-verrijkte documenten",
     description:
       "Automatische samenvattingen, hoofdpunten en bevindingen gegenereerd door AI.",
   },
   {
-    icon: Languages,
+    icon: "/icons_landingpages/taal.png",
     title: "Meerdere taalniveaus",
     description:
       "Herschrijf content op B1, B2 of C1 niveau voor maximale toegankelijkheid.",
   },
   {
-    icon: MessageSquare,
+    icon: "/icons_landingpages/ai-chat.png",
     title: "AI Chat per document",
     description:
       "Lezers kunnen direct vragen stellen over het document en krijgen instant antwoord.",
   },
   {
-    icon: Shield,
+    icon: "/icons_landingpages/veilig.png",
     title: "Veilig & Beheerbaar",
     description:
       "Wachtwoordbeveiliging, toegangsbeheer en volledige controle over je documenten.",
   },
   {
-    icon: Zap,
-    title: "Snel & Mooi",
+    icon: "/icons_landingpages/snel.png",
+    title: "Digitale toegankelijkheid",
     description:
-      "Professionele reader views die snel laden en er prachtig uitzien op elk apparaat.",
+      "Maak documenten begrijpelijk en toegankelijk voor iedereen met B1-herschrijving, duidelijke structuur en ondersteuning voor WCAG-richtlijnen.",
   },
   {
-    icon: Users,
+    icon: "/icons_landingpages/team.png",
     title: "Team & Huisstijl",
     description:
       "Werk samen met je team en pas de huisstijl aan per organisatie of document.",
   },
 ];
 
-const pricingPlans = [
+/* const pricingPlans = [
   {
     name: "Free",
     price: "€0",
@@ -94,7 +88,7 @@ const pricingPlans = [
     cta: "Neem contact op",
     popular: false,
   },
-];
+]; */
 
 export default function LandingPage() {
   return (
@@ -115,9 +109,9 @@ export default function LandingPage() {
             <a href="#features" className="text-sm text-muted-foreground hover:text-gray-900">
               Features
             </a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-gray-900">
+            {/* <a href="#pricing" className="text-sm text-muted-foreground hover:text-gray-900">
               Prijzen
-            </a>
+            </a> */}
           </nav>
           <div className="flex items-center gap-3">
             <Link href="/login">
@@ -137,17 +131,17 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 py-20 text-center">
         <Badge className="mb-6 bg-primary/10 text-primary">
-          AI-powered document platform
+          Een Smart Document
         </Badge>
-        <h1 className="mx-auto mb-6 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+        <h1 className="mx-auto mb-6 max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
           Maak elk document{" "}
           <span className="text-primary">slim, toegankelijk</span> en{" "}
           <span className="text-primary">interactief</span>
         </h1>
         <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
           Transformeer PDF en DOCX bestanden in interactieve webdocumenten met
-          AI-samenvattingen, meerdere taalniveaus en een ingebouwde chat-assistent.
-          Ideaal voor overheden en organisaties.
+          AI-samenvattingen, meerdere taalniveaus en een ingebouwde
+          chat-assistent. Ideaal voor overheden en organisaties.
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link href="/register">
@@ -172,16 +166,21 @@ export default function LandingPage() {
               Alles wat je nodig hebt
             </h2>
             <p className="text-muted-foreground">
-              Van upload tot interactief webdocument in een paar klikken
+              Van upload tot interactief Smart Doc in een paar klikken
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <Card key={feature.title} className="border-0 shadow-sm">
-                <CardContent className="p-6">
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <feature.icon className="h-5 w-5 text-primary" />
-                  </div>
+                <CardContent className="px-6 pt-2 pb-6">
+                  <Image
+                    src={feature.icon}
+                    alt={feature.title}
+                    width={64}
+                    height={64}
+                    className="mb-4"
+                    unoptimized
+                  />
                   <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">
                     {feature.description}
@@ -237,7 +236,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing - temporarily hidden
       <section id="pricing" className="bg-gray-50 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-12 text-center">
@@ -292,6 +291,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      */}
 
       {/* CTA */}
       <section className="py-20">
