@@ -15,7 +15,7 @@ export async function POST(
     await connectDB();
     const { id } = await params;
 
-    const { message, history } = await req.json();
+    const { message, history, isExplanation } = await req.json();
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -34,7 +34,8 @@ export async function POST(
     }
 
     // Block AI chat requests for terms-only documents (no free questions allowed)
-    if (doc.chatMode === "terms-only") {
+    // Allow internal explanation requests (keypoint/finding expand) regardless of chatMode
+    if (doc.chatMode === "terms-only" && !isExplanation) {
       return NextResponse.json(
         { error: "Dit document heeft alleen voorgedefinieerde begrippen." },
         { status: 403 }

@@ -148,3 +148,38 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(0, 98, 235, 0);
   }
 }
+
+/* WCAG: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* WCAG: Skip navigation link */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: #0062EB;
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* WCAG: Ensure focus-visible on custom interactive elements */
+[data-term]:focus-visible {
+  outline: 2px solid #0062EB;
+  outline-offset: 2px;
+  border-radius: 2px;
+}

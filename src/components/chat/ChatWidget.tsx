@@ -26,6 +26,12 @@ interface ChatWidgetProps {
   language?: DocumentLanguage;
   /** Collection mode: provide collectionSlug to enable multi-document chat */
   collectionSlug?: string;
+  /** Custom intro text shown above suggestions */
+  customIntro?: string;
+  /** Custom placeholder for the input field */
+  customPlaceholder?: string;
+  /** Custom suggested questions */
+  customSuggestions?: string[];
 }
 
 export interface ChatWidgetRef {
@@ -34,7 +40,7 @@ export interface ChatWidgetRef {
 }
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions },
   ref
 ) {
   const isCollectionMode = !!collectionSlug;
@@ -47,6 +53,9 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const L = getLangStrings(language).chat;
+  const introText = customIntro || L.emptyFull;
+  const placeholderText = customPlaceholder || L.inputPlaceholder;
+  const suggestions = customSuggestions && customSuggestions.length > 0 ? customSuggestions : L.suggestedQuestions;
 
   useEffect(() => {
     if (skipAutoScrollRef.current) {
@@ -295,7 +304,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 )}
                 <div className="space-y-2 border-t pt-3">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{L.orAskQuestion}</p>
-                  {L.suggestedQuestions.map((q, i) => (
+                  {suggestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => setInput(q)}
@@ -310,10 +319,10 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             {messages.length === 0 && chatMode === "full" && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground text-center">
-                  {L.emptyFull}
+                  {introText}
                 </p>
                 <div className="space-y-2">
-                  {L.suggestedQuestions.map((q, i) => (
+                  {suggestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => setInput(q)}
@@ -388,12 +397,12 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
           {isCollectionMode || chatMode !== "terms-only" ? (
             <form onSubmit={sendMessage} className="border-t p-3" aria-label={language === "en" ? "Send a message" : "Stuur een bericht"}>
               <div className="flex gap-2">
-                <label htmlFor="chat-input" className="sr-only">{L.inputPlaceholder}</label>
+                <label htmlFor="chat-input" className="sr-only">{placeholderText}</label>
                 <Input
                   id="chat-input"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={L.inputPlaceholder}
+                  placeholder={placeholderText}
                   className="flex-1"
                   disabled={loading}
                 />

@@ -82,6 +82,9 @@ export async function processDocument(
     doc.content.findings = analysis.findings;
     if (analysis.languageLevel && ["B1", "B2", "C1", "C2"].includes(analysis.languageLevel)) {
       doc.languageLevel = analysis.languageLevel;
+    } else if (!doc.languageLevel) {
+      // Fallback: default to C1 if AI did not return a valid language level
+      doc.languageLevel = "C1";
     }
     await doc.save();
 

@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import Collection from "@/models/Collection";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
+import Template from "@/models/Template";
 
 export async function GET(
   req: NextRequest,
@@ -77,6 +78,26 @@ export async function GET(
       .sort({ createdAt: -1 })
       .lean();
 
+    // Fetch full template config if a template is set
+    let templateConfig = null;
+    if (collection.template) {
+      const tpl = await Template.findOne({ templateId: collection.template })
+        .select("templateId name primary primaryDark primaryLight logo headerStyle logoPosition")
+        .lean();
+      if (tpl) {
+        templateConfig = {
+          id: tpl.templateId,
+          name: tpl.name,
+          primary: tpl.primary,
+          primaryDark: tpl.primaryDark,
+          primaryLight: tpl.primaryLight,
+          logo: tpl.logo,
+          headerStyle: tpl.headerStyle,
+          logoPosition: tpl.logoPosition,
+        };
+      }
+    }
+
     return NextResponse.json({
       data: {
         _id: collection._id,
@@ -84,6 +105,11 @@ export async function GET(
         slug: collection.slug,
         description: collection.description,
         coverImage: collection.coverImage,
+        template: collection.template,
+        templateConfig,
+        chatIntro: collection.chatIntro,
+        chatPlaceholder: collection.chatPlaceholder,
+        chatSuggestions: collection.chatSuggestions,
         organization: org,
         documents: docs,
       },

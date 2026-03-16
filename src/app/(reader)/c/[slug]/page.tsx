@@ -11,9 +11,6 @@ import { Input } from "@/components/ui/input";
 import {
   FileText,
   FolderOpen,
-  User,
-  Calendar,
-  BookOpen,
   Search,
   X,
   Lock,
@@ -21,6 +18,9 @@ import {
 } from "lucide-react";
 import DocFooter from "@/components/reader/DocFooter";
 import ChatWidget from "@/components/chat/ChatWidget";
+import DefaultHeader from "@/components/reader/headers/DefaultHeader";
+import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader";
+import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 
 interface CollectionDocument {
   _id: string;
@@ -37,12 +37,28 @@ interface CollectionDocument {
   createdAt: string;
 }
 
+interface TemplateConfig {
+  id: string;
+  name: string;
+  primary: string;
+  primaryDark: string;
+  primaryLight: string;
+  logo?: string;
+  headerStyle: "default" | "split-bar" | "inline-logo";
+  logoPosition?: "left" | "center" | "right";
+}
+
 interface CollectionData {
   _id: string;
   name: string;
   slug: string;
   description?: string;
   coverImage?: string;
+  template?: string;
+  templateConfig?: TemplateConfig;
+  chatIntro?: string;
+  chatPlaceholder?: string;
+  chatSuggestions?: string[];
   organization: {
     name: string;
     slug: string;
@@ -230,23 +246,29 @@ export default function PublicCollectionPage() {
     );
   }
 
-  const brandPrimary =
-    collection.organization.brandColors?.primary || "#0062EB";
+  const tpl = collection.templateConfig;
+  const brandPrimary = tpl?.primary || "#0062EB";
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
+      {/* Header */}
+      {tpl?.headerStyle === "split-bar" && tpl.logo ? (
+        <RijksoverheidHeader title={collection.name} brandPrimary={brandPrimary} logo={tpl.logo} />
+      ) : tpl?.headerStyle === "inline-logo" && tpl.logo ? (
+        <AmsterdamHeader title={collection.name} brandPrimary={brandPrimary} logo={tpl.logo} />
+      ) : (
+        <DefaultHeader title={collection.name} organization={collection.organization} brandPrimary={brandPrimary} />
+      )}
+
       {/* Collection info */}
       <div className="mx-auto max-w-[1200px] px-4 py-10 md:px-6">
         <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">
-            {collection.name}
-          </h1>
           {collection.description && (
             <p className="text-lg text-muted-foreground">
               {collection.description}
             </p>
           )}
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className={`text-sm text-muted-foreground${collection.description ? " mt-2" : ""}`}>
             {collection.documents.length} document
             {collection.documents.length !== 1 ? "en" : ""}
           </p>
@@ -337,69 +359,47 @@ export default function PublicCollectionPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {filteredDocs.map((doc) => (
               <Link key={doc._id} href={`/${doc.shortId}`}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border transition-all hover:shadow-lg">
                   {/* Cover image */}
                   {(doc.customCoverUrl || doc.coverImageUrl) ? (
-                    <div className="aspect-[16/10] overflow-hidden bg-gray-100">
+                    <div className="aspect-[210/297] overflow-hidden bg-gray-50">
                       <img
                         src={doc.customCoverUrl || doc.coverImageUrl}
                         alt={doc.title}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]"
                       />
                     </div>
                   ) : (
                     <div
-                      className="flex aspect-[16/10] items-center justify-center"
+                      className="flex aspect-[210/297] items-center justify-center"
                       style={{
-                        backgroundColor: `${brandPrimary}10`,
+                        backgroundColor: `${brandPrimary}08`,
                       }}
                     >
                       <FileText
-                        className="h-12 w-12"
+                        className="h-8 w-8 sm:h-12 sm:w-12"
                         style={{ color: `${brandPrimary}40` }}
                       />
                     </div>
                   )}
 
-                  <CardContent className="p-5">
-                    <h3 className="mb-2 text-base font-semibold text-gray-900 line-clamp-2">
+                  <CardContent className="p-3 sm:p-5">
+                    <h3 className="mb-1 text-sm font-semibold text-gray-900 line-clamp-2 sm:mb-2 sm:text-base">
                       {doc.title}
                     </h3>
 
                     {doc.description && (
-                      <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
+                      <p className="mb-2 hidden text-sm text-muted-foreground line-clamp-2 sm:block sm:mb-3">
                         {doc.description}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {doc.authors?.[0] && (
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {doc.authors[0]}
-                        </span>
-                      )}
-                      {doc.publicationDate && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(doc.publicationDate).toLocaleDateString(
-                            "nl-NL"
-                          )}
-                        </span>
-                      )}
-                      {doc.pageCount && (
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {doc.pageCount} pag.
-                        </span>
-                      )}
-                    </div>
 
                     {doc.tags?.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
+                      <div className="mt-2 hidden flex-wrap gap-1.5 sm:mt-3 sm:flex">
                         {doc.tags.slice(0, 3).map((tag, i) => (
                           <Badge
                             key={i}
@@ -438,6 +438,9 @@ export default function PublicCollectionPage() {
           chatMode="full"
           language="nl"
           collectionSlug={collection.slug}
+          customIntro={collection.chatIntro}
+          customPlaceholder={collection.chatPlaceholder}
+          customSuggestions={collection.chatSuggestions}
         />
       )}
     </div>

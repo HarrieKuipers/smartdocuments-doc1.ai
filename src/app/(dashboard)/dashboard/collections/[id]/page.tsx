@@ -29,6 +29,7 @@ import {
   FileText,
   Globe,
   Lock,
+  MessageSquare,
   Pencil,
   Plus,
   Loader2,
@@ -39,12 +40,23 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+interface TemplateOption {
+  templateId: string;
+  name: string;
+  primary: string;
+  isSystem: boolean;
+}
+
 interface Collection {
   _id: string;
   name: string;
   slug: string;
   description?: string;
+  template?: string;
   access?: { type: "public" | "password"; password?: string };
+  chatIntro?: string;
+  chatPlaceholder?: string;
+  chatSuggestions?: string[];
 }
 
 interface Document {
@@ -84,11 +96,27 @@ export default function CollectionDetailPage() {
   const [accessPassword, setAccessPassword] = useState("");
   const [savingAccess, setSavingAccess] = useState(false);
 
+  // Template
+  const [templateOptions, setTemplateOptions] = useState<TemplateOption[]>([]);
+  const [templateId, setTemplateId] = useState("doc1");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // Chat settings
+  const [chatIntro, setChatIntro] = useState("");
+  const [chatPlaceholder, setChatPlaceholder] = useState("");
+  const [chatSuggestions, setChatSuggestions] = useState<string[]>([]);
+  const [chatSuggestionInput, setChatSuggestionInput] = useState("");
+  const [savingChat, setSavingChat] = useState(false);
+
   // Delete state
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
+    fetch("/api/templates")
+      .then((r) => r.json())
+      .then(({ data }) => setTemplateOptions(data))
+      .catch(() => {});
   }, [params.id]);
 
   async function fetchData() {
@@ -103,6 +131,10 @@ export default function CollectionDetailPage() {
         setEditName(col.data.name);
         setEditDescription(col.data.description || "");
         setAccessType(col.data.access?.type || "public");
+        setTemplateId(col.data.template || "doc1");
+        setChatIntro(col.data.chatIntro || "");
+        setChatPlaceholder(col.data.chatPlaceholder || "");
+        setChatSuggestions(col.data.chatSuggestions || []);
       }
       if (docsRes.ok) {
         const d = await docsRes.json();
@@ -185,6 +217,32 @@ export default function CollectionDetailPage() {
       toast.error("Kon instellingen niet opslaan.");
     } finally {
       setSavingAccess(false);
+    }
+  }
+
+  async function handleSaveChat() {
+    setSavingChat(true);
+    try {
+      const res = await fetch(`/api/collections/${params.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatIntro: chatIntro || "",
+          chatPlaceholder: chatPlaceholder || "",
+          chatSuggestions: chatSuggestions,
+        }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setCollection(data);
+        toast.success("Chat-instellingen opgeslagen!");
+      } else {
+        toast.error("Kon chat-instellingen niet opslaan.");
+      }
+    } catch {
+      toast.error("Kon chat-instellingen niet opslaan.");
+    } finally {
+      setSavingChat(false);
     }
   }
 
@@ -370,47 +428,40 @@ export default function CollectionDetailPage() {
         </div>
       </div>
 
-      {/* Access control */}
+      {/* Settings */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                {accessType === "public" ? (
-                  <Globe className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Lock className="h-4 w-4 text-orange-600" />
-                )}
-                Toegang
-              </div>
-              <Select
-                value={accessType}
-                onValueChange={(v: "public" | "password") => setAccessType(v)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Openbaar</SelectItem>
-                  <SelectItem value="password">Met wachtwoord</SelectItem>
-                </SelectContent>
-              </Select>
-              {accessType === "password" && (
-                <Input
-                  type="password"
-                  value={accessPassword}
-                  onChange={(e) => setAccessPassword(e.target.value)}
-                  placeholder={
-                    collection?.access?.type === "password"
-                      ? "Nieuw wachtwoord (laat leeg om te behouden)"
-                      : "Wachtwoord instellen"
-                  }
-                  className="w-[250px]"
-                />
-              )}
-            </div>
+        <CardContent className="divide-y p-0">
+          {/* Access control */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Label className="w-20 shrink-0 text-sm">Toegang</Label>
+            <Select
+              value={accessType}
+              onValueChange={(v: "public" | "password") => setAccessType(v)}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public">Openbaar</SelectItem>
+                <SelectItem value="password">Met wachtwoord</SelectItem>
+              </SelectContent>
+            </Select>
+            {accessType === "password" && (
+              <Input
+                type="password"
+                value={accessPassword}
+                onChange={(e) => setAccessPassword(e.target.value)}
+                placeholder={
+                  collection?.access?.type === "password"
+                    ? "Nieuw wachtwoord"
+                    : "Wachtwoord instellen"
+                }
+                className="w-[200px]"
+              />
+            )}
             <Button
               size="sm"
+              variant="ghost"
               onClick={handleSaveAccess}
               disabled={
                 savingAccess ||
@@ -418,16 +469,130 @@ export default function CollectionDetailPage() {
                   !accessPassword &&
                   collection?.access?.type !== "password")
               }
-              className="bg-[#0062EB] hover:bg-[#0050C0]"
             >
               {savingAccess ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Check className="mr-1 h-4 w-4" />
+                <Check className="h-4 w-4" />
               )}
-              Opslaan
             </Button>
           </div>
+
+          {/* Template */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Label className="w-20 shrink-0 text-sm">Sjabloon</Label>
+            <Select
+              value={templateId}
+              onValueChange={async (v) => {
+                setTemplateId(v);
+                setSavingTemplate(true);
+                try {
+                  const res = await fetch(`/api/collections/${params.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ template: v }),
+                  });
+                  if (res.ok) {
+                    toast.success("Sjabloon opgeslagen!");
+                  } else {
+                    toast.error("Kon sjabloon niet opslaan.");
+                  }
+                } catch {
+                  toast.error("Kon sjabloon niet opslaan.");
+                } finally {
+                  setSavingTemplate(false);
+                }
+              }}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {templateOptions.map((t) => (
+                  <SelectItem key={t.templateId} value={t.templateId}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-3 w-3 rounded-full"
+                        style={{ backgroundColor: t.primary }}
+                      />
+                      {t.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {savingTemplate && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Chat settings */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Chat-instellingen</Label>
+          </div>
+          <div className="space-y-2">
+            <Input
+              value={chatIntro}
+              onChange={(e) => setChatIntro(e.target.value)}
+              placeholder="Intro tekst (bijv. Stel een vraag over de documenten)"
+            />
+            <Input
+              value={chatPlaceholder}
+              onChange={(e) => setChatPlaceholder(e.target.value)}
+              placeholder="Placeholder (bijv. Vraag iets over de verkiezingsprogramma's...)"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Suggestievragen</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {chatSuggestions.map((s, i) => (
+                <Badge key={i} variant="secondary" className="gap-1">
+                  {s}
+                  <button onClick={() => setChatSuggestions(chatSuggestions.filter((_, j) => j !== i))}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={chatSuggestionInput}
+                onChange={(e) => setChatSuggestionInput(e.target.value)}
+                placeholder="Voeg suggestievraag toe"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && chatSuggestionInput.trim()) {
+                    e.preventDefault();
+                    setChatSuggestions([...chatSuggestions, chatSuggestionInput.trim()]);
+                    setChatSuggestionInput("");
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (chatSuggestionInput.trim()) {
+                    setChatSuggestions([...chatSuggestions, chatSuggestionInput.trim()]);
+                    setChatSuggestionInput("");
+                  }
+                }}
+              >
+                Toevoegen
+              </Button>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleSaveChat}
+            disabled={savingChat}
+            className="bg-[#0062EB] hover:bg-[#0050C0]"
+          >
+            {savingChat && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Opslaan
+          </Button>
         </CardContent>
       </Card>
 

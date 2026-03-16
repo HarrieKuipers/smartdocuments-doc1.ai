@@ -5,10 +5,11 @@ interface TemplateInfoBoxProps {
   brandPrimary: string;
   primaryLight: string;
   label: string;
+  text?: string;
   lang?: DocumentLanguage;
 }
 
-export default function TemplateInfoBox({ brandPrimary, primaryLight, label, lang = "nl" }: TemplateInfoBoxProps) {
+export default function TemplateInfoBox({ brandPrimary, primaryLight, label, text, lang = "nl" }: TemplateInfoBoxProps) {
   const t = getLangStrings(lang).reader;
 
   return (
@@ -24,7 +25,7 @@ export default function TemplateInfoBox({ brandPrimary, primaryLight, label, lan
         {label}
       </h3>
       <p className="leading-relaxed text-gray-700">
-        {t.infoBoxText}
+        {text || t.infoBoxText}
       </p>
     </div>
   );

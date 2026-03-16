@@ -7,11 +7,15 @@ export interface ICollection extends Document {
   description?: string;
   organizationId: mongoose.Types.ObjectId;
   coverImage?: string;
+  template?: string;
   documentCount: number;
   access: {
     type: "public" | "password";
     password?: string;
   };
+  chatIntro?: string;
+  chatPlaceholder?: string;
+  chatSuggestions?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +32,7 @@ const CollectionSchema = new Schema<ICollection>(
       index: true,
     },
     coverImage: { type: String },
+    template: { type: String },
     documentCount: { type: Number, default: 0 },
     access: {
       type: {
@@ -37,6 +42,9 @@ const CollectionSchema = new Schema<ICollection>(
       },
       password: { type: String },
     },
+    chatIntro: { type: String },
+    chatPlaceholder: { type: String },
+    chatSuggestions: [{ type: String }],
   },
   { timestamps: true }
 );

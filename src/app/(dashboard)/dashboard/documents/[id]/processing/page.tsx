@@ -162,7 +162,7 @@ export default function ProcessingPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Document Verwerken</h1>
+        <h1 className="text-2xl font-bold">Document verwerken</h1>
         <p className="text-muted-foreground">
           Je document wordt geanalyseerd door AI
         </p>

@@ -28,9 +28,6 @@ import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
 import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
-import TableOfContents, { type TocSection } from "@/components/reader/TableOfContents";
-import AnnotationBadge from "@/components/reader/AnnotationBadge";
-import AnnotationPanel from "@/components/reader/AnnotationPanel";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
 
@@ -106,8 +103,6 @@ export default function ReaderPage() {
   const [findingExplanations, setFindingExplanations] = useState<Record<number, string>>({});
   const [loadingFinding, setLoadingFinding] = useState<number | null>(null);
   const [coverIsLandscape, setCoverIsLandscape] = useState<boolean | null>(null);
-  const [annotationCounts, setAnnotationCounts] = useState<Record<string, number>>({});
-  const [openAnnotation, setOpenAnnotation] = useState<{ sectionType: string; sectionIndex?: number; sectionTitle: string } | null>(null);
   const [versions, setVersions] = useState<{ versionNumber: number; versionLabel?: string; createdAt: string }[]>([]);
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [versionContent, setVersionContent] = useState<ReaderDocument["content"] | null>(null);
@@ -130,7 +125,7 @@ export default function ReaderPage() {
       const res = await fetch(`/api/documents/${documentId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt, history: [] }),
+        body: JSON.stringify({ message: prompt, history: [], isExplanation: true }),
       });
 
       if (!res.ok) throw new Error();
@@ -272,26 +267,6 @@ export default function ReaderPage() {
     img.src = coverUrl;
   }, [doc?.customCoverUrl, doc?.coverImageUrl]);
 
-  // Fetch annotation counts
-  useEffect(() => {
-    if (!doc?.shortId) return;
-    fetch(`/api/reader/${doc.shortId}/annotations`)
-      .then((r) => r.json())
-      .then(({ data }) => {
-        if (data?.counts) {
-          const counts: Record<string, number> = {};
-          for (const c of data.counts) {
-            const key = c._id.sectionIndex !== undefined
-              ? `${c._id.sectionType}-${c._id.sectionIndex}`
-              : c._id.sectionType;
-            counts[key] = c.count;
-          }
-          setAnnotationCounts(counts);
-        }
-      })
-      .catch(() => {});
-  }, [doc?.shortId]);
-
   // Fetch versions if document has multiple
   useEffect(() => {
     if (!doc?.shortId || (doc.totalVersions || 1) <= 1) return;
@@ -409,36 +384,6 @@ export default function ReaderPage() {
   const currentSummary = summaryKey
     ? activeContent.summary[summaryKey] || activeContent.summary.original
     : activeContent.summary.original;
-
-  // Helper to get annotation count for a section
-  const getAnnotationCount = (sectionType: string, sectionIndex?: number) => {
-    const key = sectionIndex !== undefined ? `${sectionType}-${sectionIndex}` : sectionType;
-    return annotationCounts[key] || 0;
-  };
-
-  // Build TOC sections from document content
-  const tocSections: TocSection[] = [];
-  tocSections.push({ id: "samenvatting", label: t.summary });
-  if (activeContent.keyPoints?.length > 0) {
-    tocSections.push({
-      id: "hoofdpunten",
-      label: t.keyPoints,
-      children: activeContent.keyPoints.map((kp, i) => ({
-        id: `hoofdpunt-${i}`,
-        label: kp.text.length > 60 ? kp.text.slice(0, 60) + "…" : kp.text,
-      })),
-    });
-  }
-  if (activeContent.findings?.length > 0) {
-    tocSections.push({
-      id: "bevindingen",
-      label: t.findings,
-      children: activeContent.findings.map((f, i) => ({
-        id: `bevinding-${i}`,
-        label: f.title,
-      })),
-    });
-  }
 
   function formatParagraphs(html: string): string {
     // Split on double newlines and wrap each paragraph in <p> tags
@@ -681,13 +626,6 @@ export default function ReaderPage() {
                 </div>
               </div>
 
-              {/* Table of Contents */}
-              <TableOfContents
-                sections={tocSections}
-                brandPrimary={brandPrimary}
-                onTocClick={(id, label) => analytics.trackTocClick(id, label)}
-              />
-
               {/* Version selector */}
               {(doc.totalVersions || 1) > 1 && versions.length > 0 && (
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -836,33 +774,13 @@ export default function ReaderPage() {
                   <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                   {t.summary}
                 </h2>
-                <div className="flex items-center gap-1">
-                  <AnnotationBadge
-                    count={getAnnotationCount("summary")}
-                    brandPrimary={brandPrimary}
-                    onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "summary" ? null : { sectionType: "summary", sectionTitle: t.summary })}
-                  />
-                  <SectionFeedbackButton
-                    shortId={doc.shortId}
-                    sectionType="summary"
-                    sectionTitle={t.summary}
-                    sessionId={analytics.sessionId}
-                  />
-                </div>
+                <SectionFeedbackButton
+                  shortId={doc.shortId}
+                  sectionType="summary"
+                  sectionTitle={t.summary}
+                  sessionId={analytics.sessionId}
+                />
               </div>
-              {openAnnotation?.sectionType === "summary" && (
-                <div className="mb-4">
-                  <AnnotationPanel
-                    shortId={doc.shortId}
-                    sectionType="summary"
-                    sectionTitle={t.summary}
-                    brandPrimary={brandPrimary}
-                    sessionId={analytics.sessionId}
-                    onClose={() => setOpenAnnotation(null)}
-                    onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, summary: count }))}
-                  />
-                </div>
-              )}
               <div onClick={handleTermClick}>
                 <div
                   className="prose max-w-none text-gray-700"
@@ -880,33 +798,13 @@ export default function ReaderPage() {
                     <CheckCircle className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                     {t.keyPoints}
                   </h2>
-                  <div className="flex items-center gap-1">
-                    <AnnotationBadge
-                      count={getAnnotationCount("keyPoint")}
-                      brandPrimary={brandPrimary}
-                      onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "keyPoint" && openAnnotation.sectionIndex === undefined ? null : { sectionType: "keyPoint", sectionTitle: t.keyPoints })}
-                    />
-                    <SectionFeedbackButton
-                      shortId={doc.shortId}
-                      sectionType="keyPoint"
-                      sectionTitle={t.keyPoints}
-                      sessionId={analytics.sessionId}
-                    />
-                  </div>
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="keyPoint"
+                    sectionTitle={t.keyPoints}
+                    sessionId={analytics.sessionId}
+                  />
                 </div>
-                {openAnnotation?.sectionType === "keyPoint" && openAnnotation.sectionIndex === undefined && (
-                  <div className="mb-4">
-                    <AnnotationPanel
-                      shortId={doc.shortId}
-                      sectionType="keyPoint"
-                      sectionTitle={t.keyPoints}
-                      brandPrimary={brandPrimary}
-                      sessionId={analytics.sessionId}
-                      onClose={() => setOpenAnnotation(null)}
-                      onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, keyPoint: count }))}
-                    />
-                  </div>
-                )}
                 <div className="space-y-3" onClick={handleTermClick}>
                   {activeContent.keyPoints.map((kp, i) => (
                     <div
@@ -971,33 +869,13 @@ export default function ReaderPage() {
                     <BarChart3 className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                     {t.findings}
                   </h2>
-                  <div className="flex items-center gap-1">
-                    <AnnotationBadge
-                      count={getAnnotationCount("finding")}
-                      brandPrimary={brandPrimary}
-                      onClick={() => setOpenAnnotation(openAnnotation?.sectionType === "finding" && openAnnotation.sectionIndex === undefined ? null : { sectionType: "finding", sectionTitle: t.findings })}
-                    />
-                    <SectionFeedbackButton
-                      shortId={doc.shortId}
-                      sectionType="finding"
-                      sectionTitle={t.findings}
-                      sessionId={analytics.sessionId}
-                    />
-                  </div>
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="finding"
+                    sectionTitle={t.findings}
+                    sessionId={analytics.sessionId}
+                  />
                 </div>
-                {openAnnotation?.sectionType === "finding" && openAnnotation.sectionIndex === undefined && (
-                  <div className="mb-4">
-                    <AnnotationPanel
-                      shortId={doc.shortId}
-                      sectionType="finding"
-                      sectionTitle={t.findings}
-                      brandPrimary={brandPrimary}
-                      sessionId={analytics.sessionId}
-                      onClose={() => setOpenAnnotation(null)}
-                      onAnnotationCountChange={(count) => setAnnotationCounts((prev) => ({ ...prev, finding: count }))}
-                    />
-                  </div>
-                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   {activeContent.findings.map((f, i) => (
                     <button

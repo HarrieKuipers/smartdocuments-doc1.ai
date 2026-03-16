@@ -36,7 +36,7 @@ export default function PasswordGate({ onUnlock, lang = "nl" }: PasswordGateProp
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-            <Lock className="h-6 w-6 text-gray-500" />
+            <Lock className="h-6 w-6 text-gray-500" aria-hidden="true" />
           </div>
           <CardTitle>{t.passwordTitle}</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -45,19 +45,25 @@ export default function PasswordGate({ onUnlock, lang = "nl" }: PasswordGateProp
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              type="password"
-              placeholder={t.passwordPlaceholder}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            <div>
+              <label htmlFor="doc-password" className="sr-only">{t.passwordPlaceholder}</label>
+              <Input
+                id="doc-password"
+                type="password"
+                placeholder={t.passwordPlaceholder}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
+                aria-invalid={!!error}
+                aria-describedby={error ? "password-error" : undefined}
+              />
+            </div>
+            {error && <p id="password-error" role="alert" className="text-sm text-red-500">{error}</p>}
             <Button
               type="submit"
               className="w-full bg-[#0062EB] hover:bg-[#0050C0]"
               disabled={loading}
             >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
               {t.passwordOpen}
             </Button>
           </form>
