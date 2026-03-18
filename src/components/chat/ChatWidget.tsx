@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BookOpen, MessageSquare, X, Send, Loader2, Maximize2, Minimize2, ArrowLeft } from "lucide-react";
@@ -51,7 +51,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 ) {
   const isCollectionMode = !!collectionSlug;
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(isCollectionMode);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -83,7 +83,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
         { role: "assistant", content: cached.answer, sourceDocuments: cached.sourceDocuments },
       ]);
     } else {
-      setInput(question);
+      sendMessageText(question);
     }
   }
 
@@ -388,26 +388,9 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 >
                   {msg.role === "assistant" ? (
                     <div>
-                      <div className="prose prose-sm prose-gray max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_p]:my-1 [&_h1]:text-base [&_h1]:font-bold [&_h1]:my-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:my-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:my-1 [&_strong]:font-semibold">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className="prose prose-sm prose-gray max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_p]:my-2.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_strong]:font-semibold">
+                        <ReactMarkdown>{msg.content.replace(/\s*\[Document:\s*"[^"]*"\]/g, "")}</ReactMarkdown>
                       </div>
-                      {msg.sourceDocuments && msg.sourceDocuments.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1 border-t border-gray-200 pt-2">
-                          <span className="text-xs text-gray-400">Bronnen:</span>
-                          {msg.sourceDocuments.map((sd) => (
-                            <a
-                              key={sd.shortId}
-                              href={`/${sd.shortId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
-                              style={{ backgroundColor: `${brandPrimary}15`, color: brandPrimary }}
-                            >
-                              {sd.title.length > 30 ? sd.title.slice(0, 30) + "…" : sd.title}
-                            </a>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   ) : (
                     msg.content

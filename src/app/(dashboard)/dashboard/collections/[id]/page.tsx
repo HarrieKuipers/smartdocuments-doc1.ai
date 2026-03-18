@@ -237,30 +237,6 @@ export default function CollectionDetailPage() {
         const { data } = await res.json();
         setCollection(data);
         toast.success("Chat-instellingen opgeslagen!");
-
-        // Pre-generate answers for suggestions
-        if (chatSuggestions.length > 0) {
-          setPrecaching(true);
-          toast.info("Antwoorden worden vooraf gegenereerd...");
-          try {
-            const cacheRes = await fetch(
-              `/api/collections/${params.id}/precache-chat`,
-              { method: "POST" }
-            );
-            if (cacheRes.ok) {
-              const { data: cacheData } = await cacheRes.json();
-              toast.success(
-                `${cacheData.cached} antwoord${cacheData.cached !== 1 ? "en" : ""} vooraf gegenereerd!`
-              );
-            } else {
-              toast.error("Kon antwoorden niet vooraf genereren.");
-            }
-          } catch {
-            toast.error("Kon antwoorden niet vooraf genereren.");
-          } finally {
-            setPrecaching(false);
-          }
-        }
       } else {
         toast.error("Kon chat-instellingen niet opslaan.");
       }
@@ -268,6 +244,33 @@ export default function CollectionDetailPage() {
       toast.error("Kon chat-instellingen niet opslaan.");
     } finally {
       setSavingChat(false);
+    }
+  }
+
+  async function handlePrecache() {
+    if (chatSuggestions.length === 0) {
+      toast.error("Voeg eerst suggestievragen toe.");
+      return;
+    }
+    setPrecaching(true);
+    toast.info("Antwoorden worden vooraf gegenereerd...");
+    try {
+      const cacheRes = await fetch(
+        `/api/collections/${params.id}/precache-chat`,
+        { method: "POST" }
+      );
+      if (cacheRes.ok) {
+        const { data: cacheData } = await cacheRes.json();
+        toast.success(
+          `${cacheData.cached} antwoord${cacheData.cached !== 1 ? "en" : ""} vooraf gegenereerd!`
+        );
+      } else {
+        toast.error("Kon antwoorden niet vooraf genereren.");
+      }
+    } catch {
+      toast.error("Kon antwoorden niet vooraf genereren.");
+    } finally {
+      setPrecaching(false);
     }
   }
 
@@ -609,15 +612,28 @@ export default function CollectionDetailPage() {
               </Button>
             </div>
           </div>
-          <Button
-            size="sm"
-            onClick={handleSaveChat}
-            disabled={savingChat || precaching}
-            className="bg-[#0062EB] hover:bg-[#0050C0]"
-          >
-            {(savingChat || precaching) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {precaching ? "Antwoorden genereren..." : "Opslaan"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={handleSaveChat}
+              disabled={savingChat || precaching}
+              className="bg-[#0062EB] hover:bg-[#0050C0]"
+            >
+              {savingChat && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Opslaan
+            </Button>
+            {chatSuggestions.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePrecache}
+                disabled={savingChat || precaching}
+              >
+                {precaching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {precaching ? "Genereren..." : "Pre-analyse"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
