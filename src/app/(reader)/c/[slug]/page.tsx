@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { nanoid } from "nanoid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,53 @@ export default function PublicCollectionPage() {
   // Search and filter
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Analytics tracking
+  const sessionIdRef = useRef("");
+  if (typeof window !== "undefined" && !sessionIdRef.current) {
+    let sid = sessionStorage.getItem("col_session");
+    if (!sid) {
+      sid = nanoid();
+      sessionStorage.setItem("col_session", sid);
+    }
+    sessionIdRef.current = sid;
+  }
+
+  const trackEvent = useCallback(
+    (eventType: string, metadata?: Record<string, unknown>) => {
+      if (!params.slug) return;
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      fetch(`/api/reader/collections/${params.slug}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: [{ eventType, sessionId: sid, metadata }],
+        }),
+      }).catch(() => {});
+    },
+    [params.slug]
+  );
+
+  // Track page view once
+  const trackedRef = useRef(false);
+  useEffect(() => {
+    if (collection && !trackedRef.current) {
+      trackedRef.current = true;
+      trackEvent("page_view");
+    }
+  }, [collection, trackEvent]);
+
+  // Track search queries (debounced)
+  const searchTimerRef = useRef<NodeJS.Timeout>(undefined);
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      trackEvent("search_query", { searchQuery: searchQuery.trim() });
+    }, 1000);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [searchQuery, trackEvent]);
 
   async function fetchCollection(pw?: string) {
     try {
@@ -317,7 +365,11 @@ export default function PublicCollectionPage() {
                   <button
                     key={tag}
                     onClick={() =>
-                      setSelectedTag(selectedTag === tag ? null : tag)
+                    {
+                      const newTag = selectedTag === tag ? null : tag;
+                      setSelectedTag(newTag);
+                      if (newTag) trackEvent("tag_filter", { tag: newTag });
+                    }
                     }
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                       selectedTag === tag
@@ -365,7 +417,7 @@ export default function PublicCollectionPage() {
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {filteredDocs.map((doc) => (
-              <Link key={doc._id} href={`/${doc.shortId}`}>
+              <Link key={doc._id} href={`/${doc.shortId}`} onClick={() => trackEvent("document_click", { documentShortId: doc.shortId, documentTitle: doc.title })}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border py-0 gap-0 transition-all hover:shadow-lg">
                   {/* Cover image */}
                   {(doc.customCoverUrl || doc.coverImageUrl) ? (

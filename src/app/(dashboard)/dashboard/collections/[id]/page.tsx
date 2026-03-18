@@ -37,6 +37,7 @@ import {
   Trash2,
   Check,
   X,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -432,6 +433,12 @@ export default function CollectionDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link href={`/dashboard/collections/${params.id}/analytics`}>
+            <Button variant="outline" size="sm">
+              <BarChart3 className="mr-1 h-4 w-4" />
+              Analytics
+            </Button>
+          </Link>
           {collection?.slug && (
             <Link href={`/c/${collection.slug}`} target="_blank">
               <Button variant="outline" size="sm">
