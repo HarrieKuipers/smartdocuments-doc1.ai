@@ -188,8 +188,10 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
         <div
           role="dialog"
           aria-label={language === "en" ? "AI assistant chat" : "AI assistent chat"}
-          className={`fixed bottom-20 right-6 z-50 flex flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl transition-all duration-300 ${
-          expanded ? "h-[80vh] w-[600px]" : "h-[500px] w-[380px]"
+          className={`fixed z-50 flex flex-col overflow-hidden bg-white shadow-2xl transition-all duration-300 ${
+          expanded
+            ? "inset-y-0 right-0 w-full sm:w-[480px] rounded-none border-l"
+            : "bottom-20 right-6 h-[500px] w-[380px] rounded-2xl border"
         }`}>
           {/* Header */}
           <div
