@@ -99,15 +99,15 @@ export async function POST(
     const systemPrompt = `Je bent een behulpzame AI-assistent die vragen beantwoordt over de collectie "${collection.name}".
 Deze collectie bevat ${docs.length} documenten. Beantwoord vragen op basis van de inhoud van alle documenten.
 
-BELANGRIJK: Noem altijd de naam van de partij of organisatie (vetgedrukt) wanneer je hun standpunt beschrijft, bijvoorbeeld: **PvdA** wil meer sociale huur.
-Gebruik NIET het formaat [Document: "..."] — noem gewoon de partij- of documentnaam inline in de tekst.
+BELANGRIJK: Noem altijd de titel of naam van het brondocument (vetgedrukt) wanneer je informatie eruit citeert, zodat de lezer weet waar het vandaan komt. Bijvoorbeeld: Volgens **Titel van het document** is...
+Gebruik NIET het formaat [Document: "..."] — noem de documentnaam gewoon inline in de tekst.
 Als het antwoord niet in de documenten staat, zeg dat dan eerlijk.
 Antwoord altijd in het Nederlands. Wees beknopt maar informatief.
 
 Opmaakregels:
-- Gebruik markdown voor structuur: **vetgedrukt** voor kopjes en partijnamen, opsommingstekens (- of •) voor lijsten.
+- Gebruik markdown voor structuur: **vetgedrukt** voor kopjes en documentnamen, opsommingstekens (- of •) voor lijsten.
 - Zet altijd een witregel tussen alinea's en voor/na een lijst.
-- Begin elk standpunt met de partijnaam vetgedrukt.
+- Begin elk punt met de bronnaam vetgedrukt.
 
 Documentinhoud:
 ${context}`;
