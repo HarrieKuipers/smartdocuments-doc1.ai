@@ -32,6 +32,12 @@ interface ChatWidgetProps {
   customPlaceholder?: string;
   /** Custom suggested questions */
   customSuggestions?: string[];
+  /** Pre-cached answers for suggestions */
+  cachedAnswers?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+  }[];
 }
 
 export interface ChatWidgetRef {
@@ -40,7 +46,7 @@ export interface ChatWidgetRef {
 }
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers },
   ref
 ) {
   const isCollectionMode = !!collectionSlug;
@@ -56,6 +62,30 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const introText = customIntro || L.emptyFull;
   const placeholderText = customPlaceholder || L.inputPlaceholder;
   const suggestions = customSuggestions && customSuggestions.length > 0 ? customSuggestions : L.suggestedQuestions;
+
+  // Build a lookup map for cached answers
+  const cacheMap = useMemo(() => {
+    const map = new Map<string, { answer: string; sourceDocuments?: { shortId: string; title: string }[] }>();
+    if (cachedAnswers) {
+      for (const c of cachedAnswers) {
+        map.set(c.question, { answer: c.answer, sourceDocuments: c.sourceDocuments });
+      }
+    }
+    return map;
+  }, [cachedAnswers]);
+
+  function handleSuggestionClick(question: string) {
+    const cached = cacheMap.get(question);
+    if (cached) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: question },
+        { role: "assistant", content: cached.answer, sourceDocuments: cached.sourceDocuments },
+      ]);
+    } else {
+      setInput(question);
+    }
+  }
 
   useEffect(() => {
     if (skipAutoScrollRef.current) {
@@ -309,7 +339,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   {suggestions.map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => setInput(q)}
+                      onClick={() => handleSuggestionClick(q)}
                       className="block w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
                     >
                       {q}
@@ -327,7 +357,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   {suggestions.map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => setInput(q)}
+                      onClick={() => handleSuggestionClick(q)}
                       className="block w-full rounded-lg border p-2 text-left text-sm hover:bg-gray-50 transition-colors"
                     >
                       {q}

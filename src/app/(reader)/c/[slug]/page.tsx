@@ -60,6 +60,11 @@ interface CollectionData {
   chatIntro?: string;
   chatPlaceholder?: string;
   chatSuggestions?: string[];
+  chatSuggestionsCache?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+  }[];
   organization: {
     name: string;
     slug: string;
@@ -387,10 +392,10 @@ export default function PublicCollectionPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {filteredDocs.map((doc) => (
               <Link key={doc._id} href={`/${doc.shortId}`}>
-                <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border transition-all hover:shadow-lg">
+                <Card className="group h-full cursor-pointer overflow-hidden rounded-xl border py-0 gap-0 transition-all hover:shadow-lg">
                   {/* Cover image */}
                   {(doc.customCoverUrl || doc.coverImageUrl) ? (
-                    <div className="aspect-[210/297] overflow-hidden bg-gray-50">
+                    <div className="aspect-[3/4] overflow-hidden bg-gray-50">
                       <img
                         src={doc.customCoverUrl || doc.coverImageUrl}
                         alt={doc.title}
@@ -399,7 +404,7 @@ export default function PublicCollectionPage() {
                     </div>
                   ) : (
                     <div
-                      className="flex aspect-[210/297] items-center justify-center"
+                      className="flex aspect-[3/4] items-center justify-center"
                       style={{
                         backgroundColor: `${brandPrimary}08`,
                       }}
@@ -466,6 +471,7 @@ export default function PublicCollectionPage() {
           customIntro={collection.chatIntro}
           customPlaceholder={collection.chatPlaceholder}
           customSuggestions={collection.chatSuggestions}
+          cachedAnswers={collection.chatSuggestionsCache}
         />
       )}
     </div>

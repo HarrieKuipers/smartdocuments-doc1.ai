@@ -110,6 +110,7 @@ export async function GET(
         chatIntro: collection.chatIntro,
         chatPlaceholder: collection.chatPlaceholder,
         chatSuggestions: collection.chatSuggestions,
+        chatSuggestionsCache: collection.chatSuggestionsCache,
         organization: org,
         documents: docs,
       },

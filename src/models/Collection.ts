@@ -16,6 +16,12 @@ export interface ICollection extends Document {
   chatIntro?: string;
   chatPlaceholder?: string;
   chatSuggestions?: string[];
+  chatSuggestionsCache?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+    generatedAt: Date;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +51,19 @@ const CollectionSchema = new Schema<ICollection>(
     chatIntro: { type: String },
     chatPlaceholder: { type: String },
     chatSuggestions: [{ type: String }],
+    chatSuggestionsCache: [
+      {
+        question: { type: String, required: true },
+        answer: { type: String, required: true },
+        sourceDocuments: [
+          {
+            shortId: { type: String },
+            title: { type: String },
+          },
+        ],
+        generatedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
