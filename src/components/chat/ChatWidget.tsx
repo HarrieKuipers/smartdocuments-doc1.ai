@@ -93,7 +93,15 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
       return;
     }
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Scroll to the last user message so the question stays in view
+      const msgs = scrollRef.current.querySelectorAll("[data-msg-role='user']");
+      const lastUserMsg = msgs[msgs.length - 1] as HTMLElement | undefined;
+      if (lastUserMsg) {
+        const container = scrollRef.current;
+        container.scrollTo({ top: Math.max(0, lastUserMsg.offsetTop - 16), behavior: "smooth" });
+      } else {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
     }
   }, [messages]);
 
@@ -370,6 +378,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
               <div
                 key={i}
                 data-msg
+                data-msg-role={msg.role}
                 className={`flex ${
                   msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
