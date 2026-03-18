@@ -15,6 +15,7 @@ import {
   X,
   Lock,
   Loader2,
+  ArrowUpDown,
 } from "lucide-react";
 import DocFooter from "@/components/reader/DocFooter";
 import ChatWidget from "@/components/chat/ChatWidget";
@@ -85,9 +86,10 @@ export default function PublicCollectionPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
-  // Search and filter
+  // Search, filter, and sort
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"alpha" | "date-new" | "date-old">("alpha");
 
   async function fetchCollection(pw?: string) {
     try {
@@ -144,10 +146,10 @@ export default function PublicCollectionPage() {
     return Array.from(tagSet).sort();
   }, [collection]);
 
-  // Filter documents
+  // Filter and sort documents
   const filteredDocs = useMemo(() => {
     if (!collection) return [];
-    let docs = collection.documents;
+    let docs = [...collection.documents];
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -163,8 +165,17 @@ export default function PublicCollectionPage() {
       docs = docs.filter((doc) => doc.tags?.includes(selectedTag));
     }
 
+    // Sort
+    if (sortBy === "alpha") {
+      docs.sort((a, b) => a.title.localeCompare(b.title, "nl"));
+    } else if (sortBy === "date-new") {
+      docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "date-old") {
+      docs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+
     return docs;
-  }, [collection, searchQuery, selectedTag]);
+  }, [collection, searchQuery, selectedTag, sortBy]);
 
   function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -277,23 +288,37 @@ export default function PublicCollectionPage() {
         {/* Search + tag filters */}
         {collection.documents.length > 0 && (
           <div className="mb-6 space-y-4">
-            {/* Search bar */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Zoek op titel, auteur of beschrijving..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white pl-10"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-900"
+            {/* Search bar + sort */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Zoek op titel, auteur of beschrijving..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white pl-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-900"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "alpha" | "date-new" | "date-old")}
+                  className="rounded-md border bg-white px-3 py-2 text-sm text-gray-700 outline-none"
                 >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+                  <option value="alpha">A–Z</option>
+                  <option value="date-new">Nieuwste eerst</option>
+                  <option value="date-old">Oudste eerst</option>
+                </select>
+              </div>
             </div>
 
             {/* Tag filters */}
@@ -369,7 +394,7 @@ export default function PublicCollectionPage() {
                       <img
                         src={doc.customCoverUrl || doc.coverImageUrl}
                         alt={doc.title}
-                        className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]"
+                        className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
                       />
                     </div>
                   ) : (
