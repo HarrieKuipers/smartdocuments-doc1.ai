@@ -12,7 +12,7 @@ export async function GET(
     const { shortId } = await params;
 
     const doc = await DocumentModel.findOne({ shortId })
-      .select("sourceFile status access")
+      .select("sourceFile status access title")
       .lean();
 
     if (!doc || doc.status !== "ready") {
@@ -45,17 +45,18 @@ export async function GET(
       );
     }
 
-    const pdfBuffer = await pdfResponse.arrayBuffer();
+    const fileBuffer = await pdfResponse.arrayBuffer();
 
     const isDownload = req.nextUrl.searchParams.get("download") === "true";
     const filename = doc.sourceFile.filename || "document.pdf";
+    const mimeType = doc.sourceFile.mimeType || "application/pdf";
     const disposition = isDownload
       ? `attachment; filename="${filename}"`
       : "inline";
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(fileBuffer, {
       headers: {
-        "Content-Type": "application/pdf",
+        "Content-Type": mimeType,
         "Content-Disposition": disposition,
         "Cache-Control": "private, max-age=3600",
       },

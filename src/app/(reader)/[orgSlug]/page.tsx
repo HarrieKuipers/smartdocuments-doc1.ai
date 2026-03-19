@@ -97,6 +97,7 @@ export default function ReaderPage() {
   const [error, setError] = useState("");
   const [isOwner, setIsOwner] = useState(false);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const isPdf = doc?.sourceFile?.mimeType === "application/pdf" || (!doc?.sourceFile?.mimeType && doc?.sourceFile?.filename?.endsWith(".pdf"));
   const [expandedKeyPoint, setExpandedKeyPoint] = useState<number | null>(null);
   const [keyPointExplanations, setKeyPointExplanations] = useState<Record<number, string>>({});
   const [loadingKeyPoint, setLoadingKeyPoint] = useState<number | null>(null);
@@ -503,18 +504,20 @@ export default function ReaderPage() {
                     }}
                   >
                     <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                    {t.downloadPdf}
+                    {isPdf ? t.downloadPdf : "Download"}
                   </Button>
-                  <Button
-                    variant={showPdfViewer ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-xl"
-                    style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
-                    onClick={() => setShowPdfViewer(!showPdfViewer)}
-                    title="PDF bekijken"
-                  >
-                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
+                  {isPdf && (
+                    <Button
+                      variant={showPdfViewer ? "default" : "outline"}
+                      size="sm"
+                      className="rounded-xl"
+                      style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                      onClick={() => setShowPdfViewer(!showPdfViewer)}
+                      title="PDF bekijken"
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
                 </div>
               </>
             ) : (
@@ -570,18 +573,20 @@ export default function ReaderPage() {
                       }}
                     >
                       <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                      {t.downloadPdf}
+                      {isPdf ? t.downloadPdf : "Download"}
                     </Button>
-                    <Button
-                      variant={showPdfViewer ? "default" : "outline"}
-                      size="sm"
-                      className="rounded-xl"
-                      style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
-                      onClick={() => setShowPdfViewer(!showPdfViewer)}
-                      title="PDF bekijken"
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Button>
+                    {isPdf && (
+                      <Button
+                        variant={showPdfViewer ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-xl"
+                        style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                        onClick={() => setShowPdfViewer(!showPdfViewer)}
+                        title="PDF bekijken"
+                      >
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -619,17 +624,19 @@ export default function ReaderPage() {
                     }}
                   >
                     <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-                    {t.downloadPdf}
+                    {isPdf ? t.downloadPdf : "Download"}
                   </Button>
-                  <Button
-                    variant={showPdfViewer ? "default" : "outline"}
-                    className="rounded-xl"
-                    style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
-                    onClick={() => setShowPdfViewer(!showPdfViewer)}
-                    title="PDF bekijken"
-                  >
-                    <Eye className="h-4 w-4" aria-hidden="true" />
-                  </Button>
+                  {isPdf && (
+                    <Button
+                      variant={showPdfViewer ? "default" : "outline"}
+                      className="rounded-xl"
+                      style={showPdfViewer ? { backgroundColor: brandPrimary } : {}}
+                      onClick={() => setShowPdfViewer(!showPdfViewer)}
+                      title="PDF bekijken"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -758,8 +765,8 @@ export default function ReaderPage() {
               </div>
             )}
 
-            {/* PDF Viewer */}
-            {showPdfViewer && (
+            {/* PDF Viewer — only for PDF files */}
+            {showPdfViewer && isPdf && (
               <Suspense
                 fallback={
                   <div className="flex h-[400px] items-center justify-center rounded-xl bg-white shadow-sm">
@@ -787,6 +794,7 @@ export default function ReaderPage() {
                     lang={doc.language === "en" ? "en-GB" : "nl-NL"}
                     labels={t}
                     brandPrimary={brandPrimary}
+                    shortId={doc.shortId}
                   />
                   <SectionFeedbackButton
                     shortId={doc.shortId}

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Volume2, Pause, Play, Square } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Volume2, Pause, Play, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type TTSStatus = "idle" | "playing" | "paused";
+type TTSStatus = "idle" | "loading" | "playing" | "paused";
 
 interface TextToSpeechProps {
   text: string;
@@ -18,6 +18,7 @@ interface TextToSpeechProps {
     ttsUnsupported: string;
   };
   brandPrimary?: string;
+  shortId?: string;
 }
 
 /**
@@ -25,44 +26,15 @@ interface TextToSpeechProps {
  */
 function stripFormatting(text: string): string {
   return text
-    // Remove HTML tags
     .replace(/<[^>]+>/g, "")
-    // Remove markdown bold/italic
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\*(.+?)\*/g, "$1")
     .replace(/__(.+?)__/g, "$1")
     .replace(/_(.+?)_/g, "$1")
-    // Remove markdown links, keep text
     .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-    // Remove markdown headings
     .replace(/^#{1,6}\s+/gm, "")
-    // Clean up extra whitespace
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-/**
- * Splits text into chunks that fit within the SpeechSynthesis character limit.
- * Splits on sentence boundaries to keep speech natural.
- */
-function splitIntoChunks(text: string, maxLength = 200): string[] {
-  const sentences = text.split(/(?<=[.!?;])\s+/);
-  const chunks: string[] = [];
-  let current = "";
-
-  for (const sentence of sentences) {
-    if (current.length + sentence.length + 1 > maxLength && current.length > 0) {
-      chunks.push(current.trim());
-      current = sentence;
-    } else {
-      current += (current ? " " : "") + sentence;
-    }
-  }
-  if (current.trim()) {
-    chunks.push(current.trim());
-  }
-
-  return chunks;
 }
 
 export default function TextToSpeech({
@@ -70,111 +42,102 @@ export default function TextToSpeech({
   lang = "nl-NL",
   labels,
   brandPrimary,
+  shortId,
 }: TextToSpeechProps) {
   const [status, setStatus] = useState<TTSStatus>("idle");
-  const [supported, setSupported] = useState(true);
   const [progress, setProgress] = useState(0);
-  const chunksRef = useRef<string[]>([]);
-  const currentChunkRef = useRef(0);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      setSupported(false);
-    }
-    return () => {
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
-
-  const speakChunk = useCallback(
-    (index: number) => {
-      const chunks = chunksRef.current;
-      if (index >= chunks.length) {
-        setStatus("idle");
-        setProgress(0);
-        currentChunkRef.current = 0;
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(chunks[index]);
-      utterance.lang = lang;
-      utterance.rate = 0.95;
-      utterance.pitch = 1;
-
-      // Try to find a Dutch voice
-      const voices = window.speechSynthesis.getVoices();
-      const langPrefix = lang.split("-")[0];
-      const preferred = voices.find(
-        (v) => v.lang.startsWith(langPrefix) && v.localService
-      );
-      const fallback = voices.find((v) => v.lang.startsWith(langPrefix));
-      if (preferred) utterance.voice = preferred;
-      else if (fallback) utterance.voice = fallback;
-
-      utterance.onend = () => {
-        const next = index + 1;
-        currentChunkRef.current = next;
-        setProgress(Math.round((next / chunks.length) * 100));
-        speakChunk(next);
-      };
-
-      utterance.onerror = (e) => {
-        // "interrupted" and "canceled" are expected when user stops/pauses
-        if (e.error !== "interrupted" && e.error !== "canceled") {
-          console.error("TTS error:", e.error);
-          setStatus("idle");
-          setProgress(0);
-        }
-      };
-
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-    },
-    [lang]
-  );
-
-  const handlePlay = useCallback(() => {
-    if (!supported) return;
-
-    if (status === "paused") {
-      window.speechSynthesis.resume();
+  const handlePlay = useCallback(async () => {
+    if (status === "paused" && audioRef.current) {
+      audioRef.current.play();
       setStatus("playing");
       return;
     }
 
-    // Start fresh
-    window.speechSynthesis.cancel();
-    const cleanText = stripFormatting(text);
-    const chunks = splitIntoChunks(cleanText);
-    chunksRef.current = chunks;
-    currentChunkRef.current = 0;
-    setProgress(0);
-    setStatus("playing");
-
-    // Voices may load asynchronously - wait briefly if none available
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        speakChunk(0);
-      };
-    } else {
-      speakChunk(0);
+    // Stop any existing playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
-  }, [supported, status, text, speakChunk]);
+
+    const cleanText = stripFormatting(text);
+    if (!cleanText) return;
+
+    // If no shortId, we can't call the API
+    if (!shortId) return;
+
+    setStatus("loading");
+    setProgress(0);
+
+    try {
+      abortRef.current = new AbortController();
+
+      const response = await fetch(`/api/reader/${shortId}/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleanText }),
+        signal: abortRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("TTS request failed");
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.ontimeupdate = () => {
+        if (audio.duration > 0) {
+          setProgress(Math.round((audio.currentTime / audio.duration) * 100));
+        }
+      };
+
+      audio.onended = () => {
+        setStatus("idle");
+        setProgress(0);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+
+      audio.onerror = () => {
+        console.error("Audio playback error");
+        setStatus("idle");
+        setProgress(0);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+
+      audioRef.current = audio;
+      await audio.play();
+      setStatus("playing");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      console.error("TTS error:", err);
+      setStatus("idle");
+      setProgress(0);
+    }
+  }, [status, text, shortId]);
 
   const handlePause = useCallback(() => {
-    window.speechSynthesis.pause();
-    setStatus("paused");
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setStatus("paused");
+    }
   }, []);
 
   const handleStop = useCallback(() => {
-    window.speechSynthesis.cancel();
+    abortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
     setStatus("idle");
     setProgress(0);
-    currentChunkRef.current = 0;
   }, []);
-
-  if (!supported) return null;
 
   const isActive = status === "playing" || status === "paused";
 
@@ -186,14 +149,38 @@ export default function TextToSpeech({
           size="sm"
           onClick={handlePlay}
           className="gap-2 text-gray-600 hover:text-gray-900"
-          style={brandPrimary ? {
-            borderColor: `${brandPrimary}40`,
-            color: brandPrimary,
-          } : undefined}
+          style={
+            brandPrimary
+              ? {
+                  borderColor: `${brandPrimary}40`,
+                  color: brandPrimary,
+                }
+              : undefined
+          }
           aria-label={labels.ttsPlay}
         >
           <Volume2 className="h-4 w-4" />
           <span className="hidden sm:inline">{labels.ttsPlay}</span>
+        </Button>
+      )}
+
+      {status === "loading" && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          className="gap-2 text-gray-500"
+          style={
+            brandPrimary
+              ? {
+                  borderColor: `${brandPrimary}40`,
+                  color: brandPrimary,
+                }
+              : undefined
+          }
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="hidden sm:inline">Laden...</span>
         </Button>
       )}
 
@@ -203,11 +190,17 @@ export default function TextToSpeech({
             variant="outline"
             size="icon-sm"
             onClick={status === "playing" ? handlePause : handlePlay}
-            aria-label={status === "playing" ? labels.ttsPause : labels.ttsResume}
-            style={brandPrimary ? {
-              borderColor: `${brandPrimary}40`,
-              color: brandPrimary,
-            } : undefined}
+            aria-label={
+              status === "playing" ? labels.ttsPause : labels.ttsResume
+            }
+            style={
+              brandPrimary
+                ? {
+                    borderColor: `${brandPrimary}40`,
+                    color: brandPrimary,
+                  }
+                : undefined
+            }
           >
             {status === "playing" ? (
               <Pause className="h-4 w-4" />

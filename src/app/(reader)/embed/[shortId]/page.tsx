@@ -156,6 +156,7 @@ export default function EmbedReaderPage() {
               lang={doc.language === "en" ? "en-GB" : "nl-NL"}
               labels={getLangStrings(doc.language || "nl").reader}
               brandPrimary={brandPrimary}
+              shortId={doc.shortId}
             />
           </div>
           <div
