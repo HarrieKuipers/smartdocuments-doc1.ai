@@ -6,6 +6,7 @@ import ChatQuestion from "@/models/ChatQuestion";
 import anthropic, { MODELS } from "@/lib/ai/client";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import { nanoid } from "nanoid";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 export async function POST(
   req: NextRequest,
@@ -26,7 +27,7 @@ export async function POST(
 
     // Get document for context
     const doc = await DocumentModel.findById(id)
-      .select("title chatMode language content.originalText content.summary.original")
+      .select("title chatMode language targetCEFRLevel organizationId content.originalText content.summary.original")
       .lean();
 
     if (!doc) {
@@ -58,11 +59,18 @@ export async function POST(
     const lang: DocumentLanguage = (doc.language as DocumentLanguage) || "nl";
     const L = getLangStrings(lang);
 
+    const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
+    const levelInstruction = targetLevel
+      ? lang === "nl"
+        ? `\n\nBELANGRIJK: Schrijf je antwoord op CEFR taalniveau ${targetLevel}. ${targetLevel === "B1" ? "Gebruik korte zinnen, dagelijkse woorden, geen vakjargon." : targetLevel === "B2" ? "Gebruik duidelijke zinnen, beperkt vakjargon met uitleg." : targetLevel === "C1" ? "Complexere zinsstructuren en vakjargon zijn toegestaan." : "Academisch niveau met volledige vakjargon."}`
+        : `\n\nIMPORTANT: Write your response at CEFR level ${targetLevel}. ${targetLevel === "B1" ? "Use short sentences, everyday words, no jargon." : targetLevel === "B2" ? "Use clear sentences, limited jargon with explanations." : targetLevel === "C1" ? "More complex sentence structures and jargon are allowed." : "Academic level with full technical jargon."}`
+      : "";
+
     const chatStartTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODELS.chat,
       max_tokens: 1024,
-      system: `${L.chatSystemPrompt(doc.title)}
+      system: `${L.chatSystemPrompt(doc.title)}${levelInstruction}
 
 ${lang === "nl" ? "Documentinhoud" : "Document content"}:
 ${docContext}`,
@@ -111,6 +119,20 @@ ${docContext}`,
       tokensUsed: response.usage?.output_tokens,
       aiModel: MODELS.chat,
     }).catch(() => {}); // fire-and-forget
+
+    // Dispatch webhook for chat message
+    if (doc.organizationId) {
+      dispatchWebhookEvent(
+        doc.organizationId.toString(),
+        "chat.message",
+        {
+          documentId: id,
+          title: doc.title,
+          question: message,
+          sessionId,
+        }
+      ).catch(() => {});
+    }
 
     const res = NextResponse.json({
       data: { response: assistantResponse },

@@ -13,6 +13,7 @@ import {
   FileText,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 interface ProgressData {
   status: string;
@@ -25,47 +26,56 @@ const SMART_STEPS = [
     key: "text-extraction",
     label: "Tekstextractie",
     description: "Content uit het bestand halen",
+    onboardingTip: "AI leest je document en haalt alle tekst eruit, inclusief tabellen en koppen.",
   },
   {
     key: "audience-analysis",
     label: "Doelgroep Analyse",
     description: "Documenttype en doelgroep bepalen",
+    onboardingTip: "AI bepaalt voor wie het document bedoeld is en past de verwerking hierop aan.",
   },
   {
     key: "content-analysis",
     label: "Inhoud Analyse",
     description: "AI analyseert structuur en kernthema's",
+    onboardingTip: "De structuur, onderwerpen en kernboodschappen worden geïdentificeerd.",
   },
   {
     key: "summary-generation",
     label: "Samenvatting Genereren",
     description: "Creëren van samenvattingen en hoofdpunten",
+    onboardingTip: "AI maakt een heldere samenvatting met de belangrijkste punten uit je document.",
   },
   {
     key: "language-levels",
     label: "Taalniveaus Genereren",
     description: "Herschrijven op B1, B2 en C1 niveau",
+    onboardingTip: "Je samenvatting wordt herschreven in verschillende taalniveaus zodat iedereen het kan begrijpen.",
   },
   {
     key: "term-extraction",
     label: "Begrippen Extractie",
     description: "Belangrijke termen en definities identificeren",
+    onboardingTip: "Vakjargon wordt automatisch herkend. Lezers zien deze als tooltips met uitleg.",
   },
   {
     key: "cover-generation",
     label: "Coverafbeelding",
     description: "Visuele cover genereren voor het document",
+    onboardingTip: "Er wordt automatisch een aantrekkelijke coverafbeelding voor je document gemaakt.",
   },
   {
     key: "finalizing",
     label: "Afronding",
     description: "Smart Document wordt klaargemaakt",
+    onboardingTip: "Alles wordt samengevoegd tot je Smart Document, klaar om te publiceren!",
   },
 ];
 
 export default function ProcessingPage() {
   const params = useParams();
   const router = useRouter();
+  const { isFirstUpload } = useOnboarding();
   const documentId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -222,6 +232,11 @@ export default function ProcessingPage() {
                     <p className="text-xs text-muted-foreground">
                       {step.description}
                     </p>
+                    {isFirstUpload && isCurrent && step.onboardingTip && (
+                      <p className="mt-1 text-xs text-[#0062EB]">
+                        {step.onboardingTip}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

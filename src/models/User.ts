@@ -13,6 +13,7 @@ export interface IUser extends Document {
   plan: "free" | "pro" | "enterprise";
   isSuperAdmin: boolean;
   documentsUsed: number;
+  onboardingCompleted: boolean;
   weeklyDigestEnabled: boolean;
   resetToken?: string;
   resetTokenExpiry?: Date;
@@ -45,6 +46,7 @@ const UserSchema = new Schema<IUser>(
     },
     isSuperAdmin: { type: Boolean, default: false },
     documentsUsed: { type: Number, default: 0 },
+    onboardingCompleted: { type: Boolean, default: false },
     weeklyDigestEnabled: { type: Boolean, default: true },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },

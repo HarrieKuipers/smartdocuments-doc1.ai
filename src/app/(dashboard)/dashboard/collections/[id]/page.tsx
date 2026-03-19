@@ -38,7 +38,13 @@ import {
   Check,
   X,
   BarChart3,
+  Code,
+  Copy,
+  Eye,
+  EyeOff,
+  Palette,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 interface TemplateOption {
@@ -46,6 +52,13 @@ interface TemplateOption {
   name: string;
   primary: string;
   isSystem: boolean;
+}
+
+interface EmbedConfig {
+  whitelabel: boolean;
+  defaultMode: "chat" | "summary" | "full";
+  defaultTheme: "light" | "dark";
+  colorOverride?: string;
 }
 
 interface Collection {
@@ -58,6 +71,7 @@ interface Collection {
   chatIntro?: string;
   chatPlaceholder?: string;
   chatSuggestions?: string[];
+  embedConfig?: EmbedConfig;
 }
 
 interface Document {
@@ -110,6 +124,16 @@ export default function CollectionDetailPage() {
   const [savingChat, setSavingChat] = useState(false);
   const [precaching, setPrecaching] = useState(false);
 
+  // Embed settings
+  const [embedWhitelabel, setEmbedWhitelabel] = useState(false);
+  const [embedMode, setEmbedMode] = useState<"chat" | "summary" | "full">("full");
+  const [embedTheme, setEmbedTheme] = useState<"light" | "dark">("light");
+  const [embedColorOverride, setEmbedColorOverride] = useState("");
+  const [embedWidth, setEmbedWidth] = useState("100%");
+  const [embedHeight, setEmbedHeight] = useState("600");
+  const [savingEmbed, setSavingEmbed] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   // Delete state
   const [deleting, setDeleting] = useState(false);
 
@@ -137,6 +161,12 @@ export default function CollectionDetailPage() {
         setChatIntro(col.data.chatIntro || "");
         setChatPlaceholder(col.data.chatPlaceholder || "");
         setChatSuggestions(col.data.chatSuggestions || []);
+        if (col.data.embedConfig) {
+          setEmbedWhitelabel(col.data.embedConfig.whitelabel || false);
+          setEmbedMode(col.data.embedConfig.defaultMode || "full");
+          setEmbedTheme(col.data.embedConfig.defaultTheme || "light");
+          setEmbedColorOverride(col.data.embedConfig.colorOverride || "");
+        }
       }
       if (docsRes.ok) {
         const d = await docsRes.json();
@@ -644,6 +674,31 @@ export default function CollectionDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Embed & White-label settings */}
+      {collection?.slug && (
+        <EmbedSection
+          collectionSlug={collection.slug}
+          collectionId={collection._id}
+          embedWhitelabel={embedWhitelabel}
+          setEmbedWhitelabel={setEmbedWhitelabel}
+          embedMode={embedMode}
+          setEmbedMode={setEmbedMode}
+          embedTheme={embedTheme}
+          setEmbedTheme={setEmbedTheme}
+          embedColorOverride={embedColorOverride}
+          setEmbedColorOverride={setEmbedColorOverride}
+          embedWidth={embedWidth}
+          setEmbedWidth={setEmbedWidth}
+          embedHeight={embedHeight}
+          setEmbedHeight={setEmbedHeight}
+          savingEmbed={savingEmbed}
+          setSavingEmbed={setSavingEmbed}
+          copiedField={copiedField}
+          setCopiedField={setCopiedField}
+          paramsId={params.id as string}
+        />
+      )}
+
       {/* Add documents button */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -776,5 +831,317 @@ export default function CollectionDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// -- Embed & White-label Section --
+function EmbedSection({
+  collectionSlug,
+  collectionId,
+  embedWhitelabel,
+  setEmbedWhitelabel,
+  embedMode,
+  setEmbedMode,
+  embedTheme,
+  setEmbedTheme,
+  embedColorOverride,
+  setEmbedColorOverride,
+  embedWidth,
+  setEmbedWidth,
+  embedHeight,
+  setEmbedHeight,
+  savingEmbed,
+  setSavingEmbed,
+  copiedField,
+  setCopiedField,
+  paramsId,
+}: {
+  collectionSlug: string;
+  collectionId: string;
+  embedWhitelabel: boolean;
+  setEmbedWhitelabel: (v: boolean) => void;
+  embedMode: "chat" | "summary" | "full";
+  setEmbedMode: (v: "chat" | "summary" | "full") => void;
+  embedTheme: "light" | "dark";
+  setEmbedTheme: (v: "light" | "dark") => void;
+  embedColorOverride: string;
+  setEmbedColorOverride: (v: string) => void;
+  embedWidth: string;
+  setEmbedWidth: (v: string) => void;
+  embedHeight: string;
+  setEmbedHeight: (v: string) => void;
+  savingEmbed: boolean;
+  setSavingEmbed: (v: boolean) => void;
+  copiedField: string | null;
+  setCopiedField: (v: string | null) => void;
+  paramsId: string;
+}) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doc1.ai";
+
+  // Build embed URL with current settings
+  const embedParams = new URLSearchParams();
+  embedParams.set("mode", embedMode);
+  if (embedTheme === "dark") embedParams.set("theme", "dark");
+  if (embedWhitelabel) embedParams.set("whitelabel", "true");
+  if (embedColorOverride) embedParams.set("color", embedColorOverride);
+
+  const embedUrl = `${siteUrl}/embed/c/${collectionSlug}?${embedParams.toString()}`;
+  const widthAttr = embedWidth.includes("%") ? embedWidth : `${embedWidth}px`;
+
+  const iframeCode = `<iframe src="${embedUrl}" width="${widthAttr}" height="${embedHeight}" style="border: 1px solid #e5e7eb; border-radius: 8px;" frameborder="0" allowfullscreen></iframe>`;
+
+  const scriptCode = `<div id="doc1-collection-${collectionSlug}"></div>
+<script>
+(function() {
+  var c = document.getElementById('doc1-collection-${collectionSlug}');
+  var f = document.createElement('iframe');
+  f.src = '${embedUrl}';
+  f.style.width = '${widthAttr}';
+  f.style.height = '${embedHeight}px';
+  f.style.border = '1px solid #e5e7eb';
+  f.style.borderRadius = '8px';
+  f.frameBorder = '0';
+  f.allowFullscreen = true;
+  c.appendChild(f);
+})();
+</script>`;
+
+  async function handleSaveEmbed() {
+    setSavingEmbed(true);
+    try {
+      const res = await fetch(`/api/collections/${paramsId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embedConfig: {
+            whitelabel: embedWhitelabel,
+            defaultMode: embedMode,
+            defaultTheme: embedTheme,
+            colorOverride: embedColorOverride || undefined,
+          },
+        }),
+      });
+      if (res.ok) {
+        toast.success("Embed-instellingen opgeslagen!");
+      } else {
+        toast.error("Kon embed-instellingen niet opslaan.");
+      }
+    } catch {
+      toast.error("Kon embed-instellingen niet opslaan.");
+    } finally {
+      setSavingEmbed(false);
+    }
+  }
+
+  async function copyToClipboard(text: string, field: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast.success("Gekopieerd naar klembord");
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      toast.error("Kon niet kopiëren.");
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-5 p-4">
+        <div className="flex items-center gap-2">
+          <Code className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-sm font-medium">Embed & White-label</Label>
+        </div>
+
+        {/* Settings grid */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Weergavemodus</Label>
+            <Select
+              value={embedMode}
+              onValueChange={(v) => setEmbedMode(v as "chat" | "summary" | "full")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full">Volledig (documenten + chat)</SelectItem>
+                <SelectItem value="chat">Alleen chat</SelectItem>
+                <SelectItem value="summary">Alleen documenten</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Thema</Label>
+            <Select
+              value={embedTheme}
+              onValueChange={(v) => setEmbedTheme(v as "light" | "dark")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Licht</SelectItem>
+                <SelectItem value="dark">Donker</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Breedte</Label>
+            <Input
+              value={embedWidth}
+              onChange={(e) => setEmbedWidth(e.target.value)}
+              placeholder="100% of 600"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Hoogte (px)</Label>
+            <Input
+              value={embedHeight}
+              onChange={(e) => setEmbedHeight(e.target.value)}
+              placeholder="600"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Kleur override (optioneel)</Label>
+            <div className="flex gap-2">
+              <Input
+                value={embedColorOverride}
+                onChange={(e) => setEmbedColorOverride(e.target.value)}
+                placeholder="#0062EB"
+                className="flex-1"
+              />
+              {embedColorOverride && (
+                <div
+                  className="h-9 w-9 shrink-0 rounded-md border"
+                  style={{ backgroundColor: embedColorOverride }}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-5">
+            <Switch
+              checked={embedWhitelabel}
+              onCheckedChange={setEmbedWhitelabel}
+              id="whitelabel"
+            />
+            <Label htmlFor="whitelabel" className="cursor-pointer text-sm">
+              White-label <span className="text-xs text-muted-foreground">(verberg doc1.ai branding)</span>
+            </Label>
+          </div>
+        </div>
+
+        {/* Save button */}
+        <Button
+          size="sm"
+          onClick={handleSaveEmbed}
+          disabled={savingEmbed}
+          className="bg-[#0062EB] hover:bg-[#0050C0]"
+        >
+          {savingEmbed && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Instellingen opslaan
+        </Button>
+
+        {/* Embed codes */}
+        <div className="space-y-3 border-t pt-4">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Embed codes
+          </Label>
+
+          {/* iFrame */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">iFrame code</p>
+            <div className="relative">
+              <pre className="overflow-x-auto rounded-lg border bg-gray-50 p-3 text-xs text-gray-700">
+                <code>{iframeCode}</code>
+              </pre>
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute right-2 top-2"
+                onClick={() => copyToClipboard(iframeCode, "iframe")}
+              >
+                {copiedField === "iframe" ? (
+                  <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <Copy className="mr-1 h-3.5 w-3.5" />
+                )}
+                {copiedField === "iframe" ? "Gekopieerd" : "Kopiëren"}
+              </Button>
+            </div>
+          </div>
+
+          {/* JavaScript */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">JavaScript snippet</p>
+            <div className="relative">
+              <pre className="overflow-x-auto rounded-lg border bg-gray-50 p-3 text-xs text-gray-700">
+                <code>{scriptCode}</code>
+              </pre>
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute right-2 top-2"
+                onClick={() => copyToClipboard(scriptCode, "script")}
+              >
+                {copiedField === "script" ? (
+                  <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <Copy className="mr-1 h-3.5 w-3.5" />
+                )}
+                {copiedField === "script" ? "Gekopieerd" : "Kopiëren"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Direct URL */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Directe URL</p>
+            <div className="flex items-center gap-2">
+              <Input value={embedUrl} readOnly className="font-mono text-xs" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(embedUrl, "url")}
+                className="shrink-0"
+              >
+                {copiedField === "url" ? (
+                  <Check className="mr-1 h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <Copy className="mr-1 h-3.5 w-3.5" />
+                )}
+                {copiedField === "url" ? "Gekopieerd" : "Kopiëren"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="space-y-1.5 border-t pt-4">
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Voorbeeld
+            </Label>
+          </div>
+          <div
+            className="overflow-hidden rounded-lg border"
+            style={{ height: `${Math.min(Number(embedHeight) || 600, 500)}px` }}
+          >
+            <iframe
+              src={embedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: "none" }}
+              title="Collectie embed voorbeeld"
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

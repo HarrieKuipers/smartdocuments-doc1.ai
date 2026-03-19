@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import DocumentEvent from "@/models/DocumentEvent";
 import AnalyticsNotification from "@/models/AnalyticsNotification";
 import DocumentModel from "@/models/Document";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 const MILESTONES = [100, 500, 1000, 5000, 10000];
 const SPIKE_MULTIPLIER = 3; // 3x normal volume = spike
@@ -49,6 +50,14 @@ export async function checkAlerts() {
               threshold: milestone,
             },
           });
+
+          // Dispatch webhook
+          dispatchWebhookEvent(orgId.toString(), "analytics.milestone", {
+            documentId: docId.toString(),
+            title: doc.title,
+            milestone,
+            currentViews: totalViews,
+          }).catch(() => {});
         }
       }
     }

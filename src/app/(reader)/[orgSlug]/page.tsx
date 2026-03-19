@@ -28,6 +28,7 @@ import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
 import TemplateInfoBox from "@/components/reader/TemplateInfoBox";
 import DocFooter from "@/components/reader/DocFooter";
 import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
+import TextToSpeech from "@/components/reader/TextToSpeech";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
 
@@ -163,9 +164,12 @@ export default function ReaderPage() {
       if (kp.explanation) {
         setKeyPointExplanations((prev) => ({ ...prev, [index]: kp.explanation! }));
       } else {
+        const level = doc.targetCEFRLevel;
+        const levelHintNl = level ? ` Schrijf op CEFR taalniveau ${level}.` : "";
+        const levelHintEn = level ? ` Write at CEFR level ${level}.` : "";
         const kpPrompt = doc.language === "en"
-          ? `Explain the following key point from the document "${doc.title}" in 2-3 sentences. Provide more context and background. Key point: "${kp.text}"`
-          : `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond. Hoofdpunt: "${kp.text}"`;
+          ? `Explain the following key point from the document "${doc.title}" in 2-3 sentences. Provide more context and background.${levelHintEn} Key point: "${kp.text}"`
+          : `Leg het volgende hoofdpunt uit het document "${doc.title}" verder uit in 2-3 zinnen. Geef meer context en achtergrond.${levelHintNl} Hoofdpunt: "${kp.text}"`;
         fetchExplanation(doc._id, kpPrompt, "keypoint", index);
       }
     }
@@ -179,9 +183,12 @@ export default function ReaderPage() {
     setExpandedFinding(index);
     if (!findingExplanations[index] && doc) {
       const f = doc.content.findings[index];
+      const level = doc.targetCEFRLevel;
+      const levelHintNl = level ? ` Schrijf op CEFR taalniveau ${level}.` : "";
+      const levelHintEn = level ? ` Write at CEFR level ${level}.` : "";
       const fPrompt = doc.language === "en"
-        ? `Provide more context and explanation about the following finding from the document "${doc.title}" in 2-3 sentences. Do NOT repeat the title or add a heading — start directly with the explanation. Category: "${f.category}". Title: "${f.title}". Content: "${f.content}"`
-        : `Geef meer context en uitleg over de volgende bevinding uit het document "${doc.title}" in 2-3 zinnen. Herhaal NIET de titel en gebruik geen kopjes — begin direct met de uitleg. Categorie: "${f.category}". Titel: "${f.title}". Inhoud: "${f.content}"`;
+        ? `Provide more context and explanation about the following finding from the document "${doc.title}" in 2-3 sentences. Do NOT repeat the title or add a heading — start directly with the explanation.${levelHintEn} Category: "${f.category}". Title: "${f.title}". Content: "${f.content}"`
+        : `Geef meer context en uitleg over de volgende bevinding uit het document "${doc.title}" in 2-3 zinnen. Herhaal NIET de titel en gebruik geen kopjes — begin direct met de uitleg.${levelHintNl} Categorie: "${f.category}". Titel: "${f.title}". Inhoud: "${f.content}"`;
       fetchExplanation(doc._id, fPrompt, "finding", index);
     }
   }, [expandedFinding, findingExplanations, doc, fetchExplanation]);
@@ -774,12 +781,20 @@ export default function ReaderPage() {
                   <FileText className="h-6 w-6 md:h-7 md:w-7" style={{ color: brandPrimary }} aria-hidden="true" />
                   {t.summary}
                 </h2>
-                <SectionFeedbackButton
-                  shortId={doc.shortId}
-                  sectionType="summary"
-                  sectionTitle={t.summary}
-                  sessionId={analytics.sessionId}
-                />
+                <div className="flex items-center gap-2">
+                  <TextToSpeech
+                    text={currentSummary}
+                    lang={doc.language === "en" ? "en-GB" : "nl-NL"}
+                    labels={t}
+                    brandPrimary={brandPrimary}
+                  />
+                  <SectionFeedbackButton
+                    shortId={doc.shortId}
+                    sectionType="summary"
+                    sectionTitle={t.summary}
+                    sessionId={analytics.sessionId}
+                  />
+                </div>
               </div>
               <div onClick={handleTermClick}>
                 <div

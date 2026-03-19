@@ -16,12 +16,14 @@ import {
   X,
   Lock,
   Loader2,
+  GitCompareArrows,
 } from "lucide-react";
 import DocFooter from "@/components/reader/DocFooter";
 import ChatWidget from "@/components/chat/ChatWidget";
 import DefaultHeader from "@/components/reader/headers/DefaultHeader";
 import RijksoverheidHeader from "@/components/reader/headers/RijksoverheidHeader";
 import AmsterdamHeader from "@/components/reader/headers/AmsterdamHeader";
+import DocumentCompare from "@/components/collection/DocumentCompare";
 
 interface CollectionDocument {
   _id: string;
@@ -94,6 +96,9 @@ export default function PublicCollectionPage() {
   // Search and filter
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Compare mode
+  const [compareMode, setCompareMode] = useState(false);
 
   // Analytics tracking
   const sessionIdRef = useRef("");
@@ -326,11 +331,25 @@ export default function PublicCollectionPage() {
           )}
         </div>
 
+        {/* Compare mode */}
+        {compareMode && collection.documents.length >= 2 && (
+          <DocumentCompare
+            collectionSlug={collection.slug}
+            documents={collection.documents.map((d) => ({
+              title: d.title,
+              shortId: d.shortId,
+            }))}
+            brandPrimary={brandPrimary}
+            onClose={() => setCompareMode(false)}
+          />
+        )}
+
         {/* Search + tag filters */}
-        {collection.documents.length > 0 && (
+        {!compareMode && collection.documents.length > 0 && (
           <div className="mb-6 space-y-4">
-            {/* Search bar */}
-            <div className="relative max-w-md">
+            {/* Search bar + compare button */}
+            <div className="flex items-center gap-3">
+            <div className="relative max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Zoek op titel, auteur of beschrijving..."
@@ -345,6 +364,17 @@ export default function PublicCollectionPage() {
                 >
                   <X className="h-4 w-4" />
                 </button>
+              )}
+            </div>
+              {collection.documents.length >= 2 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setCompareMode(true)}
+                  className="shrink-0"
+                >
+                  <GitCompareArrows className="mr-2 h-4 w-4" />
+                  Vergelijken
+                </Button>
               )}
             </div>
 
@@ -391,7 +421,7 @@ export default function PublicCollectionPage() {
         )}
 
         {/* Documents grid */}
-        {filteredDocs.length === 0 ? (
+        {compareMode ? null : filteredDocs.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
               <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />

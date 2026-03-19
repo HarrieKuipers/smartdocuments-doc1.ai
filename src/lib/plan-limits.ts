@@ -4,6 +4,12 @@ export function canCreateDocument(plan: PlanType, currentCount: number): boolean
   return currentCount < PLANS[plan].maxDocuments;
 }
 
+export function getRemainingDocuments(plan: PlanType, currentCount: number): number {
+  const max = PLANS[plan].maxDocuments;
+  if (max === Infinity) return Infinity;
+  return Math.max(0, max - currentCount);
+}
+
 export function canUseLanguageLevel(plan: PlanType, level: string): boolean {
   if (plan === "free") return level === "B1";
   return true;
@@ -49,4 +55,16 @@ export function getMaxPublicAnnotations(plan: PlanType): number {
 
 export function canUseCollectionChat(plan: PlanType): boolean {
   return plan !== "free";
+}
+
+export function canUseApi(plan: PlanType): boolean {
+  return plan === "enterprise";
+}
+
+export function canUseWebhooks(plan: PlanType): boolean {
+  return plan === "enterprise";
+}
+
+export function canUseIntegrations(plan: PlanType): boolean {
+  return plan === "enterprise";
 }

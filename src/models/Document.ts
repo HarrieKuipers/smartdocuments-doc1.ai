@@ -69,6 +69,7 @@ export interface IDocument extends MongoDocument {
   customSlug?: string;
   coverImageUrl?: string;
   customCoverUrl?: string;
+  coverDesign?: Record<string, unknown>;
   publishedAt?: Date;
   scheduledPublishAt?: Date;
   currentVersion: number;
@@ -199,6 +200,7 @@ const DocumentSchema = new Schema<IDocument>(
     customSlug: { type: String, sparse: true, unique: true },
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },
+    coverDesign: { type: Schema.Types.Mixed },
     publishedAt: { type: Date },
     scheduledPublishAt: { type: Date },
     currentVersion: { type: Number, default: 1 },

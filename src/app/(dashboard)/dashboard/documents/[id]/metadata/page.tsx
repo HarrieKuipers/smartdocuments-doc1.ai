@@ -23,8 +23,10 @@ import {
   Loader2,
   X,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useOnboarding } from "@/components/onboarding/OnboardingProvider";
 
 interface DocumentData {
   _id: string;
@@ -41,6 +43,7 @@ interface DocumentData {
 export default function MetadataPage() {
   const params = useParams();
   const router = useRouter();
+  const { isFirstUpload } = useOnboarding();
   const [doc, setDoc] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -160,6 +163,7 @@ export default function MetadataPage() {
           variant="outline"
           onClick={handleExtractMetadata}
           disabled={extracting}
+          className={isFirstUpload && !extracting ? "animate-pulse ring-2 ring-[#0062EB] ring-offset-2" : ""}
         >
           {extracting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -169,6 +173,20 @@ export default function MetadataPage() {
           AI Extractie
         </Button>
       </div>
+
+      {/* First-upload guidance */}
+      {isFirstUpload && (
+        <div className="flex items-start gap-3 rounded-lg border border-[#0062EB]/20 bg-[#0062EB]/5 p-4">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#0062EB]" />
+          <div className="text-sm text-gray-700">
+            <p className="font-medium text-[#0062EB]">Tip: Gebruik AI Extractie</p>
+            <p className="mt-1">
+              Klik op <span className="font-medium">&quot;AI Extractie&quot;</span> om automatisch
+              de titel, auteurs en tags uit je document te halen. Je kunt alles daarna nog aanpassen.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -317,6 +335,11 @@ export default function MetadataPage() {
             <p className="text-[10px] text-muted-foreground">
               De samenvatting wordt herschreven naar dit taalniveau. Kies leeg om het originele niveau te behouden.
             </p>
+            {isFirstUpload && (
+              <p className="text-xs text-[#0062EB]">
+                Kies een taalniveau om je document toegankelijker te maken voor een breder publiek. B1 is het meest toegankelijk.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

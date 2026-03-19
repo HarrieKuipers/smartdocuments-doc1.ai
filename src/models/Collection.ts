@@ -22,6 +22,12 @@ export interface ICollection extends Document {
     sourceDocuments?: { shortId: string; title: string }[];
     generatedAt: Date;
   }[];
+  embedConfig?: {
+    whitelabel: boolean;
+    defaultMode: "chat" | "summary" | "full";
+    defaultTheme: "light" | "dark";
+    colorOverride?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +70,20 @@ const CollectionSchema = new Schema<ICollection>(
         generatedAt: { type: Date, default: Date.now },
       },
     ],
+    embedConfig: {
+      whitelabel: { type: Boolean, default: false },
+      defaultMode: {
+        type: String,
+        enum: ["chat", "summary", "full"],
+        default: "full",
+      },
+      defaultTheme: {
+        type: String,
+        enum: ["light", "dark"],
+        default: "light",
+      },
+      colorOverride: { type: String },
+    },
   },
   { timestamps: true }
 );

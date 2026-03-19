@@ -9,6 +9,7 @@ import { extractTerms } from "./extract-terms";
 import { generateAndUploadCover } from "./generate-cover";
 import { generateDisplayTitle } from "./generate-display-title";
 import type { DocumentLanguage } from "./language";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
 
@@ -158,11 +159,28 @@ export async function processDocument(
 
     await onProgress?.("finalizing", 100);
 
+    // Dispatch webhook event
+    dispatchWebhookEvent(doc.organizationId.toString(), "document.processed", {
+      documentId: doc._id.toString(),
+      shortId: doc.shortId,
+      title: doc.displayTitle || doc.title,
+      status: "ready",
+      slug: doc.slug,
+    }).catch((err) => console.error("Webhook dispatch failed:", err));
+
     return doc;
   } catch (error) {
     console.error("Document processing error:", error);
     doc.status = "error";
     await doc.save();
+
+    // Dispatch error webhook event
+    dispatchWebhookEvent(doc.organizationId.toString(), "document.error", {
+      documentId: doc._id.toString(),
+      title: doc.title,
+      error: (error as Error).message,
+    }).catch(() => {});
+
     throw error;
   }
 }

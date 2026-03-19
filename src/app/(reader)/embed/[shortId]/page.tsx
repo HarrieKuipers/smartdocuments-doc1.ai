@@ -10,6 +10,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import TextToSpeech from "@/components/reader/TextToSpeech";
+import { getLangStrings } from "@/lib/ai/language";
 
 interface EmbedDocument {
   _id: string;
@@ -138,16 +140,24 @@ export default function EmbedReaderPage() {
       <div className="p-4 md:p-6 space-y-5">
         {/* Summary */}
         <section>
-          <h2
-            className="mb-3 flex items-center gap-2 text-lg font-bold"
-            style={{ color: headingColor }}
-          >
-            <FileText
-              className="h-5 w-5 shrink-0"
-              style={{ color: brandPrimary }}
+          <div className="mb-3 flex items-center justify-between">
+            <h2
+              className="flex items-center gap-2 text-lg font-bold"
+              style={{ color: headingColor }}
+            >
+              <FileText
+                className="h-5 w-5 shrink-0"
+                style={{ color: brandPrimary }}
+              />
+              Samenvatting
+            </h2>
+            <TextToSpeech
+              text={currentSummary}
+              lang={doc.language === "en" ? "en-GB" : "nl-NL"}
+              labels={getLangStrings(doc.language || "nl").reader}
+              brandPrimary={brandPrimary}
             />
-            Samenvatting
-          </h2>
+          </div>
           <div
             className="prose prose-sm max-w-none leading-relaxed"
             style={{ color: textColor, fontSize: "0.9rem", lineHeight: "1.75" }}

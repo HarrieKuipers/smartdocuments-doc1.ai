@@ -50,6 +50,8 @@ import {
 import { toast } from "sonner";
 import { getTemplate } from "@/lib/templates";
 import VersionHistory from "@/components/documents/VersionHistory";
+import CoverBuilder from "@/components/documents/cover-builder/CoverBuilder";
+import type { ICoverDesign } from "@/components/documents/cover-builder/types";
 
 interface TemplateOption {
   templateId: string;
@@ -83,6 +85,7 @@ interface DocumentData {
   customSlug?: string;
   coverImageUrl?: string;
   customCoverUrl?: string;
+  coverDesign?: ICoverDesign;
   language?: "nl" | "en";
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
@@ -213,17 +216,35 @@ export default function DocumentEditPage() {
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Organization data for cover builder
+  const [orgData, setOrgData] = useState<{ name: string; logo?: string; brandPrimary: string }>({
+    name: "Organisatie",
+    brandPrimary: "#0062EB",
+  });
+
   // Textarea refs for rich text toolbar
   const summaryRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Track content version for auto-save triggering
   const [contentVersion, setContentVersion] = useState(0);
 
-  // Load available templates
+  // Load available templates + org data
   useEffect(() => {
     fetch("/api/templates")
       .then((r) => r.json())
       .then(({ data }) => setTemplateOptions(data))
+      .catch(() => {});
+    fetch("/api/organizations")
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data) {
+          setOrgData({
+            name: data.name || "Organisatie",
+            logo: data.logo,
+            brandPrimary: data.brandColors?.primary || "#0062EB",
+          });
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -639,6 +660,10 @@ export default function DocumentEditPage() {
           <TabsTrigger value="intelligentie" className="gap-1.5">
             <Settings className="h-3.5 w-3.5" />
             Instellingen
+          </TabsTrigger>
+          <TabsTrigger value="voorblad" className="gap-1.5">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Voorblad
           </TabsTrigger>
           <TabsTrigger value="samenvatting" className="gap-1.5">
             <Pencil className="h-3.5 w-3.5" />
@@ -1147,6 +1172,22 @@ export default function DocumentEditPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Voorblad Tab */}
+        <TabsContent value="voorblad">
+          <CoverBuilder
+            documentId={doc._id}
+            title={title || doc.title}
+            tags={tags}
+            orgName={orgData.name}
+            orgLogo={orgData.logo}
+            brandPrimary={doc.brandOverride?.primary || orgData.brandPrimary}
+            initialDesign={doc.coverDesign}
+            onCoverSaved={(url) =>
+              setDoc((prev) => (prev ? { ...prev, customCoverUrl: url } : prev))
+            }
+          />
         </TabsContent>
 
         {/* Samenvatting Tab */}
