@@ -64,7 +64,7 @@ export async function POST(
       $or: [{ shortId }, { customSlug: shortId }],
       status: "ready",
     })
-      .select("_id organizationId")
+      .select("_id organizationId authors")
       .lean();
 
     if (!doc) {
@@ -106,12 +106,13 @@ export async function POST(
       );
     }
 
-    // Check if the replying user is the document owner
-    const user = await User.findById(session.user.id)
-      .select("organizationId")
-      .lean();
+    // Check if the replying user's name matches one of the document authors
+    const userName = session.user.name || "";
     const isDocumentOwner =
-      user?.organizationId?.toString() === doc.organizationId.toString();
+      Array.isArray(doc.authors) &&
+      doc.authors.some(
+        (a: string) => a.toLowerCase() === userName.toLowerCase()
+      );
 
     const reply = await DiscussionReply.create({
       discussionId,

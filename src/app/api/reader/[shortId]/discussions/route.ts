@@ -48,19 +48,26 @@ export async function GET(
         ? { isPinned: -1, upvotes: -1, lastActivityAt: -1 }
         : { isPinned: -1, lastActivityAt: -1 };
 
-    const [discussions, total] = await Promise.all([
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [discussions, total, recentCount] = await Promise.all([
       Discussion.find(filter)
         .sort(sortOption)
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       Discussion.countDocuments(filter),
+      Discussion.countDocuments({
+        documentId: doc._id,
+        lastActivityAt: { $gte: oneDayAgo },
+      }),
     ]);
 
     return NextResponse.json({
       data: {
         discussions,
         total,
+        recentCount,
         page,
         totalPages: Math.ceil(total / limit),
       },

@@ -113,6 +113,7 @@ export default function ReaderPage() {
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [versionContent, setVersionContent] = useState<ReaderDocument["content"] | null>(null);
   const [activeTab, setActiveTab] = useState<"content" | "discussions">("content");
+  const [recentDiscussionCount, setRecentDiscussionCount] = useState(0);
   const chatRef = useRef<ChatWidgetRef>(null);
   const analytics = useDocumentAnalytics(doc?._id || "");
 
@@ -270,6 +271,17 @@ export default function ReaderPage() {
   useEffect(() => {
     fetchDocument();
   }, [params.orgSlug]);
+
+  // Fetch recent discussion count (activity in last 24h)
+  useEffect(() => {
+    if (!doc?.shortId || !doc?.discussionsEnabled) return;
+    fetch(`/api/reader/${doc.shortId}/discussions?limit=1`)
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (data?.recentCount) setRecentDiscussionCount(data.recentCount);
+      })
+      .catch(() => {});
+  }, [doc?.shortId, doc?.discussionsEnabled]);
 
   // Detect cover image orientation
   useEffect(() => {
@@ -782,6 +794,14 @@ export default function ReaderPage() {
                 >
                   <MessageSquarePlus className="h-4 w-4" />
                   {getLangStrings(doc.language || "nl").community.discussionsTab}
+                  {recentDiscussionCount > 0 && activeTab !== "discussions" && (
+                    <span
+                      className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white"
+                      style={{ backgroundColor: brandPrimary }}
+                    >
+                      {recentDiscussionCount}
+                    </span>
+                  )}
                 </button>
               </div>
             )}
