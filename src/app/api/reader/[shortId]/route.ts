@@ -57,10 +57,8 @@ export async function GET(
       .select("name slug logo brandColors")
       .lean();
 
-    // Increment view count
-    await DocumentModel.findByIdAndUpdate(doc._id, {
-      $inc: { "analytics.totalViews": 1 },
-    });
+    // Note: view counts are tracked via DocumentEvent page_view events
+    // and synced to Document.analytics by the aggregate-analytics cron job
 
     // Strip original text from response (too large for public)
     const { content, ...docData } = doc;

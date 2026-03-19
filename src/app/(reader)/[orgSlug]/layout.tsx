@@ -3,6 +3,7 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
 import CookieBanner from "@/components/analytics/CookieBanner";
+import SessionProvider from "@/components/common/SessionProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +66,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default function ReaderLayout({ children }: Props) {
   return (
-    <>
+    <SessionProvider>
       {children}
       <CookieBanner />
-    </>
+    </SessionProvider>
   );
 }

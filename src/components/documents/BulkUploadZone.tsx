@@ -580,7 +580,7 @@ export default function BulkUploadZone() {
         </Card>
 
         <Card>
-          <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+          <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 [&_[data-slot=select-trigger]]:w-full">
             <div className="space-y-2">
               <Label>Taal</Label>
               <Select

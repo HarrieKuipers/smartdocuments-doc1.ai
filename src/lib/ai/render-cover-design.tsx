@@ -102,49 +102,22 @@ export async function renderCoverFromDesign({
             ...layoutStyles,
           }}
         >
-          {/* Org name */}
-          {design.showOrgName && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {design.showLogo && !orgLogo && (
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    backgroundColor: brandPrimary,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontSize: 18,
-                    fontWeight: 700,
-                  }}
-                >
-                  {orgName[0]?.toUpperCase() || "D"}
-                </div>
-              )}
-              {design.showLogo && orgLogo && (
-                <img
-                  src={orgLogo}
-                  width={40}
-                  height={40}
-                  style={{ borderRadius: 8, objectFit: "contain" }}
-                />
-              )}
-              <span
-                style={{
-                  fontSize: 18,
-                  color: isLight ? "rgba(255,255,255,0.7)" : "#6b7280",
-                  fontWeight: 500,
-                }}
-              >
-                {orgName}
-              </span>
+          {/* Org logo */}
+          {design.showLogo && orgLogo && (
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <img
+                src={orgLogo}
+                width={40}
+                height={40}
+                style={{ borderRadius: 8, objectFit: "contain" }}
+              />
             </div>
           )}
 
-          {/* Spacer */}
-          <div style={{ display: "flex", flex: 1 }} />
+          {/* Top spacer — pushes content down for bottom-left, centered, split-left */}
+          {(design.layout === "bottom-left" || design.layout === "centered" || design.layout === "split-left") && (
+            <div style={{ display: "flex", flex: 1 }} />
+          )}
 
           {/* Title + subtitle */}
           <div
@@ -206,41 +179,18 @@ export async function renderCoverFromDesign({
             )}
           </div>
 
-          {/* Bottom spacer for centered */}
-          {design.layout === "centered" && <div style={{ display: "flex", flex: 1 }} />}
-
-          {/* Doc branding */}
-          {design.showDocBranding && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: design.layout === "centered" ? 0 : 40,
-              }}
-            >
-              <div
-                style={{
-                  width: 80,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: brandPrimary,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 14,
-                  color: isLight ? "rgba(255,255,255,0.5)" : "#9ca3af",
-                }}
-              >
-                doc1.ai
-              </span>
-            </div>
+          {/* Bottom spacer — pushes branding down for centered and top-left */}
+          {(design.layout === "centered" || design.layout === "top-left") && (
+            <div style={{ display: "flex", flex: 1 }} />
           )}
+
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: design.orientation === "portrait" ? 630 : 1200,
+      height: design.orientation === "portrait" ? 891 : 630,
+    }
   );
 
   const arrayBuffer = await response.arrayBuffer();
@@ -252,13 +202,11 @@ function getLayoutStyles(
 ): Record<string, string> {
   switch (layout) {
     case "centered":
-      return { justifyContent: "center", alignItems: "center" };
+      return { alignItems: "center" };
     case "bottom-left":
-      return { justifyContent: "flex-end", alignItems: "flex-start" };
     case "top-left":
-      return { justifyContent: "flex-start", alignItems: "flex-start" };
     case "split-left":
-      return { justifyContent: "center", alignItems: "flex-start" };
+      return { alignItems: "flex-start" };
   }
 }
 

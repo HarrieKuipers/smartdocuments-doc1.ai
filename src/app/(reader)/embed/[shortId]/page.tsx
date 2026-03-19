@@ -29,6 +29,7 @@ interface EmbedDocument {
   brandOverride?: { primary?: string };
   template?: string;
   templateConfig?: { primary: string; primaryLight: string };
+  ttsAudioUrl?: string;
 }
 
 export default function EmbedReaderPage() {
@@ -157,6 +158,7 @@ export default function EmbedReaderPage() {
               labels={getLangStrings(doc.language || "nl").reader}
               brandPrimary={brandPrimary}
               shortId={doc.shortId}
+              ttsAudioUrl={doc.ttsAudioUrl}
             />
           </div>
           <div

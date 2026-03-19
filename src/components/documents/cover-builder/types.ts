@@ -13,7 +13,10 @@ export interface ICoverTextElement {
   align: TextAlign;
 }
 
+export type CoverOrientation = "landscape" | "portrait";
+
 export interface ICoverDesign {
+  orientation: CoverOrientation;
   background: {
     type: "solid" | "gradient" | "image";
     color?: string;
@@ -50,11 +53,11 @@ export const LAYOUT_OPTIONS: { value: CoverLayout; label: string; description: s
   { value: "centered", label: "Gecentreerd", description: "Tekst in het midden" },
   { value: "bottom-left", label: "Linksonder", description: "Tekst linksonder" },
   { value: "top-left", label: "Linksboven", description: "Tekst linksboven" },
-  { value: "split-left", label: "Gesplitst", description: "Tekst links, kleurvlak rechts" },
 ];
 
 export function getDefaultCoverDesign(title: string): ICoverDesign {
   return {
+    orientation: "landscape",
     background: {
       type: "solid",
       color: "#ffffff",

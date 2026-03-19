@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Loader2,
   GitBranch,
+  MessageSquarePlus,
 } from "lucide-react";
 import PasswordGate from "@/components/reader/PasswordGate";
 import ChatWidget, { type ChatWidgetRef } from "@/components/chat/ChatWidget";
@@ -31,6 +32,7 @@ import SectionFeedbackButton from "@/components/reader/SectionFeedbackButton";
 import TextToSpeech from "@/components/reader/TextToSpeech";
 import { useDocumentAnalytics } from "@/hooks/useDocumentAnalytics";
 import ReactMarkdown from "react-markdown";
+import DiscussionPanel from "@/components/reader/DiscussionPanel";
 
 const PdfViewer = lazy(() => import("@/components/reader/PdfViewer"));
 
@@ -62,12 +64,14 @@ interface ReaderDocument {
   template?: string;
   templateConfig?: TemplateConfig;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
+  discussionsEnabled?: boolean;
   infoBoxLabel?: string;
   infoBoxText?: string;
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   coverImageUrl?: string;
   customCoverUrl?: string;
+  ttsAudioUrl?: string;
   currentVersion?: number;
   totalVersions?: number;
   brandOverride?: { primary?: string };
@@ -108,6 +112,7 @@ export default function ReaderPage() {
   const [versions, setVersions] = useState<{ versionNumber: number; versionLabel?: string; createdAt: string }[]>([]);
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [versionContent, setVersionContent] = useState<ReaderDocument["content"] | null>(null);
+  const [activeTab, setActiveTab] = useState<"content" | "discussions">("content");
   const chatRef = useRef<ChatWidgetRef>(null);
   const analytics = useDocumentAnalytics(doc?._id || "");
 
@@ -749,6 +754,52 @@ export default function ReaderPage() {
 
           {/* Main content */}
           <main className="order-1 space-y-6 lg:order-2">
+            {/* Content/Discussions tabs — only show when discussions are enabled */}
+            {doc.discussionsEnabled && (
+              <div className="flex rounded-xl bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("content")}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === "content"
+                      ? "text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={activeTab === "content" ? { backgroundColor: brandPrimary } : undefined}
+                >
+                  <FileText className="h-4 w-4" />
+                  {t.summary}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("discussions")}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === "discussions"
+                      ? "text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={activeTab === "discussions" ? { backgroundColor: brandPrimary } : undefined}
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                  {getLangStrings(doc.language || "nl").community.discussionsTab}
+                </button>
+              </div>
+            )}
+
+            {/* Discussions tab */}
+            {doc.discussionsEnabled && activeTab === "discussions" && (
+              <section className="rounded-xl bg-white p-6 shadow-sm md:p-8">
+                <DiscussionPanel
+                  shortId={doc.shortId}
+                  brandPrimary={brandPrimary}
+                  strings={getLangStrings(doc.language || "nl").community}
+                />
+              </section>
+            )}
+
+            {/* Document content — always visible when discussions disabled, tab-controlled otherwise */}
+            {(!doc.discussionsEnabled || activeTab === "content") && (
+            <>
             {/* Old version banner */}
             {viewingVersion !== null && (
               <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -795,6 +846,7 @@ export default function ReaderPage() {
                     labels={t}
                     brandPrimary={brandPrimary}
                     shortId={doc.shortId}
+                    ttsAudioUrl={doc.ttsAudioUrl}
                   />
                   <SectionFeedbackButton
                     shortId={doc.shortId}
@@ -964,6 +1016,8 @@ export default function ReaderPage() {
                 text={doc.infoBoxText}
                 lang={docLang}
               />
+            )}
+            </>
             )}
           </main>
         </div>

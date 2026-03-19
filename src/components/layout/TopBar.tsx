@@ -11,11 +11,15 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { signOut } from "next-auth/react";
-import { Settings, LogOut, User } from "lucide-react";
+import { Settings, LogOut, User, Menu } from "lucide-react";
 import Link from "next/link";
 import NotificationBell from "@/components/analytics/NotificationBell";
 
-export default function TopBar() {
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export default function TopBar({ onMenuClick }: TopBarProps) {
   const { data: session } = useSession();
 
   const initials = session?.user?.name
@@ -26,14 +30,23 @@ export default function TopBar() {
     .slice(0, 2);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
-      <div />
+    <header className="flex h-14 items-center justify-between border-b bg-white px-4 md:h-16 md:px-6">
+      <div className="flex items-center gap-3">
+        {/* Mobile hamburger */}
+        <button
+          onClick={onMenuClick}
+          className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 lg:hidden"
+          aria-label="Menu openen"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         <NotificationBell />
         <Badge
           variant="secondary"
-          className="bg-[#0062EB]/10 text-[#0062EB] capitalize"
+          className="hidden bg-[#0062EB]/10 text-[#0062EB] capitalize sm:inline-flex"
         >
           {session?.user?.plan || "free"} plan
         </Badge>
@@ -46,7 +59,7 @@ export default function TopBar() {
                 {initials || "U"}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden text-sm font-medium sm:block">
+            <span className="hidden text-sm font-medium md:block">
               {session?.user?.name}
             </span>
           </DropdownMenuTrigger>

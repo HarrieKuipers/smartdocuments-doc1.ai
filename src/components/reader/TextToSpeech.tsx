@@ -19,6 +19,7 @@ interface TextToSpeechProps {
   };
   brandPrimary?: string;
   shortId?: string;
+  ttsAudioUrl?: string;
 }
 
 /**
@@ -39,15 +40,18 @@ function stripFormatting(text: string): string {
 
 export default function TextToSpeech({
   text,
-  lang = "nl-NL",
   labels,
   brandPrimary,
   shortId,
+  ttsAudioUrl,
 }: TextToSpeechProps) {
   const [status, setStatus] = useState<TTSStatus>("idle");
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Show component if audio exists OR if shortId is provided (can generate on demand)
+  if (!ttsAudioUrl && !shortId) return null;
 
   const handlePlay = useCallback(async () => {
     if (status === "paused" && audioRef.current) {
@@ -62,32 +66,43 @@ export default function TextToSpeech({
       audioRef.current = null;
     }
 
-    const cleanText = stripFormatting(text);
-    if (!cleanText) return;
-
-    // If no shortId, we can't call the API
-    if (!shortId) return;
-
     setStatus("loading");
     setProgress(0);
 
     try {
-      abortRef.current = new AbortController();
+      let audioSrc = ttsAudioUrl;
 
-      const response = await fetch(`/api/reader/${shortId}/tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleanText }),
-        signal: abortRef.current.signal,
-      });
+      // If no cached URL, request generation
+      if (!audioSrc) {
+        const cleanText = stripFormatting(text);
+        if (!cleanText || !shortId) {
+          setStatus("idle");
+          return;
+        }
 
-      if (!response.ok) {
-        throw new Error("TTS request failed");
+        abortRef.current = new AbortController();
+
+        const response = await fetch(`/api/reader/${shortId}/tts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: cleanText }),
+          signal: abortRef.current.signal,
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "TTS request failed");
+        }
+
+        const data = await response.json();
+        audioSrc = data.audioUrl;
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      if (!audioSrc) {
+        throw new Error("Geen audio URL ontvangen");
+      }
+
+      const audio = new Audio(audioSrc);
 
       audio.ontimeupdate = () => {
         if (audio.duration > 0) {
@@ -98,7 +113,6 @@ export default function TextToSpeech({
       audio.onended = () => {
         setStatus("idle");
         setProgress(0);
-        URL.revokeObjectURL(audioUrl);
         audioRef.current = null;
       };
 
@@ -106,7 +120,6 @@ export default function TextToSpeech({
         console.error("Audio playback error");
         setStatus("idle");
         setProgress(0);
-        URL.revokeObjectURL(audioUrl);
         audioRef.current = null;
       };
 
@@ -119,7 +132,7 @@ export default function TextToSpeech({
       setStatus("idle");
       setProgress(0);
     }
-  }, [status, text, shortId]);
+  }, [status, text, shortId, ttsAudioUrl]);
 
   const handlePause = useCallback(() => {
     if (audioRef.current) {

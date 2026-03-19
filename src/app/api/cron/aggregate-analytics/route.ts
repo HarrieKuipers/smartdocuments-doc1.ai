@@ -265,6 +265,36 @@ export async function GET(req: NextRequest) {
         { $limit: 10 },
       ]);
 
+      // Sync Document.analytics with actual event counts
+      const allTimeViewStats = await DocumentEvent.aggregate([
+        {
+          $match: {
+            documentId: docId,
+            eventType: "page_view",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalViews: { $sum: 1 },
+            uniqueSessions: { $addToSet: "$sessionId" },
+          },
+        },
+      ]);
+
+      const allTimeDownloads = await DocumentEvent.countDocuments({
+        documentId: docId,
+        eventType: "pdf_download",
+      });
+
+      if (allTimeViewStats[0]) {
+        await DocumentModel.findByIdAndUpdate(docId, {
+          "analytics.totalViews": allTimeViewStats[0].totalViews,
+          "analytics.uniqueViews": allTimeViewStats[0].uniqueSessions?.length || 0,
+          "analytics.totalDownloads": allTimeDownloads,
+        });
+      }
+
       // Save summary
       await DocumentAnalyticsSummary.create({
         documentId: docId,

@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import { getTemplate } from "@/lib/templates";
 import VersionHistory from "@/components/documents/VersionHistory";
 import CoverBuilder from "@/components/documents/cover-builder/CoverBuilder";
+import TextToSpeech from "@/components/reader/TextToSpeech";
 import type { ICoverDesign } from "@/components/documents/cover-builder/types";
 
 interface TemplateOption {
@@ -86,6 +87,7 @@ interface DocumentData {
   coverImageUrl?: string;
   customCoverUrl?: string;
   coverDesign?: ICoverDesign;
+  ttsAudioUrl?: string;
   language?: "nl" | "en";
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
@@ -211,6 +213,7 @@ export default function DocumentEditPage() {
   const [targetCEFRLevel, setTargetCEFRLevel] = useState<"B1" | "B2" | "C1" | "C2" | "">("");
   const [isDraft, setIsDraft] = useState(false);
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
+  const [discussionsEnabled, setDiscussionsEnabled] = useState(false);
 
   // Cover image
   const [coverUploading, setCoverUploading] = useState(false);
@@ -274,6 +277,7 @@ export default function DocumentEditPage() {
         setTargetCEFRLevel(data.targetCEFRLevel || "");
         setIsDraft(data.isDraft || false);
         setScheduledPublishAt(data.scheduledPublishAt ? new Date(data.scheduledPublishAt).toISOString().slice(0, 16) : "");
+        setDiscussionsEnabled(data.discussionsEnabled || false);
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -308,6 +312,7 @@ export default function DocumentEditPage() {
           targetCEFRLevel: targetCEFRLevel || null,
           template: templateId || "doc1",
           chatMode,
+          discussionsEnabled,
           customSlug: customSlug || null,
           isDraft,
           scheduledPublishAt: scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null,
@@ -335,7 +340,7 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt]);
 
   useEffect(() => {
     if (!doc) return;
@@ -347,7 +352,7 @@ export default function DocumentEditPage() {
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt, saveChanges, doc]);
 
   // Warn user if they try to leave with unsaved changes
   useEffect(() => {
@@ -655,551 +660,51 @@ export default function DocumentEditPage() {
       </div>
 
       {/* Tab-based layout */}
-      <Tabs defaultValue="intelligentie" className="w-full">
+      <Tabs defaultValue="inhoud" className="w-full">
         <TabsList variant="line" className="w-full justify-start border-b px-0">
-          <TabsTrigger value="intelligentie" className="gap-1.5">
+          <TabsTrigger value="inhoud" className="gap-1.5">
+            <Pencil className="h-3.5 w-3.5" />
+            Inhoud
+          </TabsTrigger>
+          <TabsTrigger value="vormgeving" className="gap-1.5">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Vormgeving
+          </TabsTrigger>
+          <TabsTrigger value="instellingen" className="gap-1.5">
             <Settings className="h-3.5 w-3.5" />
             Instellingen
           </TabsTrigger>
-          <TabsTrigger value="voorblad" className="gap-1.5">
-            <ImageIcon className="h-3.5 w-3.5" />
-            Voorblad
-          </TabsTrigger>
-          <TabsTrigger value="samenvatting" className="gap-1.5">
-            <Pencil className="h-3.5 w-3.5" />
-            Samenvatting
-          </TabsTrigger>
-          <TabsTrigger value="definities" className="gap-1.5">
-            <BookOpen className="h-3.5 w-3.5" />
-            Begrippen & definities
-          </TabsTrigger>
-          {doc.status === "ready" && (
-            <TabsTrigger value="insluiten" className="gap-1.5">
-              <Code className="h-3.5 w-3.5" />
-              Insluiten
-            </TabsTrigger>
-          )}
           <TabsTrigger value="versies" className="gap-1.5">
             <GitBranch className="h-3.5 w-3.5" />
             Versies
           </TabsTrigger>
         </TabsList>
 
-        {/* Intelligentie Tab */}
-        <TabsContent value="intelligentie">
-          <div className="mx-auto max-w-4xl space-y-6 py-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Instellingen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Documentnaam</Label>
-                      <Input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        De originele naam van het document
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Paginatitel</Label>
-                      <Input
-                        value={displayTitle}
-                        onChange={(e) => setDisplayTitle(e.target.value)}
-                        placeholder="Communicatieve titel voor de lezer..."
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        De titel die bezoekers zien in de header. Wordt automatisch gegenereerd, maar is aanpasbaar.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Beschrijving</Label>
-                      <Textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    {(doc.publicationDate || doc.pageCount || doc.languageLevel) && (
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {doc.publicationDate && (
-                          <span>
-                            {new Date(doc.publicationDate).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}
-                          </span>
-                        )}
-                        {doc.publicationDate && doc.pageCount && <span>·</span>}
-                        {doc.pageCount && <span>{doc.pageCount} pag.</span>}
-                        {(doc.publicationDate || doc.pageCount) && doc.languageLevel && <span>·</span>}
-                        {doc.languageLevel && (
-                          <Badge variant="secondary" className="text-[10px] font-medium">
-                            CEFR {doc.languageLevel}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label>Auteur(s)</Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {authors.map((a, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs flex items-center gap-1">
-                            {a}
-                            <button
-                              type="button"
-                              onClick={() => setAuthors(authors.filter((_, j) => j !== i))}
-                              className="ml-0.5 hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={newAuthor}
-                          onChange={(e) => setNewAuthor(e.target.value)}
-                          placeholder="Naam toevoegen..."
-                          className="text-sm"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newAuthor.trim()) {
-                              e.preventDefault();
-                              setAuthors([...authors, newAuthor.trim()]);
-                              setNewAuthor("");
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          disabled={!newAuthor.trim()}
-                          onClick={() => {
-                            setAuthors([...authors, newAuthor.trim()]);
-                            setNewAuthor("");
-                          }}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tags</Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {tags.map((t, i) => (
-                          <Badge key={i} variant="outline" className="text-xs flex items-center gap-1">
-                            {t}
-                            <button
-                              type="button"
-                              onClick={() => setTags(tags.filter((_, j) => j !== i))}
-                              className="ml-0.5 hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={newTag}
-                          onChange={(e) => setNewTag(e.target.value)}
-                          placeholder="Tag toevoegen..."
-                          className="text-sm"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newTag.trim()) {
-                              e.preventDefault();
-                              setTags([...tags, newTag.trim()]);
-                              setNewTag("");
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          disabled={!newTag.trim()}
-                          onClick={() => {
-                            setTags([...tags, newTag.trim()]);
-                            setNewTag("");
-                          }}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Taal verwerking</Label>
-                      <div className="flex items-center gap-3">
-                        <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <Select value={language} onValueChange={(v) => setLanguage(v as "nl" | "en")}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="nl">Nederlands</SelectItem>
-                            <SelectItem value="en">Engels</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Wijzig de taal en herindexeer om opnieuw te verwerken
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Doelniveau (CEFR)</Label>
-                      <Select value={targetCEFRLevel || "auto"} onValueChange={(v) => setTargetCEFRLevel(v === "auto" ? "" : v as "B1" | "B2" | "C1" | "C2")}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Automatisch</SelectItem>
-                          <SelectItem value="B1">B1 — Eenvoudig</SelectItem>
-                          <SelectItem value="B2">B2 — Gemiddeld</SelectItem>
-                          <SelectItem value="C1">C1 — Geavanceerd</SelectItem>
-                          <SelectItem value="C2">C2 — Academisch</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[10px] text-muted-foreground">
-                        Op welk taalniveau moeten de samenvatting, begrippen en bevindingen worden geschreven? Herindexeer na wijziging.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Toegang</Label>
-                      <Select value={accessType} onValueChange={setAccessType}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="public">
-                            <div className="flex items-center gap-2">
-                              <Globe className="h-3 w-3" /> Openbaar
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="link-only">
-                            <div className="flex items-center gap-2">
-                              <LinkIcon className="h-3 w-3" /> Alleen via link
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="password">
-                            <div className="flex items-center gap-2">
-                              <Lock className="h-3 w-3" /> Wachtwoord
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {accessType === "password" && (
-                        <Input
-                          type="password"
-                          placeholder="Voer wachtwoord in"
-                          value={accessPassword}
-                          onChange={(e) => setAccessPassword(e.target.value)}
-                          className="mt-2"
-                        />
-                      )}
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-3">
-                      <Label>Publicatie</Label>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Concept</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            Als concept is het document niet publiek zichtbaar
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isDraft}
-                          onClick={() => {
-                            const newVal = !isDraft;
-                            setIsDraft(newVal);
-                            if (!newVal) setScheduledPublishAt("");
-                          }}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                            isDraft ? "bg-primary" : "bg-gray-200"
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                              isDraft ? "translate-x-4" : "translate-x-0"
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      {isDraft && (
-                        <div className="space-y-2">
-                          <Label>Geplande publicatie</Label>
-                          <input
-                            type="datetime-local"
-                            value={scheduledPublishAt}
-                            onChange={(e) => setScheduledPublishAt(e.target.value)}
-                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Optioneel. Het document wordt automatisch gepubliceerd op dit moment.
-                          </p>
-                        </div>
-                      )}
-                      <div className="text-xs">
-                        <span className="text-muted-foreground">Status: </span>
-                        {isDraft && scheduledPublishAt ? (
-                          <span className="text-purple-600 font-medium">
-                            Gepland op {new Date(scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        ) : isDraft ? (
-                          <span className="text-gray-600 font-medium">Concept</span>
-                        ) : (
-                          <span className="text-green-600 font-medium">Gepubliceerd</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Sjabloon</Label>
-                      <div className="grid grid-cols-1 gap-2">
-                        {templateOptions.length === 0 && (
-                          <p className="text-[10px] text-muted-foreground">Sjablonen laden...</p>
-                        )}
-                        {templateOptions.map((tmpl) => (
-                          <button
-                            key={tmpl.templateId}
-                            onClick={() => setTemplateId(tmpl.templateId)}
-                            className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
-                              templateId === tmpl.templateId
-                                ? "border-primary ring-2 ring-primary/20"
-                                : "hover:border-gray-400"
-                            }`}
-                          >
-                            <div
-                              className="h-8 w-8 flex-shrink-0 rounded"
-                              style={{ backgroundColor: tmpl.primary }}
-                            />
-                            <div>
-                              <div className="font-medium">{tmpl.name}</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                {tmpl.headerStyle === "split-bar"
-                                  ? "Logo + titelbalk"
-                                  : tmpl.headerStyle === "inline-logo"
-                                  ? "Logo + titel inline"
-                                  : "Standaard header"}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <Label>AI Assistent modus</Label>
-                      <Select value={chatMode} onValueChange={(v: "terms-only" | "terms-and-chat" | "full") => setChatMode(v)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="terms-only">
-                            <div className="flex items-center gap-2">
-                              <BookOpen className="h-3 w-3" /> Alleen begrippen
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="terms-and-chat">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare className="h-3 w-3" /> Begrippen + vragen
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="full">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare className="h-3 w-3" /> Volledig AI
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[10px] text-muted-foreground">
-                        {chatMode === "terms-only"
-                          ? "Gebruikers zien alleen voorgedefinieerde begrippen, geen vrije vragen"
-                          : chatMode === "terms-and-chat"
-                            ? "Begrippen uit de lijst bij klik, plus vrije vragen aan de AI"
-                            : "AI genereert antwoorden voor begrippen en vragen"}
-                      </p>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <Label>Custom URL</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">/</span>
-                        <Input
-                          value={customSlug}
-                          onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
-                          placeholder={doc.shortId}
-                          className="text-xs"
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Optioneel. Laat leeg om de standaard ID te gebruiken.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Deellink</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          readOnly
-                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/${customSlug || doc.shortId}`}
-                          className="text-xs"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              `${window.location.origin}/${customSlug || doc.shortId}`
-                            );
-                            toast.success("Link gekopieerd!");
-                          }}
-                        >
-                          Kopieer
-                        </Button>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5">
-                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                        Informatiebox
-                      </Label>
-                      <Input
-                        value={infoBoxLabel}
-                        onChange={(e) => setInfoBoxLabel(e.target.value)}
-                        placeholder="Meer informatie"
-                        className="text-xs"
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        Koptekst van de informatiebox onderaan de pagina. Laat leeg om te verbergen.
-                      </p>
-                      {infoBoxLabel && (
-                        <Textarea
-                          value={infoBoxText}
-                          onChange={(e) => setInfoBoxText(e.target.value)}
-                          placeholder="Voor volledige details en uitvoeringsplannen, zie het oorspronkelijke document."
-                          rows={2}
-                          className="text-xs"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Cover Image */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  Coverafbeelding
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Current cover preview */}
-                  <div className="overflow-hidden rounded-lg border bg-gray-50">
-                    {(doc.customCoverUrl || doc.coverImageUrl) ? (
-                      <img
-                        src={doc.customCoverUrl || doc.coverImageUrl}
-                        alt="Cover"
-                        className="w-full h-auto max-h-[300px] object-contain"
-                      />
-                    ) : (
-                      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                        Geen cover beschikbaar
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={coverInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={handleCoverUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => coverInputRef.current?.click()}
-                      disabled={coverUploading}
-                    >
-                      {coverUploading ? (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="mr-1 h-3.5 w-3.5" />
-                      )}
-                      {doc.customCoverUrl ? "Cover vervangen" : "Custom cover uploaden"}
-                    </Button>
-                    {doc.customCoverUrl && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCoverRemove}
-                        disabled={coverUploading}
-                        className="text-muted-foreground hover:text-red-500"
-                      >
-                        <X className="mr-1 h-3.5 w-3.5" />
-                        Standaard herstellen
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Upload een JPG, PNG of WebP (max 5MB). Zonder custom cover wordt de eerste pagina van de PDF gebruikt.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Voorblad Tab */}
-        <TabsContent value="voorblad">
-          <CoverBuilder
-            documentId={doc._id}
-            title={title || doc.title}
-            tags={tags}
-            orgName={orgData.name}
-            orgLogo={orgData.logo}
-            brandPrimary={doc.brandOverride?.primary || orgData.brandPrimary}
-            initialDesign={doc.coverDesign}
-            onCoverSaved={(url) =>
-              setDoc((prev) => (prev ? { ...prev, customCoverUrl: url } : prev))
-            }
-          />
-        </TabsContent>
-
-        {/* Samenvatting Tab */}
-        <TabsContent value="samenvatting">
+        {/* ===== INHOUD TAB ===== */}
+        <TabsContent value="inhoud">
           <div className="mx-auto max-w-4xl space-y-4 py-6">
             {/* Samenvatting */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                  Samenvatting
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    Samenvatting
+                  </CardTitle>
+                  <TextToSpeech
+                    text={summary}
+                    shortId={doc.shortId}
+                    ttsAudioUrl={doc.ttsAudioUrl}
+                    labels={{
+                      ttsPlay: "Voorlezen",
+                      ttsPlaying: "Aan het voorlezen...",
+                      ttsPause: "Pauzeren",
+                      ttsResume: "Hervatten",
+                      ttsStop: "Stoppen",
+                      ttsUnsupported: "Voorlezen wordt niet ondersteund in deze browser.",
+                    }}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <RichTextToolbar textareaRef={summaryRef} />
@@ -1359,12 +864,8 @@ export default function DocumentEditPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
 
-        {/* Begrippen & definities Tab */}
-        <TabsContent value="definities">
-          <div className="mx-auto max-w-5xl py-6">
+            {/* Begrippen & definities */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1431,14 +932,516 @@ export default function DocumentEditPage() {
           </div>
         </TabsContent>
 
-        {/* Insluiten Tab */}
-        {doc.status === "ready" && (
-          <TabsContent value="insluiten">
-            <EmbedTabContent doc={doc} />
-          </TabsContent>
-        )}
+        {/* ===== VORMGEVING TAB ===== */}
+        <TabsContent value="vormgeving">
+          <div className="mx-auto max-w-4xl space-y-6 py-6">
+            {/* Voorblad */}
+            <CoverBuilder
+              documentId={doc._id}
+              title={title || doc.title}
+              tags={tags}
+              orgName={orgData.name}
+              orgLogo={orgData.logo}
+              brandPrimary={doc.brandOverride?.primary || orgData.brandPrimary}
+              initialDesign={doc.coverDesign}
+              coverImageUrl={doc.coverImageUrl}
+              customCoverUrl={doc.customCoverUrl}
+              onCoverSaved={(url) =>
+                setDoc((prev) => (prev ? { ...prev, customCoverUrl: url } : prev))
+              }
+              onCoverUploaded={(url) =>
+                setDoc((prev) => (prev ? { ...prev, customCoverUrl: url } : prev))
+              }
+              onCoverRemoved={() =>
+                setDoc((prev) => (prev ? { ...prev, customCoverUrl: undefined } : prev))
+              }
+            />
 
-        {/* Versies Tab */}
+            {/* Sjabloon */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Sjabloon</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {templateOptions.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground">Sjablonen laden...</p>
+                  )}
+                  {templateOptions.map((tmpl) => (
+                    <button
+                      key={tmpl.templateId}
+                      onClick={() => setTemplateId(tmpl.templateId)}
+                      className={`flex items-center gap-3 rounded-lg border p-2.5 text-left text-xs transition-all ${
+                        templateId === tmpl.templateId
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "hover:border-gray-400"
+                      }`}
+                    >
+                      <div
+                        className="h-8 w-8 flex-shrink-0 rounded"
+                        style={{ backgroundColor: tmpl.primary }}
+                      />
+                      <div>
+                        <div className="font-medium">{tmpl.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {tmpl.headerStyle === "split-bar"
+                            ? "Logo + titelbalk"
+                            : tmpl.headerStyle === "inline-logo"
+                            ? "Logo + titel inline"
+                            : "Standaard header"}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Informatiebox */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  Informatiebox
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Input
+                    value={infoBoxLabel}
+                    onChange={(e) => setInfoBoxLabel(e.target.value)}
+                    placeholder="Meer informatie"
+                    className="text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Koptekst van de informatiebox onderaan de pagina. Laat leeg om te verbergen.
+                  </p>
+                </div>
+                {infoBoxLabel && (
+                  <Textarea
+                    value={infoBoxText}
+                    onChange={(e) => setInfoBoxText(e.target.value)}
+                    placeholder="Voor volledige details en uitvoeringsplannen, zie het oorspronkelijke document."
+                    rows={2}
+                    className="text-xs"
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ===== INSTELLINGEN TAB ===== */}
+        <TabsContent value="instellingen">
+          <div className="mx-auto max-w-4xl space-y-6 py-6">
+            {/* Document metadata */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Document</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Documentnaam</Label>
+                      <Input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        De originele naam van het document
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Paginatitel</Label>
+                      <Input
+                        value={displayTitle}
+                        onChange={(e) => setDisplayTitle(e.target.value)}
+                        placeholder="Communicatieve titel voor de lezer..."
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        De titel die bezoekers zien in de header. Wordt automatisch gegenereerd, maar is aanpasbaar.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Beschrijving</Label>
+                      <Textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Auteur(s)</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {authors.map((a, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs flex items-center gap-1">
+                            {a}
+                            <button
+                              type="button"
+                              onClick={() => setAuthors(authors.filter((_, j) => j !== i))}
+                              className="ml-0.5 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newAuthor}
+                          onChange={(e) => setNewAuthor(e.target.value)}
+                          placeholder="Naam toevoegen..."
+                          className="text-sm"
+                          autoComplete="off"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newAuthor.trim()) {
+                              e.preventDefault();
+                              setAuthors([...authors, newAuthor.trim()]);
+                              setNewAuthor("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!newAuthor.trim()}
+                          onClick={() => {
+                            setAuthors([...authors, newAuthor.trim()]);
+                            setNewAuthor("");
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tags</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t, i) => (
+                          <Badge key={i} variant="outline" className="text-xs flex items-center gap-1">
+                            {t}
+                            <button
+                              type="button"
+                              onClick={() => setTags(tags.filter((_, j) => j !== i))}
+                              className="ml-0.5 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          placeholder="Tag toevoegen..."
+                          className="text-sm"
+                          autoComplete="off"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newTag.trim()) {
+                              e.preventDefault();
+                              setTags([...tags, newTag.trim()]);
+                              setNewTag("");
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={!newTag.trim()}
+                          onClick={() => {
+                            setTags([...tags, newTag.trim()]);
+                            setNewTag("");
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {(doc.publicationDate || doc.pageCount || doc.languageLevel) && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {doc.publicationDate && (
+                          <span>
+                            {new Date(doc.publicationDate).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}
+                          </span>
+                        )}
+                        {doc.publicationDate && doc.pageCount && <span>·</span>}
+                        {doc.pageCount && <span>{doc.pageCount} pag.</span>}
+                        {(doc.publicationDate || doc.pageCount) && doc.languageLevel && <span>·</span>}
+                        {doc.languageLevel && (
+                          <Badge variant="secondary" className="text-[10px] font-medium">
+                            CEFR {doc.languageLevel}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Taal & AI */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Taal & AI</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Taal verwerking</Label>
+                      <div className="flex items-center gap-3">
+                        <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Select value={language} onValueChange={(v) => setLanguage(v as "nl" | "en")}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nl">Nederlands</SelectItem>
+                            <SelectItem value="en">Engels</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Wijzig de taal en herindexeer om opnieuw te verwerken
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Doelniveau (CEFR)</Label>
+                      <Select value={targetCEFRLevel || "auto"} onValueChange={(v) => setTargetCEFRLevel(v === "auto" ? "" : v as "B1" | "B2" | "C1" | "C2")}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Automatisch</SelectItem>
+                          <SelectItem value="B1">B1 — Eenvoudig</SelectItem>
+                          <SelectItem value="B2">B2 — Gemiddeld</SelectItem>
+                          <SelectItem value="C1">C1 — Geavanceerd</SelectItem>
+                          <SelectItem value="C2">C2 — Academisch</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        Op welk taalniveau moeten de samenvatting, begrippen en bevindingen worden geschreven? Herindexeer na wijziging.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>AI Assistent modus</Label>
+                      <Select value={chatMode} onValueChange={(v: "terms-only" | "terms-and-chat" | "full") => setChatMode(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="terms-only">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-3 w-3" /> Alleen begrippen
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="terms-and-chat">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" /> Begrippen + vragen
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="full">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" /> Volledig AI
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        {chatMode === "terms-only"
+                          ? "Gebruikers zien alleen voorgedefinieerde begrippen, geen vrije vragen"
+                          : chatMode === "terms-and-chat"
+                            ? "Begrippen uit de lijst bij klik, plus vrije vragen aan de AI"
+                            : "AI genereert antwoorden voor begrippen en vragen"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Community discussies</Label>
+                          <p className="text-[10px] text-muted-foreground">
+                            Lezers kunnen discussies starten en reageren op het document
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={discussionsEnabled}
+                          onClick={() => setDiscussionsEnabled(!discussionsEnabled)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                            discussionsEnabled ? "bg-primary" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                              discussionsEnabled ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Toegang & publicatie */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Toegang & publicatie</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Toegang</Label>
+                      <Select value={accessType} onValueChange={setAccessType}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-3 w-3" /> Openbaar
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="link-only">
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-3 w-3" /> Alleen via link
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="password">
+                            <div className="flex items-center gap-2">
+                              <Lock className="h-3 w-3" /> Wachtwoord
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {accessType === "password" && (
+                        <Input
+                          type="password"
+                          placeholder="Voer wachtwoord in"
+                          value={accessPassword}
+                          onChange={(e) => setAccessPassword(e.target.value)}
+                          className="mt-2"
+                          autoComplete="new-password"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Custom URL</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">/</span>
+                        <Input
+                          value={customSlug}
+                          onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                          placeholder={doc.shortId}
+                          className="text-xs"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Optioneel. Laat leeg om de standaard ID te gebruiken.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Deellink</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          readOnly
+                          value={`${process.env.NEXT_PUBLIC_SITE_URL || ""}/${customSlug || doc.shortId}`}
+                          className="text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/${customSlug || doc.shortId}`
+                            );
+                            toast.success("Link gekopieerd!");
+                          }}
+                        >
+                          Kopieer
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <Label>Publicatie</Label>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Concept</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Als concept is het document niet publiek zichtbaar
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isDraft}
+                          onClick={() => {
+                            const newVal = !isDraft;
+                            setIsDraft(newVal);
+                            if (!newVal) setScheduledPublishAt("");
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                            isDraft ? "bg-primary" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                              isDraft ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      {isDraft && (
+                        <div className="space-y-2">
+                          <Label>Geplande publicatie</Label>
+                          <input
+                            type="datetime-local"
+                            value={scheduledPublishAt}
+                            onChange={(e) => setScheduledPublishAt(e.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Optioneel. Het document wordt automatisch gepubliceerd op dit moment.
+                          </p>
+                        </div>
+                      )}
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Status: </span>
+                        {isDraft && scheduledPublishAt ? (
+                          <span className="text-purple-600 font-medium">
+                            Gepland op {new Date(scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        ) : isDraft ? (
+                          <span className="text-gray-600 font-medium">Concept</span>
+                        ) : (
+                          <span className="text-green-600 font-medium">Gepubliceerd</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Insluiten */}
+            {doc.status === "ready" && <EmbedTabContent doc={doc} />}
+          </div>
+        </TabsContent>
+
+        {/* ===== VERSIES TAB ===== */}
         <TabsContent value="versies">
           <div className="mx-auto max-w-4xl py-6">
             <VersionHistory documentId={doc._id} />

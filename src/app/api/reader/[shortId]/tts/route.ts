@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import connectDB from "@/lib/db";
+import DocumentModel from "@/models/Document";
+import { uploadPublicFile } from "@/lib/storage";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_VOICE_ID =
   process.env.ELEVENLABS_VOICE_ID || "ARIOBKJtltx2F7r1TMzI"; // Dirk - Dutch voice
+
+export const maxDuration = 60;
 
 export async function POST(
   req: NextRequest,
@@ -16,6 +21,28 @@ export async function POST(
       );
     }
 
+    const { shortId } = await params;
+
+    await connectDB();
+
+    // Check if audio already exists
+    const doc = await DocumentModel.findOne({ shortId })
+      .select("ttsAudioUrl content.summary.original")
+      .lean();
+
+    if (!doc) {
+      return NextResponse.json(
+        { error: "Document niet gevonden." },
+        { status: 404 }
+      );
+    }
+
+    // If audio already generated, return the URL
+    if (doc.ttsAudioUrl) {
+      return NextResponse.json({ audioUrl: doc.ttsAudioUrl });
+    }
+
+    // Generate new audio
     const { text } = await req.json();
 
     if (!text || typeof text !== "string") {
@@ -25,7 +52,6 @@ export async function POST(
       );
     }
 
-    // Limit text length to prevent abuse (ElevenLabs charges per character)
     const maxChars = 5000;
     const trimmedText = text.slice(0, maxChars);
 
@@ -54,19 +80,24 @@ export async function POST(
       const errorText = await response.text().catch(() => "");
       console.error("ElevenLabs API error:", response.status, errorText);
       return NextResponse.json(
-        { error: "Spraaksynthese mislukt." },
+        {
+          error: `Spraaksynthese mislukt (${response.status}): ${errorText || "ElevenLabs API fout"}`,
+        },
         { status: 502 }
       );
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    const storageKey = `tts/${shortId}.mp3`;
+    const audioUrl = await uploadPublicFile(storageKey, audioBuffer, "audio/mpeg");
 
-    return new NextResponse(audioBuffer, {
-      headers: {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "private, max-age=3600",
-      },
-    });
+    // Save URL on document
+    await DocumentModel.findOneAndUpdate(
+      { shortId },
+      { $set: { ttsAudioUrl: audioUrl } }
+    );
+
+    return NextResponse.json({ audioUrl });
   } catch (error) {
     console.error("TTS error:", error);
     return NextResponse.json(

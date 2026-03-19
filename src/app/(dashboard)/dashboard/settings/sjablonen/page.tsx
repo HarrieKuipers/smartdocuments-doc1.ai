@@ -328,85 +328,55 @@ export default function SjablonenPage() {
             className="group cursor-pointer rounded-2xl border-gray-100 overflow-hidden transition-shadow hover:shadow-md"
             onClick={() => router.push(`/dashboard/settings/sjablonen/${t.templateId}`)}
           >
-            {/* Preview header */}
+            {/* Color bar */}
             <div
-              className="relative h-24 flex items-end p-4"
+              className="relative h-3"
               style={{ backgroundColor: t.primary }}
             >
-              <div className="flex items-center gap-3">
-                {t.logo && (
-                  <img
-                    src={t.logo}
-                    alt={t.name}
-                    className="h-8 rounded bg-white/20 p-1"
-                  />
-                )}
-                <span className="text-lg font-bold text-white">{t.name}</span>
-              </div>
               {t.isSystem && (
-                <div className="absolute top-3 right-3">
-                  <Badge className="bg-white/20 text-white border-0 text-[10px]">
+                <div className="absolute -bottom-3 right-3">
+                  <Badge className="bg-gray-100 text-gray-500 border-0 text-[10px] shadow-sm">
                     <ShieldCheck className="mr-1 h-3 w-3" />
                     Systeem
                   </Badge>
                 </div>
               )}
-              <div className={`absolute ${t.isSystem ? "top-3 right-20" : "top-3 right-3"} rounded-full bg-white/20 p-1.5 opacity-0 transition-opacity group-hover:opacity-100`}>
-                <Pencil className="h-3.5 w-3.5 text-white" />
-              </div>
             </div>
 
             <CardContent className="p-5 space-y-4">
-              {/* Colors */}
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 mb-2">
-                  Kleuren
-                </p>
-                <div className="flex gap-2">
-                  {[
-                    { label: "Primary", color: t.primary },
-                    { label: "Dark", color: t.primaryDark },
-                    { label: "Light", color: t.primaryLight },
-                  ].map((c) => (
-                    <div key={c.label} className="flex items-center gap-2">
-                      <span
-                        className="h-6 w-6 rounded-lg border border-gray-200"
-                        style={{ backgroundColor: c.color }}
-                      />
-                      <span className="text-xs text-gray-500">{c.color}</span>
-                    </div>
-                  ))}
-                </div>
+              {/* Logo + name */}
+              <div className="flex items-center gap-3 min-h-[48px]">
+                {t.logo ? (
+                  <img
+                    src={t.logo}
+                    alt={t.name}
+                    className="h-10 max-w-[120px] shrink-0 object-contain"
+                  />
+                ) : (
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: t.primaryLight }}
+                  >
+                    <Palette className="h-5 w-5" style={{ color: t.primary }} />
+                  </div>
+                )}
+                <span className="text-base font-semibold text-gray-900 truncate">{t.name}</span>
               </div>
 
-              {/* Features */}
-              <div className="flex flex-wrap gap-2">
-                <Badge className="bg-gray-100 text-gray-600">
-                  <Layout className="mr-1 h-3 w-3" />
-                  {t.headerStyle}
-                </Badge>
-                {t.showB1Button && (
-                  <Badge className="bg-emerald-100 text-emerald-700">
-                    <BookOpen className="mr-1 h-3 w-3" />
-                    B1
-                  </Badge>
-                )}
-                {t.showInfoBox && (
-                  <Badge className="bg-blue-100 text-blue-700">
-                    <Info className="mr-1 h-3 w-3" />
-                    Info
-                  </Badge>
-                )}
-                {t.fontHeading && (
-                  <Badge className="bg-purple-100 text-purple-700">
-                    <Type className="mr-1 h-3 w-3" />
-                    {t.fontHeading}
-                  </Badge>
-                )}
+              {/* Colors */}
+              <div className="flex gap-1.5">
+                {[t.primary, t.primaryDark, t.primaryLight].map((color, i) => (
+                  <span
+                    key={i}
+                    className="h-5 w-5 rounded-md border border-gray-200"
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 border-t border-gray-100">
                 <Button
                   variant="ghost"
                   size="sm"

@@ -329,33 +329,6 @@ export default function CoverControls({
         </div>
       </Section>
 
-      <Separator />
-
-      {/* Branding */}
-      <Section title="Huisstijl">
-        <div className="space-y-2.5">
-          <ToggleOption
-            label="Organisatienaam"
-            checked={design.showOrgName}
-            onChange={(showOrgName) => update({ showOrgName })}
-          />
-          <ToggleOption
-            label="Logo tonen"
-            checked={design.showLogo}
-            onChange={(showLogo) => update({ showLogo })}
-          />
-          <ToggleOption
-            label="doc1.ai branding"
-            checked={design.showDocBranding}
-            onChange={(showDocBranding) => update({ showDocBranding })}
-          />
-          <ToggleOption
-            label="Tags tonen"
-            checked={design.showTags}
-            onChange={(showTags) => update({ showTags })}
-          />
-        </div>
-      </Section>
     </div>
   );
 }

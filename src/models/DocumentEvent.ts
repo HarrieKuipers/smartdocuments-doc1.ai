@@ -32,6 +32,11 @@ export const EVENT_TYPES = [
   "annotation_create",
   "annotation_reply",
   "annotation_resolve",
+  // Community discussions
+  "discussion_create",
+  "discussion_reply",
+  "discussion_upvote",
+  "discussion_view",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import type { ICoverDesign } from "./types";
+import type { ICoverDesign, CoverOrientation } from "./types";
 import { getFontFamilyCSS, getGradientCSS } from "./types";
 
 interface CoverPreviewProps {
@@ -12,8 +12,10 @@ interface CoverPreviewProps {
   brandPrimary?: string;
 }
 
-const COVER_W = 1200;
-const COVER_H = 630;
+const DIMENSIONS: Record<CoverOrientation, { w: number; h: number }> = {
+  landscape: { w: 1200, h: 630 },
+  portrait: { w: 630, h: 891 },
+};
 
 export default function CoverPreview({
   design,
@@ -25,17 +27,20 @@ export default function CoverPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
 
+  const orientation = design.orientation || "landscape";
+  const { w: COVER_W, h: COVER_H } = DIMENSIONS[orientation];
+
   useEffect(() => {
     function updateScale() {
       if (!containerRef.current) return;
-      const w = containerRef.current.offsetWidth;
-      setScale(w / COVER_W);
+      const containerW = containerRef.current.offsetWidth;
+      setScale(containerW / COVER_W);
     }
     updateScale();
     const observer = new ResizeObserver(updateScale);
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [COVER_W]);
 
   const bg = design.background;
   const backgroundStyle: React.CSSProperties = {};
@@ -53,8 +58,11 @@ export default function CoverPreview({
     backgroundStyle.backgroundPosition = "center";
   }
 
-  // Layout positioning
   const layoutStyles = getLayoutStyles(design.layout);
+
+  // Scale font sizes for portrait (smaller canvas width)
+  const fontScale = orientation === "portrait" ? 0.75 : 1;
+  const padding = orientation === "portrait" ? 40 : 60;
 
   return (
     <div
@@ -114,72 +122,38 @@ export default function CoverPreview({
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            padding: 60,
+            padding,
             ...layoutStyles,
           }}
         >
-          {/* Top: org branding */}
-          {design.showOrgName && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                ...(design.layout === "centered" ? {} : {}),
-              }}
-            >
-              {design.showLogo && orgLogo && (
-                <img
-                  src={orgLogo}
-                  alt=""
-                  style={{ width: 40, height: 40, borderRadius: 8, objectFit: "contain" }}
-                />
-              )}
-              {design.showLogo && !orgLogo && (
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 8,
-                    backgroundColor: brandPrimary,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontSize: 18,
-                    fontWeight: 700,
-                  }}
-                >
-                  {orgName[0]?.toUpperCase() || "D"}
-                </div>
-              )}
-              <span
-                style={{
-                  fontSize: 18,
-                  color: isLightText(design.title.color) ? "rgba(255,255,255,0.7)" : "#6b7280",
-                  fontWeight: 500,
-                }}
-              >
-                {orgName}
-              </span>
+          {/* Top: org logo */}
+          {design.showLogo && orgLogo && (
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <img
+                src={orgLogo}
+                alt=""
+                style={{ width: 40 * fontScale, height: 40 * fontScale, borderRadius: 8, objectFit: "contain" }}
+              />
             </div>
           )}
 
-          {/* Spacer */}
-          <div style={{ flex: 1 }} />
+          {/* Top spacer — pushes content down for bottom-left and centered */}
+          {(design.layout === "bottom-left" || design.layout === "centered" || design.layout === "split-left") && (
+            <div style={{ flex: 1 }} />
+          )}
 
           {/* Title + subtitle */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 16,
+              gap: 16 * fontScale,
               maxWidth: design.layout === "split-left" ? "45%" : "90%",
             }}
           >
             <div
               style={{
-                fontSize: design.title.fontSize,
+                fontSize: design.title.fontSize * fontScale,
                 fontWeight: design.title.fontWeight,
                 fontFamily: getFontFamilyCSS(design.title.fontFamily),
                 color: design.title.color,
@@ -194,7 +168,7 @@ export default function CoverPreview({
             {design.subtitle?.text && (
               <div
                 style={{
-                  fontSize: design.subtitle.fontSize,
+                  fontSize: design.subtitle.fontSize * fontScale,
                   fontWeight: design.subtitle.fontWeight,
                   fontFamily: getFontFamilyCSS(design.subtitle.fontFamily),
                   color: design.subtitle.color,
@@ -213,11 +187,11 @@ export default function CoverPreview({
                   <span
                     key={tag}
                     style={{
-                      padding: "6px 16px",
+                      padding: `${4 * fontScale}px ${12 * fontScale}px`,
                       borderRadius: 20,
                       backgroundColor: `${brandPrimary}22`,
                       color: isLightText(design.title.color) ? "rgba(255,255,255,0.9)" : brandPrimary,
-                      fontSize: 14,
+                      fontSize: 14 * fontScale,
                       fontWeight: 500,
                     }}
                   >
@@ -228,37 +202,11 @@ export default function CoverPreview({
             )}
           </div>
 
-          {/* Bottom spacer for centered layout */}
-          {design.layout === "centered" && <div style={{ flex: 1 }} />}
-
-          {/* Bottom: branding */}
-          {design.showDocBranding && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: design.layout === "centered" ? 0 : 40,
-              }}
-            >
-              <div
-                style={{
-                  width: 80,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: brandPrimary,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 14,
-                  color: isLightText(design.title.color) ? "rgba(255,255,255,0.5)" : "#9ca3af",
-                }}
-              >
-                doc1.ai
-              </span>
-            </div>
+          {/* Bottom spacer — pushes branding down for centered and top-left */}
+          {(design.layout === "centered" || design.layout === "top-left") && (
+            <div style={{ flex: 1 }} />
           )}
+
         </div>
       </div>
     </div>
@@ -268,13 +216,11 @@ export default function CoverPreview({
 function getLayoutStyles(layout: ICoverDesign["layout"]): React.CSSProperties {
   switch (layout) {
     case "centered":
-      return { justifyContent: "center", alignItems: "center" };
+      return { alignItems: "center" };
     case "bottom-left":
-      return { justifyContent: "flex-end", alignItems: "flex-start" };
     case "top-left":
-      return { justifyContent: "flex-start", alignItems: "flex-start" };
     case "split-left":
-      return { justifyContent: "center", alignItems: "flex-start" };
+      return { alignItems: "flex-start" };
   }
 }
 

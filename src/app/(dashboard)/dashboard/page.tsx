@@ -3,60 +3,52 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   FileText,
-  MessageSquare,
   Eye,
-  TrendingUp,
   Upload,
-  FolderOpen,
-  BarChart3,
+  Plus,
+  ArrowRight,
+  MessageSquare,
 } from "lucide-react";
-
-interface DashboardStats {
-  totalDocuments: number;
-  totalChatInteractions: number;
-  totalViews: number;
-  growthThisMonth: number;
-}
 
 interface RecentDocument {
   _id: string;
   title: string;
+  displayTitle?: string;
   status: string;
   createdAt: string;
-  analytics: { totalViews: number };
+  analytics: { totalViews: number; chatInteractions: number };
   coverImageUrl?: string;
   customCoverUrl?: string;
 }
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentDocs, setRecentDocs] = useState<RecentDocument[]>([]);
+  const [totalDocs, setTotalDocs] = useState(0);
+  const [totalViews, setTotalViews] = useState(0);
+  const [totalChats, setTotalChats] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch("/api/documents?limit=6");
+        const res = await fetch("/api/documents?limit=8");
         if (res.ok) {
           const data = await res.json();
-          setRecentDocs(data.data || []);
-          setStats({
-            totalDocuments: data.total || 0,
-            totalChatInteractions: 0,
-            totalViews: (data.data || []).reduce(
-              (acc: number, d: RecentDocument) =>
-                acc + (d.analytics?.totalViews || 0),
-              0
-            ),
-            growthThisMonth: 0,
-          });
+          const docs: RecentDocument[] = data.data || [];
+          setRecentDocs(docs);
+          setTotalDocs(data.total || 0);
+          setTotalViews(
+            docs.reduce((sum, d) => sum + (d.analytics?.totalViews || 0), 0)
+          );
+          setTotalChats(
+            docs.reduce((sum, d) => sum + (d.analytics?.chatInteractions || 0), 0)
+          );
         }
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
@@ -81,225 +73,139 @@ export default function DashboardPage() {
     error: "Fout",
   };
 
+  const firstName = session?.user?.name?.split(" ")[0] || "gebruiker";
+
   return (
-    <div className="space-y-8">
-      {/* Welcome */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          Welkom terug, {session?.user?.name?.split(" ")[0] || "gebruiker"}!
-        </h1>
-        <p className="text-muted-foreground">
-          Hier is een overzicht van je documenten en activiteiten
-        </p>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Totaal documenten
-                </CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {stats?.totalDocuments || 0}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  AI interacties
-                </CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {stats?.totalChatInteractions || 0}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Totaal views
-                </CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {stats?.totalViews || 0}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Groei deze maand
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  +{stats?.growthThisMonth || 0}%
-                </p>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+    <div className="mx-auto max-w-3xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold md:text-2xl">
+            Welkom terug, {firstName}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {totalDocs} {totalDocs === 1 ? "document" : "documenten"}
+          </p>
+        </div>
         <Link href="/dashboard/upload">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
-                <Upload className="h-5 w-5 text-[#0062EB]" />
-              </div>
-              <div>
-                <p className="font-medium">Upload Document</p>
-                <p className="text-sm text-muted-foreground">
-                  PDF of DOCX uploaden
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/collections">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
-                <FolderOpen className="h-5 w-5 text-[#0062EB]" />
-              </div>
-              <div>
-                <p className="font-medium">Bekijk Collecties</p>
-                <p className="text-sm text-muted-foreground">
-                  Organiseer documenten
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/analytics">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0062EB]/10">
-                <BarChart3 className="h-5 w-5 text-[#0062EB]" />
-              </div>
-              <div>
-                <p className="font-medium">Analytics</p>
-                <p className="text-sm text-muted-foreground">
-                  Bekijk statistieken
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
+            <Plus className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Nieuw document</span>
+            <span className="sm:hidden">Nieuw</span>
+          </Button>
         </Link>
       </div>
 
-      {/* Recent Documents */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recente Documenten</h2>
-          <Link href="/dashboard/documents">
-            <Button variant="ghost" size="sm">
-              Bekijk alles
+      {/* Analytics summary — one compact row */}
+      {!loading && recentDocs.length > 0 && (
+        <div className="flex items-center gap-6 rounded-lg bg-white px-4 py-3 text-sm">
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <FileText className="h-3.5 w-3.5 text-gray-400" />
+            <span className="font-semibold text-gray-900">{totalDocs}</span>
+            documenten
+          </div>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Eye className="h-3.5 w-3.5 text-gray-400" />
+            <span className="font-semibold text-gray-900">{totalViews}</span>
+            views
+          </div>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <MessageSquare className="h-3.5 w-3.5 text-gray-400" />
+            <span className="font-semibold text-gray-900">{totalChats}</span>
+            chats
+          </div>
+        </div>
+      )}
+
+      {/* Document list */}
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg border bg-white p-3">
+              <Skeleton className="h-10 w-10 rounded-lg" />
+              <div className="flex-1">
+                <Skeleton className="mb-1 h-4 w-48" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : recentDocs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-16">
+          <Upload className="mb-3 h-10 w-10 text-gray-300" />
+          <p className="mb-1 font-medium text-gray-700">
+            Nog geen documenten
+          </p>
+          <p className="mb-4 text-sm text-gray-500">
+            Upload je eerste PDF of DOCX
+          </p>
+          <Link href="/dashboard/upload">
+            <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload document
             </Button>
           </Link>
         </div>
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <Skeleton className="mb-2 h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : recentDocs.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-              <p className="mb-2 font-medium">Nog geen documenten</p>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Upload je eerste document om te beginnen
-              </p>
-              <Link href="/dashboard/upload">
-                <Button className="bg-[#0062EB] hover:bg-[#0050C0]">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Document
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {recentDocs.map((doc) => (
-              <Link
-                key={doc._id}
-                href={`/dashboard/documents/${doc._id}/edit`}
-              >
-                <Card className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md">
-                  {(doc.customCoverUrl || doc.coverImageUrl) ? (
-                    <div className="aspect-[1200/630] w-full overflow-hidden bg-gray-100">
-                      <img
-                        src={doc.customCoverUrl || doc.coverImageUrl}
-                        alt={doc.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex aspect-[1200/630] w-full items-center justify-center bg-gray-50">
-                      <FileText className="h-8 w-8 text-muted-foreground" />
-                    </div>
+      ) : (
+        <div className="space-y-1">
+          {recentDocs.map((doc) => (
+            <Link
+              key={doc._id}
+              href={`/dashboard/documents/${doc._id}/edit`}
+              className="flex items-center gap-3 rounded-lg border border-transparent bg-white p-3 transition-colors hover:border-gray-200 hover:bg-gray-50"
+            >
+              {/* Thumbnail */}
+              {(doc.customCoverUrl || doc.coverImageUrl) ? (
+                <img
+                  src={doc.customCoverUrl || doc.coverImageUrl}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-lg object-cover bg-gray-100"
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                  <FileText className="h-4 w-4 text-gray-400" />
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {doc.displayTitle || doc.title}
+                </p>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span>
+                    {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
+                  </span>
+                  {doc.analytics?.totalViews > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <Eye className="h-3 w-3" />
+                      {doc.analytics.totalViews}
+                    </span>
                   )}
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between">
-                      <h3 className="font-medium line-clamp-1">
-                        {doc.title}
-                      </h3>
-                      <Badge
-                        className={
-                          statusColors[doc.status] || "bg-gray-100 text-gray-700"
-                        }
-                      >
-                        {statusLabels[doc.status] || doc.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Eye className="h-3 w-3" />
-                        {doc.analytics?.totalViews || 0} views
-                      </span>
-                      <span>
-                        {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+                </div>
+              </div>
+
+              {/* Status */}
+              <Badge
+                className={`shrink-0 text-xs ${statusColors[doc.status] || "bg-gray-100 text-gray-700"}`}
+              >
+                {statusLabels[doc.status] || doc.status}
+              </Badge>
+            </Link>
+          ))}
+
+          {/* View all link */}
+          {totalDocs > 8 && (
+            <Link
+              href="/dashboard/documents"
+              className="flex items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium text-[#0062EB] hover:bg-[#0062EB]/5 transition-colors"
+            >
+              Alle documenten bekijken
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

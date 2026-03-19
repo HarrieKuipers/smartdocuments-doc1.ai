@@ -47,6 +47,7 @@ export interface IDocument extends MongoDocument {
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
+  discussionsEnabled: boolean;
   brandOverride?: {
     primary?: string;
     logo?: string;
@@ -70,6 +71,7 @@ export interface IDocument extends MongoDocument {
   coverImageUrl?: string;
   customCoverUrl?: string;
   coverDesign?: Record<string, unknown>;
+  ttsAudioUrl?: string;
   publishedAt?: Date;
   scheduledPublishAt?: Date;
   currentVersion: number;
@@ -174,6 +176,7 @@ const DocumentSchema = new Schema<IDocument>(
       enum: ["terms-only", "terms-and-chat", "full"],
       default: "terms-only",
     },
+    discussionsEnabled: { type: Boolean, default: false },
     brandOverride: {
       primary: { type: String },
       logo: { type: String },
@@ -201,6 +204,7 @@ const DocumentSchema = new Schema<IDocument>(
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },
     coverDesign: { type: Schema.Types.Mixed },
+    ttsAudioUrl: { type: String },
     publishedAt: { type: Date },
     scheduledPublishAt: { type: Date },
     currentVersion: { type: Number, default: 1 },

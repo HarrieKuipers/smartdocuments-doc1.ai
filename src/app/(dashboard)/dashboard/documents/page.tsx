@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, FolderOpen, ArrowUpDown, X, Clock } from "lucide-react";
+import { Upload, Search, Eye, Pencil, Trash2, MoreHorizontal, FileText, FolderOpen, ArrowUpDown, X, Clock, ChevronDown, ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +54,13 @@ interface Collection {
   name: string;
 }
 
+interface DocGroup {
+  id: string;
+  name: string;
+  docs: Document[];
+  isCollection: boolean;
+}
+
 const statusColors: Record<string, string> = {
   ready: "bg-green-100 text-green-700",
   processing: "bg-blue-100 text-blue-700",
@@ -77,6 +84,7 @@ export default function DocumentsPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   async function fetchDocs() {
     try {
@@ -129,6 +137,7 @@ export default function DocumentsPage() {
       });
       if (res.ok) {
         toast.success(collectionId ? "Document verplaatst naar collectie." : "Document uit collectie verwijderd.");
+        fetchDocs();
       }
     } catch {
       toast.error("Kon document niet verplaatsen.");
@@ -152,6 +161,70 @@ export default function DocumentsPage() {
       toast.error("Verwijderen mislukt.");
     }
   }
+
+  function toggleGroup(groupId: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }
+
+  // Group documents by collection
+  function getGroups(): DocGroup[] {
+    const collectionMap = new Map<string, Collection>();
+    for (const c of collections) {
+      collectionMap.set(c._id, c);
+    }
+
+    const grouped = new Map<string, Document[]>();
+    const ungrouped: Document[] = [];
+
+    for (const doc of docs) {
+      if (doc.collectionId && collectionMap.has(doc.collectionId)) {
+        const existing = grouped.get(doc.collectionId) || [];
+        existing.push(doc);
+        grouped.set(doc.collectionId, existing);
+      } else {
+        ungrouped.push(doc);
+      }
+    }
+
+    const groups: DocGroup[] = [];
+
+    // Collections first
+    for (const [colId, colDocs] of grouped) {
+      const col = collectionMap.get(colId)!;
+      groups.push({
+        id: colId,
+        name: col.name,
+        docs: colDocs,
+        isCollection: true,
+      });
+    }
+
+    // Sort collections by name
+    groups.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Ungrouped last
+    if (ungrouped.length > 0) {
+      groups.push({
+        id: "_ungrouped",
+        name: "Losse documenten",
+        docs: ungrouped,
+        isCollection: false,
+      });
+    }
+
+    return groups;
+  }
+
+  const groups = getGroups();
+  const hasCollections = groups.some((g) => g.isCollection);
 
   return (
     <div className="space-y-6">
@@ -256,129 +329,217 @@ export default function DocumentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {docs.map((doc) => (
-                <TableRow key={doc._id}>
-                  <TableCell className="font-medium max-w-[300px]">
-                    <div className="flex items-center gap-3">
-                      {(doc.customCoverUrl || doc.coverImageUrl) ? (
-                        <img
-                          src={doc.customCoverUrl || doc.coverImageUrl}
-                          alt=""
-                          className="hidden sm:block h-8 w-12 flex-shrink-0 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="hidden sm:flex h-8 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-100">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="truncate">
-                          {doc.status === "ready" ? (
-                            <Link
-                              href={`/${doc.shortId}`}
-                              className="hover:underline"
-                              style={{ color: "#0062EB" }}
-                            >
-                              {doc.title}
-                            </Link>
-                          ) : (
-                            doc.title
-                          )}
-                        </div>
-                        <div className="sm:hidden text-xs text-muted-foreground mt-1">
-                          {doc.authors?.[0] || "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground hidden sm:table-cell">
-                    {doc.authors?.[0] || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground hidden md:table-cell whitespace-nowrap">
-                    {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Badge className={statusColors[doc.status] || ""}>
-                        {statusLabels[doc.status] || doc.status}
-                      </Badge>
-                      {doc.isDraft && doc.status === "ready" && !doc.scheduledPublishAt && (
-                        <Badge className="bg-gray-100 text-gray-600">Concept</Badge>
-                      )}
-                      {doc.isDraft && doc.scheduledPublishAt && (
-                        <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Gepland: {new Date(doc.scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{doc.analytics?.totalViews || 0}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/documents/${doc._id}/edit`}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Bewerken
-                          </Link>
-                        </DropdownMenuItem>
-                        {doc.status === "ready" && (
-                          <DropdownMenuItem asChild>
-                            <Link href={`/${doc.shortId}`} target="_blank">
-                              <Eye className="mr-2 h-4 w-4" />
-                              Bekijken
-                            </Link>
-                          </DropdownMenuItem>
-                        )}
-                        {collections.length > 0 && (
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                              <FolderOpen className="mr-2 h-4 w-4" />
-                              Collectie
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              {collections.map((col) => (
-                                <DropdownMenuItem
-                                  key={col._id}
-                                  onClick={() => handleMoveToCollection(doc._id, col._id)}
-                                >
-                                  {col.name}
-                                  {doc.collectionId === col._id && " ✓"}
-                                </DropdownMenuItem>
-                              ))}
-                              {doc.collectionId && (
-                                <DropdownMenuItem
-                                  onClick={() => handleMoveToCollection(doc._id, null)}
-                                  className="text-muted-foreground"
-                                >
-                                  Uit collectie verwijderen
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(doc._id)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Verwijderen
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {groups.map((group) => {
+                const isCollapsed = collapsedGroups.has(group.id);
+                const showGroupHeader = hasCollections;
+
+                return (
+                  <CollectionGroup
+                    key={group.id}
+                    group={group}
+                    isCollapsed={isCollapsed}
+                    showHeader={showGroupHeader}
+                    onToggle={() => toggleGroup(group.id)}
+                    collections={collections}
+                    onMoveToCollection={handleMoveToCollection}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
     </div>
+  );
+}
+
+// -- Collection Group --
+function CollectionGroup({
+  group,
+  isCollapsed,
+  showHeader,
+  onToggle,
+  collections,
+  onMoveToCollection,
+  onDelete,
+}: {
+  group: DocGroup;
+  isCollapsed: boolean;
+  showHeader: boolean;
+  onToggle: () => void;
+  collections: Collection[];
+  onMoveToCollection: (docId: string, colId: string | null) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <>
+      {showHeader && (
+        <TableRow
+          className="bg-gray-50/80 hover:bg-gray-100/80 cursor-pointer"
+          onClick={onToggle}
+        >
+          <TableCell colSpan={6}>
+            <div className="flex items-center gap-2">
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+              {group.isCollection && (
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-sm font-medium">{group.name}</span>
+              <Badge variant="secondary" className="text-[10px] font-normal">
+                {group.docs.length}
+              </Badge>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+      {!isCollapsed &&
+        group.docs.map((doc) => (
+          <DocumentRow
+            key={doc._id}
+            doc={doc}
+            collections={collections}
+            onMoveToCollection={onMoveToCollection}
+            onDelete={onDelete}
+          />
+        ))}
+    </>
+  );
+}
+
+// -- Document Row --
+function DocumentRow({
+  doc,
+  collections,
+  onMoveToCollection,
+  onDelete,
+}: {
+  doc: Document;
+  collections: Collection[];
+  onMoveToCollection: (docId: string, colId: string | null) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <TableRow>
+      <TableCell className="font-medium max-w-[300px]">
+        <div className="flex items-center gap-3">
+          {(doc.customCoverUrl || doc.coverImageUrl) ? (
+            <img
+              src={doc.customCoverUrl || doc.coverImageUrl}
+              alt=""
+              className="hidden sm:block h-8 w-12 flex-shrink-0 rounded object-cover"
+            />
+          ) : (
+            <div className="hidden sm:flex h-8 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-100">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="truncate">
+              {doc.status === "ready" ? (
+                <Link
+                  href={`/${doc.shortId}`}
+                  className="hover:underline"
+                  style={{ color: "#0062EB" }}
+                >
+                  {doc.title}
+                </Link>
+              ) : (
+                doc.title
+              )}
+            </div>
+            <div className="sm:hidden text-xs text-muted-foreground mt-1">
+              {doc.authors?.[0] || "—"}
+            </div>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground hidden sm:table-cell">
+        {doc.authors?.[0] || "—"}
+      </TableCell>
+      <TableCell className="text-muted-foreground hidden md:table-cell whitespace-nowrap">
+        {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <Badge className={statusColors[doc.status] || ""}>
+            {statusLabels[doc.status] || doc.status}
+          </Badge>
+          {doc.isDraft && doc.status === "ready" && !doc.scheduledPublishAt && (
+            <Badge className="bg-gray-100 text-gray-600">Concept</Badge>
+          )}
+          {doc.isDraft && doc.scheduledPublishAt && (
+            <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Gepland: {new Date(doc.scheduledPublishAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">{doc.analytics?.totalViews || 0}</TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/documents/${doc._id}/edit`}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Bewerken
+              </Link>
+            </DropdownMenuItem>
+            {doc.status === "ready" && (
+              <DropdownMenuItem asChild>
+                <Link href={`/${doc.shortId}`} target="_blank">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Bekijken
+                </Link>
+              </DropdownMenuItem>
+            )}
+            {collections.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  Collectie
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {collections.map((col) => (
+                    <DropdownMenuItem
+                      key={col._id}
+                      onClick={() => onMoveToCollection(doc._id, col._id)}
+                    >
+                      {col.name}
+                      {doc.collectionId === col._id && " ✓"}
+                    </DropdownMenuItem>
+                  ))}
+                  {doc.collectionId && (
+                    <DropdownMenuItem
+                      onClick={() => onMoveToCollection(doc._id, null)}
+                      className="text-muted-foreground"
+                    >
+                      Uit collectie verwijderen
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            <DropdownMenuItem
+              onClick={() => onDelete(doc._id)}
+              className="text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Verwijderen
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   );
 }
