@@ -39,6 +39,7 @@ interface Document {
   authors: string[];
   status: string;
   createdAt: string;
+  publishedAt?: string;
   analytics: { totalViews: number };
   shortId: string;
   coverImageUrl?: string;
@@ -322,7 +323,7 @@ export default function DocumentsPage() {
               <TableRow>
                 <TableHead className="min-w-[200px]">Titel</TableHead>
                 <TableHead className="hidden sm:table-cell">Auteur</TableHead>
-                <TableHead className="hidden md:table-cell">Datum</TableHead>
+                <TableHead className="hidden md:table-cell">Geïndexeerd</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden sm:table-cell">Views</TableHead>
                 <TableHead className="w-12" />
@@ -462,7 +463,9 @@ function DocumentRow({
         {doc.authors?.[0] || "—"}
       </TableCell>
       <TableCell className="text-muted-foreground hidden md:table-cell whitespace-nowrap">
-        {new Date(doc.createdAt).toLocaleDateString("nl-NL")}
+        {doc.publishedAt
+          ? new Date(doc.publishedAt).toLocaleDateString("nl-NL")
+          : new Date(doc.createdAt).toLocaleDateString("nl-NL")}
       </TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
