@@ -391,6 +391,7 @@ export default function DocumentEditPage() {
 
   const STEP_LABELS: Record<string, string> = {
     "text-extraction": "Tekst extraheren...",
+    "vectorization": "Document vectoriseren...",
     "audience-analysis": "Doelgroep analyseren...",
     "content-analysis": "Inhoud analyseren...",
     "summary-generation": "Samenvatting genereren...",
