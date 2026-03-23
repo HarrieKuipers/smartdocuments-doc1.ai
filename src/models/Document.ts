@@ -68,6 +68,8 @@ export interface IDocument extends MongoDocument {
   infoBoxLabel?: string;
   infoBoxText?: string;
   customSlug?: string;
+  vectorized: boolean;
+  chunkCount: number;
   coverImageUrl?: string;
   customCoverUrl?: string;
   coverDesign?: Record<string, unknown>;
@@ -201,6 +203,8 @@ const DocumentSchema = new Schema<IDocument>(
     infoBoxLabel: { type: String },
     infoBoxText: { type: String },
     customSlug: { type: String, sparse: true, unique: true },
+    vectorized: { type: Boolean, default: false },
+    chunkCount: { type: Number, default: 0 },
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },
     coverDesign: { type: Schema.Types.Mixed },

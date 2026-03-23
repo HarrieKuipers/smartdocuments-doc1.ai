@@ -9,6 +9,7 @@ import { extractTerms } from "./extract-terms";
 import { generateAndUploadCover } from "./generate-cover";
 import { generateDisplayTitle } from "./generate-display-title";
 import type { DocumentLanguage } from "./language";
+import { vectorizeDocument } from "./vectorize-document";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
@@ -49,9 +50,29 @@ export async function processDocument(
     if (pageCount) doc.pageCount = pageCount;
     await doc.save();
 
-    // Step 1b: Audience analysis (pre-processing)
-    await onProgress?.("audience-analysis", 18);
-    doc.processingProgress = { step: "audience-analysis", percentage: 18 };
+    // Step 1b: Vectorize document (chunk + store in Pinecone)
+    await onProgress?.("vectorization", 15);
+    doc.processingProgress = { step: "vectorization", percentage: 15 };
+    await doc.save();
+
+    try {
+      const chunkCount = await vectorizeDocument(
+        doc._id.toString(),
+        text,
+        doc.language || "nl"
+      );
+      doc.vectorized = true;
+      doc.chunkCount = chunkCount;
+      await doc.save();
+    } catch (err) {
+      console.error("Vectorization failed (non-blocking):", err);
+      doc.vectorized = false;
+      await doc.save();
+    }
+
+    // Step 1c: Audience analysis (pre-processing)
+    await onProgress?.("audience-analysis", 20);
+    doc.processingProgress = { step: "audience-analysis", percentage: 20 };
     await doc.save();
 
     let audienceContext: AudienceAnalysis | undefined;

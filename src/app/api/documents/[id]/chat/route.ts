@@ -6,6 +6,7 @@ import ChatQuestion from "@/models/ChatQuestion";
 import anthropic, { MODELS } from "@/lib/ai/client";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import { nanoid } from "nanoid";
+import { searchChunks } from "@/lib/pinecone";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 export async function POST(
@@ -27,7 +28,7 @@ export async function POST(
 
     // Get document for context
     const doc = await DocumentModel.findById(id)
-      .select("title chatMode language targetCEFRLevel organizationId content.originalText content.summary.original")
+      .select("title chatMode language targetCEFRLevel organizationId vectorized content.summary.original content.originalText")
       .lean();
 
     if (!doc) {
@@ -43,11 +44,25 @@ export async function POST(
       );
     }
 
-    // Build context - use summary + first chunk of original text
-    const docContext =
-      doc.content?.originalText?.slice(0, 50000) ||
-      doc.content?.summary?.original ||
-      "";
+    // Build context using RAG (Pinecone semantic search) or fallback to original text
+    let docContext: string;
+    if (doc.vectorized) {
+      try {
+        const relevantChunks = await searchChunks(id, message, 8);
+        docContext = relevantChunks.map((c) => c.text).join("\n\n---\n\n");
+      } catch (err) {
+        console.error("Pinecone search failed, falling back to text:", err);
+        docContext =
+          doc.content?.originalText?.slice(0, 50000) ||
+          doc.content?.summary?.original ||
+          "";
+      }
+    } else {
+      docContext =
+        doc.content?.originalText?.slice(0, 50000) ||
+        doc.content?.summary?.original ||
+        "";
+    }
 
     const conversationHistory = (history || []).map(
       (m: { role: string; content: string }) => ({

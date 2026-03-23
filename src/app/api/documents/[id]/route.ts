@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { generateAndUploadCover } from "@/lib/ai/generate-cover";
 import { generateSlug } from "@/lib/slug";
+import { deleteDocumentVectors } from "@/lib/pinecone";
 import bcrypt from "bcryptjs";
 
 export async function GET(
@@ -184,6 +185,13 @@ export async function DELETE(
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
+    }
+
+    // Clean up Pinecone vectors
+    if (doc.vectorized) {
+      deleteDocumentVectors(id).catch((err) =>
+        console.error("Pinecone cleanup failed:", err)
+      );
     }
 
     return NextResponse.json({ message: "Document verwijderd." });
