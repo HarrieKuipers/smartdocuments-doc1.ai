@@ -110,7 +110,13 @@ export function chunkText(
       : 0;
 
   // Split into paragraphs (double newline or single newline with indent)
-  const paragraphs = text.split(/\n\s*\n|\n(?=\s{2,})/).filter((p) => p.trim().length > 0);
+  let segments = text.split(/\n\s*\n|\n(?=\s{2,})/).filter((p) => p.trim().length > 0);
+
+  // If we get very few segments relative to text length, fallback to sentence splitting
+  // This handles documents without proper paragraph breaks (e.g. some PDFs)
+  if (segments.length < text.length / 10000) {
+    segments = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+  }
 
   const chunks: TextChunk[] = [];
   let currentChunk = "";
@@ -122,8 +128,8 @@ export function chunkText(
   let chunkStartParagraph = 0;
   let isNewSection = false;
 
-  for (const paragraph of paragraphs) {
-    const trimmed = paragraph.trim();
+  for (const segment of segments) {
+    const trimmed = segment.trim();
     if (!trimmed) continue;
 
     // Check if this paragraph is a heading
@@ -171,7 +177,7 @@ export function chunkText(
       currentChunk += (currentChunk ? "\n\n" : "") + trimmed;
     }
 
-    charOffset += paragraph.length;
+    charOffset += segment.length;
     paragraphIndex++;
   }
 
@@ -195,5 +201,27 @@ export function chunkText(
     });
   }
 
-  return chunks;
+  // Safety: force-split any chunks that are still too large (>8000 chars)
+  // This prevents Pinecone metadata size limit errors
+  const safeChunks: TextChunk[] = [];
+  for (const chunk of chunks) {
+    if (chunk.text.length > 8000) {
+      for (let start = 0; start < chunk.text.length; start += chunkSize) {
+        safeChunks.push({
+          ...chunk,
+          id: `${documentId}_chunk_${safeChunks.length}`,
+          text: chunk.text.slice(start, start + chunkSize),
+          chunkIndex: safeChunks.length,
+        });
+      }
+    } else {
+      safeChunks.push({
+        ...chunk,
+        id: `${documentId}_chunk_${safeChunks.length}`,
+        chunkIndex: safeChunks.length,
+      });
+    }
+  }
+
+  return safeChunks;
 }
