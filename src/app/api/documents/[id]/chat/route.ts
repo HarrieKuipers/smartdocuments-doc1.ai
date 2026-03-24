@@ -46,10 +46,37 @@ export async function POST(
 
     // Build context using RAG (Pinecone semantic search) or fallback to original text
     let docContext: string;
+    let sources: { page: number | null; section: string; score: number }[] = [];
     if (doc.vectorized) {
       try {
         const relevantChunks = await searchChunks(id, message, 8);
-        docContext = relevantChunks.map((c) => c.text).join("\n\n---\n\n");
+        // Build context with source annotations for the AI
+        docContext = relevantChunks
+          .map((c) => {
+            const label = [
+              c.page ? `Pagina ${c.page}` : null,
+              c.sectionHeading || null,
+            ]
+              .filter(Boolean)
+              .join(" - ");
+            return label
+              ? `[Bron: ${label}]\n${c.text}`
+              : c.text;
+          })
+          .join("\n\n---\n\n");
+        // Collect unique sources for frontend
+        const seen = new Set<string>();
+        for (const c of relevantChunks) {
+          const key = `${c.page ?? 0}|${c.sectionHeading}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            sources.push({
+              page: c.page,
+              section: c.sectionHeading,
+              score: c.score,
+            });
+          }
+        }
       } catch (err) {
         console.error("Pinecone search failed, falling back to text:", err);
         docContext =
@@ -81,11 +108,17 @@ export async function POST(
         : `\n\nIMPORTANT: Write your response at CEFR level ${targetLevel}. ${targetLevel === "B1" ? "Use short sentences, everyday words, no jargon." : targetLevel === "B2" ? "Use clear sentences, limited jargon with explanations." : targetLevel === "C1" ? "More complex sentence structures and jargon are allowed." : "Academic level with full technical jargon."}`
       : "";
 
+    const sourceInstruction = sources.length > 0
+      ? lang === "nl"
+        ? "\n\nAls je informatie uit de documentfragmenten gebruikt, verwijs dan naar de bron (bijv. 'Op pagina X...' of 'In de sectie over Y...'). Baseer je antwoord alleen op de aangeleverde fragmenten."
+        : "\n\nWhen using information from the document fragments, reference the source (e.g. 'On page X...' or 'In the section about Y...'). Base your answer only on the provided fragments."
+      : "";
+
     const chatStartTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODELS.chat,
       max_tokens: 1024,
-      system: `${L.chatSystemPrompt(doc.title)}${levelInstruction}
+      system: `${L.chatSystemPrompt(doc.title)}${levelInstruction}${sourceInstruction}
 
 ${lang === "nl" ? "Documentinhoud" : "Document content"}:
 ${docContext}`,
@@ -150,7 +183,10 @@ ${docContext}`,
     }
 
     const res = NextResponse.json({
-      data: { response: assistantResponse },
+      data: {
+        response: assistantResponse,
+        sources: sources.length > 0 ? sources : undefined,
+      },
     });
 
     // Set session cookie if new

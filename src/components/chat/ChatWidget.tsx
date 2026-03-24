@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BookOpen, MessageSquare, X, Send, Loader2, Maximize2, Minimize2, ArrowLeft } from "lucide-react";
+import { BookOpen, MessageSquare, X, Send, Loader2, Maximize2, Minimize2, ArrowLeft, FileText } from "lucide-react";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import ReactMarkdown from "react-markdown";
 
@@ -12,10 +12,17 @@ interface SourceDocument {
   title: string;
 }
 
+interface ChunkSource {
+  page: number | null;
+  section: string;
+  score: number;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   sourceDocuments?: SourceDocument[];
+  sources?: ChunkSource[];
 }
 
 interface ChatWidgetProps {
@@ -134,6 +141,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
           role: "assistant",
           content: data.response,
           sourceDocuments: data.sourceDocuments,
+          sources: data.sources,
         },
       ]);
     } catch {
@@ -400,6 +408,24 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                       <div className="prose prose-sm prose-gray max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_p]:my-2.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_strong]:font-semibold">
                         <ReactMarkdown>{msg.content.replace(/\s*\[Document:\s*"[^"]*"\]/g, "")}</ReactMarkdown>
                       </div>
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5 border-t pt-2 border-gray-200/60">
+                          {msg.sources
+                            .filter((s) => s.page || s.section)
+                            .slice(0, 4)
+                            .map((s, si) => (
+                              <span
+                                key={si}
+                                className="inline-flex items-center gap-1 rounded-md bg-white/80 border border-gray-200 px-1.5 py-0.5 text-[0.65rem] text-gray-500"
+                              >
+                                <FileText className="h-2.5 w-2.5" aria-hidden="true" />
+                                {s.page ? `p. ${s.page}` : ""}
+                                {s.page && s.section ? " · " : ""}
+                                {s.section ? (s.section.length > 30 ? s.section.slice(0, 30) + "…" : s.section) : ""}
+                              </span>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     msg.content

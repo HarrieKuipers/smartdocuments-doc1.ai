@@ -43,29 +43,51 @@ export async function upsertChunks(
   }
 }
 
+export interface ChunkSearchResult {
+  text: string;
+  score: number;
+  chunkIndex: number;
+  page: number | null;
+  sectionHeading: string;
+  paragraphIndex: number;
+  charOffset: number;
+}
+
 /**
  * Search for relevant chunks using semantic search.
- * Returns the top-k most relevant text chunks for a given query.
+ * Returns the top-k most relevant text chunks with full metadata.
  */
 export async function searchChunks(
   documentId: string,
   query: string,
-  topK: number = 5
-): Promise<{ text: string; score: number; chunkIndex: number }[]> {
+  topK: number = 8
+): Promise<ChunkSearchResult[]> {
   const index = getIndex();
   const namespace = index.namespace(documentId);
 
   const results = await namespace.searchRecords({
     query: { topK, inputs: { text: query } },
-    fields: ["chunk_text", "chunk_index"],
+    fields: [
+      "chunk_text",
+      "chunk_index",
+      "page",
+      "section_heading",
+      "paragraph_index",
+      "char_offset",
+    ],
   });
 
   return (results.result?.hits || []).map((hit) => {
     const fields = hit.fields as Record<string, unknown> | undefined;
+    const page = fields?.page as number | undefined;
     return {
       text: (fields?.chunk_text as string) || "",
       score: hit._score || 0,
       chunkIndex: (fields?.chunk_index as number) || 0,
+      page: page && page > 0 ? page : null,
+      sectionHeading: (fields?.section_heading as string) || "",
+      paragraphIndex: (fields?.paragraph_index as number) || 0,
+      charOffset: (fields?.char_offset as number) || 0,
     };
   });
 }

@@ -59,7 +59,8 @@ export async function processDocument(
       const chunkCount = await vectorizeDocument(
         doc._id.toString(),
         text,
-        doc.language || "nl"
+        doc.language || "nl",
+        pageCount
       );
       doc.vectorized = true;
       doc.chunkCount = chunkCount;
