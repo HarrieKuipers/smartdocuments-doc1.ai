@@ -1,6 +1,7 @@
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import { getPresignedDownloadUrl, BUCKET } from "@/lib/storage";
+import { uploadPublicFile } from "@/lib/storage";
 import { extractText } from "./extract-text";
 import { analyzeAudience, type AudienceAnalysis } from "./analyze-audience";
 import { analyzeContent } from "./analyze-content";
@@ -10,9 +11,20 @@ import { generateAndUploadCover } from "./generate-cover";
 import { generateDisplayTitle } from "./generate-display-title";
 import type { DocumentLanguage } from "./language";
 import { vectorizeDocument } from "./vectorize-document";
+import { detectVisualPages, extractVisualContent, type VisualContent, type VisualExtractionResult } from "./extract-visual-content";
+import { renderPages, renderAllPages } from "./render-pdf-pages";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 type ProgressCallback = (step: string, percentage: number) => Promise<void>;
+
+/** Atomic update helper — avoids Mongoose VersionError from concurrent modifications.
+ *  Throws if the document no longer exists (e.g. deleted mid-processing). */
+async function updateDoc(documentId: string, fields: Record<string, unknown>) {
+  const result = await DocumentModel.findByIdAndUpdate(documentId, { $set: fields });
+  if (!result) {
+    throw new Error(`Document ${documentId} was deleted during processing`);
+  }
+}
 
 export async function processDocument(
   documentId: string,
@@ -20,21 +32,22 @@ export async function processDocument(
 ) {
   await connectDB();
 
-  const doc = await DocumentModel.findById(documentId);
+  const doc = await DocumentModel.findById(documentId).lean();
   if (!doc) throw new Error("Document not found");
 
-  const lang: DocumentLanguage = doc.language || "nl";
+  const lang: DocumentLanguage = (doc.language as DocumentLanguage) || "nl";
   const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
 
   try {
     // Update status
-    doc.status = "processing";
-    await doc.save();
+    await updateDoc(documentId, { status: "processing" });
 
     // Step 1: Text extraction
     await onProgress?.("text-extraction", 10);
-    doc.processingProgress = { step: "text-extraction", percentage: 10 };
-    await doc.save();
+    await updateDoc(documentId, {
+      "processingProgress.step": "text-extraction",
+      "processingProgress.percentage": 10,
+    });
 
     // Extract storage key from URL and use presigned download
     const urlPath = new URL(doc.sourceFile.url).pathname;
@@ -46,75 +59,149 @@ export async function processDocument(
     const buffer = Buffer.from(await fileResponse.arrayBuffer());
     const { text, pageCount } = await extractText(buffer, doc.sourceFile.mimeType);
 
-    doc.content.originalText = text;
-    if (pageCount) doc.pageCount = pageCount;
-    await doc.save();
+    await updateDoc(documentId, {
+      "content.originalText": text,
+      ...(pageCount ? { pageCount } : {}),
+    });
 
-    // Step 1b: Vectorize document (chunk + store in Pinecone)
-    await onProgress?.("vectorization", 15);
-    doc.processingProgress = { step: "vectorization", percentage: 15 };
-    await doc.save();
+    // Step 1b: Visual content extraction (PDF only)
+    let visualContent: VisualContent[] = [];
+    const pageImageUrls = new Map<number, string>();
+    const highResPageImageUrls = new Map<number, string>();
+    const isPdf = doc.sourceFile.mimeType === "application/pdf";
+
+    if (isPdf && pageCount && pageCount > 0) {
+      try {
+        await onProgress?.("visual-extraction", 15);
+        await updateDoc(documentId, {
+          "processingProgress.step": "visual-extraction",
+          "processingProgress.percentage": 15,
+        });
+
+        // Render ALL pages as thumbnails (72 DPI) and upload to S3
+        // This enables page image previews in chat for every source reference
+        const allPageBuffers = await renderAllPages(buffer, 72);
+        const pageImages: { pageNumber: number; url: string }[] = [];
+
+        for (let i = 0; i < allPageBuffers.length; i++) {
+          const pageNum = i + 1; // 1-based
+          const key = `documents/${documentId}/pages/page-${pageNum}.png`;
+          const url = await uploadPublicFile(key, allPageBuffers[i], "image/png");
+          pageImages.push({ pageNumber: pageNum, url });
+          pageImageUrls.set(pageNum, url);
+        }
+
+        await updateDoc(documentId, { pageImages });
+
+        // Detect pages with visual content (tables, charts, diagrams)
+        const visualPageIndices = await detectVisualPages(buffer, pageCount);
+
+        if (visualPageIndices.length > 0) {
+          // Extract detailed visual content descriptions + 150 DPI renders
+          const extraction: VisualExtractionResult = await extractVisualContent(buffer, visualPageIndices);
+          visualContent = extraction.content;
+
+          // Upload 150 DPI high-res renders for visual pages to S3
+          // These are shown in chat instead of the blurry 72 DPI thumbnails
+          for (const [pageIdx, pngBuffer] of extraction.pageRenders) {
+            const pageNum = pageIdx + 1; // Convert 0-based to 1-based
+            const key = `documents/${documentId}/pages/page-${pageNum}-hires.png`;
+            const url = await uploadPublicFile(key, pngBuffer, "image/png");
+            highResPageImageUrls.set(pageNum, url);
+          }
+
+          await updateDoc(documentId, {
+            visualContentExtracted: true,
+            visualChunkCount: visualContent.length,
+            visualContent: visualContent.map((vc) => ({
+              pageNumber: vc.pageIndex + 1,
+              contentType: vc.contentType,
+              description: vc.description,
+            })),
+          });
+        } else {
+          await updateDoc(documentId, { visualContentExtracted: false });
+        }
+      } catch (err) {
+        console.error("Visual extraction failed (non-blocking):", err);
+        await updateDoc(documentId, { visualContentExtracted: false });
+      }
+    }
+
+    // Step 1c: Vectorize document (chunk + store in Pinecone)
+    await onProgress?.("vectorization", 20);
+    await updateDoc(documentId, {
+      "processingProgress.step": "vectorization",
+      "processingProgress.percentage": 20,
+    });
 
     try {
       const chunkCount = await vectorizeDocument(
         doc._id.toString(),
         text,
         doc.language || "nl",
-        pageCount
+        pageCount,
+        visualContent.length > 0 ? visualContent : undefined,
+        pageImageUrls.size > 0 ? pageImageUrls : undefined,
+        highResPageImageUrls.size > 0 ? highResPageImageUrls : undefined
       );
-      doc.vectorized = true;
-      doc.chunkCount = chunkCount;
-      await doc.save();
+      await updateDoc(documentId, { vectorized: true, chunkCount });
     } catch (err) {
       console.error("Vectorization failed (non-blocking):", err);
-      doc.vectorized = false;
-      await doc.save();
+      await updateDoc(documentId, { vectorized: false });
     }
 
-    // Step 1c: Audience analysis (pre-processing)
-    await onProgress?.("audience-analysis", 20);
-    doc.processingProgress = { step: "audience-analysis", percentage: 20 };
-    await doc.save();
+    // Step 2: Audience analysis (pre-processing)
+    await onProgress?.("audience-analysis", 25);
+    await updateDoc(documentId, {
+      "processingProgress.step": "audience-analysis",
+      "processingProgress.percentage": 25,
+    });
 
     let audienceContext: AudienceAnalysis | undefined;
     try {
       audienceContext = await analyzeAudience(text, lang);
-      doc.audienceContext = {
-        documentType: audienceContext.documentType,
-        audience: audienceContext.audience,
-        isExternal: audienceContext.isExternal,
-      };
-      await doc.save();
+      await updateDoc(documentId, {
+        "audienceContext.documentType": audienceContext.documentType,
+        "audienceContext.audience": audienceContext.audience,
+        "audienceContext.isExternal": audienceContext.isExternal,
+      });
     } catch (err) {
       console.error("Audience analysis failed (non-blocking):", err);
     }
 
-    // Step 2: Content analysis
-    await onProgress?.("content-analysis", 30);
-    doc.processingProgress = { step: "content-analysis", percentage: 30 };
-    await doc.save();
+    // Step 3: Content analysis
+    await onProgress?.("content-analysis", 35);
+    await updateDoc(documentId, {
+      "processingProgress.step": "content-analysis",
+      "processingProgress.percentage": 35,
+    });
 
     const analysis = await analyzeContent(text, audienceContext, lang, targetLevel);
-    doc.content.summary = {
-      original: analysis.summary,
-      B1: "",
-      B2: "",
-      C1: "",
-    };
-    doc.content.keyPoints = analysis.keyPoints;
-    doc.content.findings = analysis.findings;
-    if (analysis.languageLevel && ["B1", "B2", "C1", "C2"].includes(analysis.languageLevel)) {
-      doc.languageLevel = analysis.languageLevel;
-    } else if (!doc.languageLevel) {
-      // Fallback: default to C1 if AI did not return a valid language level
-      doc.languageLevel = "C1";
-    }
-    await doc.save();
 
-    // Step 3: Summary generation (already done in analysis) + display title
+    const contentUpdate: Record<string, unknown> = {
+      "content.summary": {
+        original: analysis.summary,
+        B1: "",
+        B2: "",
+        C1: "",
+      },
+      "content.keyPoints": analysis.keyPoints,
+      "content.findings": analysis.findings,
+    };
+    if (analysis.languageLevel && ["B1", "B2", "C1", "C2"].includes(analysis.languageLevel)) {
+      contentUpdate.languageLevel = analysis.languageLevel;
+    } else if (!doc.languageLevel) {
+      contentUpdate.languageLevel = "C1";
+    }
+    await updateDoc(documentId, contentUpdate);
+
+    // Step 4: Summary generation (already done in analysis) + display title
     await onProgress?.("summary-generation", 50);
-    doc.processingProgress = { step: "summary-generation", percentage: 50 };
-    await doc.save();
+    await updateDoc(documentId, {
+      "processingProgress.step": "summary-generation",
+      "processingProgress.percentage": 50,
+    });
 
     // Generate communicative display title if not already set
     if (!doc.displayTitle) {
@@ -124,17 +211,18 @@ export async function processDocument(
           analysis.summary,
           lang
         );
-        doc.displayTitle = displayTitle;
-        await doc.save();
+        await updateDoc(documentId, { displayTitle });
       } catch (err) {
         console.error("Display title generation failed (non-blocking):", err);
       }
     }
 
-    // Step 4: Language level rewriting
+    // Step 5: Language level rewriting
     await onProgress?.("language-levels", 65);
-    doc.processingProgress = { step: "language-levels", percentage: 65 };
-    await doc.save();
+    await updateDoc(documentId, {
+      "processingProgress.step": "language-levels",
+      "processingProgress.percentage": 65,
+    });
 
     const levelSummaries = await generateLanguageLevelSummaries(
       analysis.summary,
@@ -142,42 +230,49 @@ export async function processDocument(
       lang,
       targetLevel
     );
-    doc.content.summary.B1 = levelSummaries.B1;
-    doc.content.summary.B2 = levelSummaries.B2;
-    doc.content.summary.C1 = levelSummaries.C1;
-    await doc.save();
+    await updateDoc(documentId, {
+      "content.summary.B1": levelSummaries.B1,
+      "content.summary.B2": levelSummaries.B2,
+      "content.summary.C1": levelSummaries.C1,
+    });
 
-    // Step 5: Term extraction
+    // Step 6: Term extraction
     await onProgress?.("term-extraction", 80);
-    doc.processingProgress = { step: "term-extraction", percentage: 80 };
-    await doc.save();
+    await updateDoc(documentId, {
+      "processingProgress.step": "term-extraction",
+      "processingProgress.percentage": 80,
+    });
 
     const terms = await extractTerms(text, lang, targetLevel);
-    doc.content.terms = terms;
-    await doc.save();
+    await updateDoc(documentId, { "content.terms": terms });
 
-    // Step 6: Cover image generation (non-blocking)
+    // Step 7: Cover image generation (non-blocking)
     try {
       await onProgress?.("cover-generation", 90);
-      doc.processingProgress = { step: "cover-generation", percentage: 90 };
-      await doc.save();
+      await updateDoc(documentId, {
+        "processingProgress.step": "cover-generation",
+        "processingProgress.percentage": 90,
+      });
 
       const coverUrl = await generateAndUploadCover(documentId);
-      doc.coverImageUrl = coverUrl;
-      await doc.save();
+      await updateDoc(documentId, { coverImageUrl: coverUrl });
     } catch (coverError) {
       console.error("Cover generation failed (non-blocking):", coverError);
     }
 
-    // Step 7: Finalize
+    // Step 8: Finalize
     await onProgress?.("finalizing", 95);
-    doc.processingProgress = { step: "finalizing", percentage: 95 };
-    await doc.save();
+    await updateDoc(documentId, {
+      "processingProgress.step": "finalizing",
+      "processingProgress.percentage": 95,
+    });
 
-    doc.status = "ready";
-    doc.processingProgress = { step: "finalizing", percentage: 100 };
-    doc.publishedAt = new Date();
-    await doc.save();
+    await updateDoc(documentId, {
+      status: "ready",
+      "processingProgress.step": "finalizing",
+      "processingProgress.percentage": 100,
+      publishedAt: new Date(),
+    });
 
     await onProgress?.("finalizing", 100);
 
@@ -190,11 +285,12 @@ export async function processDocument(
       slug: doc.slug,
     }).catch((err) => console.error("Webhook dispatch failed:", err));
 
-    return doc;
+    return await DocumentModel.findById(documentId).lean();
   } catch (error) {
     console.error("Document processing error:", error);
-    doc.status = "error";
-    await doc.save();
+    await DocumentModel.findByIdAndUpdate(documentId, {
+      $set: { status: "error" },
+    }).catch(() => {});
 
     // Dispatch error webhook event
     dispatchWebhookEvent(doc.organizationId.toString(), "document.error", {

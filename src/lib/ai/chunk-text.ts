@@ -12,6 +12,14 @@ export interface TextChunk {
   charOffset: number;
   /** Whether this chunk starts a new section */
   isNewSection: boolean;
+  /** Content type: text, table, chart, or diagram */
+  contentType?: "text" | "table" | "chart" | "diagram";
+  /** Natural language description of visual content */
+  visualDescription?: string;
+  /** Markdown representation of table data */
+  tableMarkdown?: string;
+  /** URL to rendered page image in S3 */
+  pageImageUrl?: string;
 }
 
 interface PageBoundary {

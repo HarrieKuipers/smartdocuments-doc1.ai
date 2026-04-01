@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -77,6 +78,23 @@ export async function deleteFile(key: string): Promise<void> {
     Key: key,
   });
   await s3Client.send(command);
+}
+
+export async function deletePrefix(prefix: string): Promise<void> {
+  const listCommand = new ListObjectsV2Command({
+    Bucket: BUCKET,
+    Prefix: prefix,
+  });
+  const listed = await s3Client.send(listCommand);
+  if (listed.Contents && listed.Contents.length > 0) {
+    await Promise.all(
+      listed.Contents.map((obj) =>
+        obj.Key
+          ? s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
+          : Promise.resolve()
+      )
+    );
+  }
 }
 
 export function getFileUrl(key: string): string {

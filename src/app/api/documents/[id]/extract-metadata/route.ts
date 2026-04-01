@@ -22,7 +22,7 @@ export async function POST(
     const doc = await DocumentModel.findOne({
       _id: id,
       organizationId: session.user.organizationId,
-    });
+    }).lean();
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
@@ -40,9 +40,12 @@ export async function POST(
       const buffer = Buffer.from(await fileResponse.arrayBuffer());
       const extracted = await extractText(buffer, doc.sourceFile.mimeType);
       text = extracted.text;
-      doc.content.originalText = text;
-      if (extracted.pageCount) doc.pageCount = extracted.pageCount;
-      await doc.save();
+      await DocumentModel.findByIdAndUpdate(id, {
+        $set: {
+          "content.originalText": text,
+          ...(extracted.pageCount ? { pageCount: extracted.pageCount } : {}),
+        },
+      });
     }
 
     // Extract metadata with AI

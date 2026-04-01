@@ -29,6 +29,18 @@ const SMART_STEPS = [
     onboardingTip: "AI leest je document en haalt alle tekst eruit, inclusief tabellen en koppen.",
   },
   {
+    key: "visual-extraction",
+    label: "Visuele Content",
+    description: "Tabellen, grafieken en diagrammen herkennen",
+    onboardingTip: "AI scant je document op visuele content zoals tabellen en grafieken, en maakt deze doorzoekbaar.",
+  },
+  {
+    key: "vectorization",
+    label: "Vectorisatie",
+    description: "Document indexeren voor AI-chat",
+    onboardingTip: "Je document wordt opgedeeld in slimme fragmenten zodat de AI precies de juiste passages kan vinden.",
+  },
+  {
     key: "audience-analysis",
     label: "Doelgroep Analyse",
     description: "Documenttype en doelgroep bepalen",

@@ -8,7 +8,7 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<{
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
   return {
-    text: result.pages?.map((p) => p.text).join("\n") || "",
+    text: result.pages?.map((p) => p.text).join("\f") || "",
     pageCount: result.pages?.length || 0,
   };
 }

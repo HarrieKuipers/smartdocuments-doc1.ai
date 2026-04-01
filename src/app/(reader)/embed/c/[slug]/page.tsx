@@ -17,6 +17,10 @@ import {
   Loader2,
   ArrowLeft,
   MessageSquare,
+  Table2,
+  BarChart3,
+  GitBranch,
+  ChevronDown,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -36,10 +40,22 @@ interface SourceDocument {
   title: string;
 }
 
+interface ChunkSource {
+  page: number | null;
+  section: string;
+  score: number;
+  quote?: string;
+  documentTitle?: string;
+  documentShortId?: string;
+  contentType?: string;
+  pageImageUrl?: string;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   sourceDocuments?: SourceDocument[];
+  sources?: ChunkSource[];
 }
 
 interface CollectionData {
@@ -67,6 +83,23 @@ interface CollectionData {
 
 type EmbedMode = "chat" | "summary" | "full";
 
+function extractConfidence(text: string) {
+  const match = text.match(/\[(?:Betrouwbaarheid|Confidence):\s*(HOOG|MIDDEL|LAAG|HIGH|MEDIUM|LOW)\]/i);
+  return {
+    cleaned: match ? text.replace(match[0], "").trim() : text,
+    confidence: match ? match[1].toUpperCase() as "HOOG" | "MIDDEL" | "LAAG" | "HIGH" | "MEDIUM" | "LOW" : null,
+  };
+}
+
+function EmbedContentTypeIcon({ type, className }: { type?: string; className?: string }) {
+  switch (type) {
+    case "table": return <Table2 className={className} aria-hidden="true" />;
+    case "chart": return <BarChart3 className={className} aria-hidden="true" />;
+    case "diagram": return <GitBranch className={className} aria-hidden="true" />;
+    default: return <FileText className={className} aria-hidden="true" />;
+  }
+}
+
 export default function EmbedCollectionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -84,6 +117,8 @@ export default function EmbedCollectionPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Document search
@@ -155,6 +190,7 @@ export default function EmbedCollectionPage() {
             role: "assistant",
             content: data.response,
             sourceDocuments: data.sourceDocuments,
+            sources: data.sources,
           },
         ]);
       } catch {
@@ -387,7 +423,14 @@ export default function EmbedCollectionPage() {
                   </div>
                 </div>
               )}
-              {messages.map((msg, i) => (
+              {messages.map((msg, i) => {
+                const isAssistant = msg.role === "assistant";
+                const { cleaned, confidence } = isAssistant ? extractConfidence(msg.content) : { cleaned: msg.content, confidence: null };
+                const cleanedContent = isAssistant ? cleaned.replace(/\s*\[Document:\s*"[^"]*"\]/g, "") : msg.content;
+                const pageImages = isAssistant && msg.sources
+                  ? [...new Map(msg.sources.filter((s) => s.pageImageUrl).map((s) => [s.pageImageUrl, s])).values()]
+                  : [];
+                return (
                 <div
                   key={i}
                   data-msg
@@ -408,21 +451,106 @@ export default function EmbedCollectionPage() {
                           }
                     }
                   >
-                    {msg.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_strong]:font-semibold">
-                        <ReactMarkdown>
-                          {msg.content.replace(
-                            /\s*\[Document:\s*"[^"]*"\]/g,
-                            ""
-                          )}
-                        </ReactMarkdown>
+                    {isAssistant ? (
+                      <div>
+                        <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_strong]:font-semibold">
+                          <ReactMarkdown>{cleanedContent}</ReactMarkdown>
+                        </div>
+                        {/* Page image thumbnails */}
+                        {pageImages.length > 0 && (
+                          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                            {pageImages.map((s, si) => (
+                              <button
+                                key={si}
+                                onClick={() => setLightboxUrl(s.pageImageUrl!)}
+                                className="flex-shrink-0 overflow-hidden rounded-md transition-colors"
+                                style={{ border: `1px solid ${borderColor}` }}
+                                aria-label={`View page ${s.page || ""} image`}
+                              >
+                                <img
+                                  src={s.pageImageUrl}
+                                  alt={`Page ${s.page || ""}`}
+                                  className="h-[100px] w-auto object-contain"
+                                  style={{ backgroundColor: cardBg }}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Source badges */}
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-2 space-y-1" style={{ borderTop: `1px solid ${borderColor}`, paddingTop: "0.5rem" }}>
+                            <div className="flex flex-wrap gap-1.5">
+                              {msg.sources
+                                .filter((s) => s.page || s.section)
+                                .slice(0, 4)
+                                .map((s, si) => {
+                                  const quoteKey = `chat-${i}-${si}`;
+                                  const isExpanded = expandedQuotes.has(quoteKey);
+                                  const label = s.documentTitle
+                                    ? `${s.documentTitle}${s.page ? ` · p. ${s.page}` : ""}${s.section ? ` · ${s.section.length > 20 ? s.section.slice(0, 20) + "…" : s.section}` : ""}`
+                                    : `${s.page ? `p. ${s.page}` : ""}${s.page && s.section ? " · " : ""}${s.section ? (s.section.length > 30 ? s.section.slice(0, 30) + "…" : s.section) : ""}`;
+                                  return (
+                                    <span key={si} className="inline-flex flex-col">
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.65rem]"
+                                        style={{ backgroundColor: cardBg, border: `1px solid ${borderColor}`, color: mutedColor }}
+                                      >
+                                        <EmbedContentTypeIcon type={s.contentType} className="h-2.5 w-2.5" />
+                                        {label}
+                                        {s.quote && (
+                                          <button
+                                            onClick={() => {
+                                              setExpandedQuotes((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(quoteKey)) next.delete(quoteKey);
+                                                else next.add(quoteKey);
+                                                return next;
+                                              });
+                                            }}
+                                            className="ml-0.5 rounded p-0.5"
+                                            aria-label="Toggle quote"
+                                          >
+                                            <ChevronDown className={`h-2.5 w-2.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                                          </button>
+                                        )}
+                                      </span>
+                                      {s.quote && isExpanded && (
+                                        <span className="mt-0.5 ml-2 text-[0.6rem] italic leading-snug max-w-[260px]" style={{ color: mutedColor }}>
+                                          &ldquo;{s.quote.length > 150 ? s.quote.slice(0, 150) + "…" : s.quote}&rdquo;
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
+                                })}
+                            </div>
+                            {confidence && (
+                              <div className="mt-1">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-medium ${
+                                  confidence === "HOOG" || confidence === "HIGH"
+                                    ? "bg-green-100 text-green-700"
+                                    : confidence === "MIDDEL" || confidence === "MEDIUM"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-red-100 text-red-700"
+                                }`}>
+                                  {confidence === "HOOG" || confidence === "HIGH"
+                                    ? "Hoge betrouwbaarheid"
+                                    : confidence === "MIDDEL" || confidence === "MEDIUM"
+                                      ? "Gemiddelde betrouwbaarheid"
+                                      : "Lage betrouwbaarheid"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       msg.content
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {chatLoading && (
                 <div className="flex justify-start">
                   <div
@@ -675,6 +803,9 @@ export default function EmbedCollectionPage() {
               cardBg={cardBg}
               borderColor={borderColor}
               inputBg={inputBg}
+              setLightboxUrl={setLightboxUrl}
+              expandedQuotes={expandedQuotes}
+              setExpandedQuotes={setExpandedQuotes}
             />
           </div>
         )}
@@ -696,6 +827,32 @@ export default function EmbedCollectionPage() {
             Bekijk op doc1.ai
             <ExternalLink className="h-3 w-3" />
           </a>
+        </div>
+      )}
+
+      {/* Lightbox overlay */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxUrl(null); }}
+          role="dialog"
+          aria-label="Image preview"
+          tabIndex={0}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Page preview"
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
@@ -723,6 +880,9 @@ function CollapsibleChat({
   cardBg,
   borderColor,
   inputBg,
+  setLightboxUrl,
+  expandedQuotes,
+  setExpandedQuotes,
 }: {
   brandPrimary: string;
   introText: string;
@@ -743,6 +903,9 @@ function CollapsibleChat({
   cardBg: string;
   borderColor: string;
   inputBg: string;
+  setLightboxUrl: (url: string | null) => void;
+  expandedQuotes: Set<string>;
+  setExpandedQuotes: React.Dispatch<React.SetStateAction<Set<string>>>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -815,7 +978,14 @@ function CollapsibleChat({
                 </div>
               </div>
             )}
-            {messages.map((msg, i) => (
+            {messages.map((msg, i) => {
+              const isAssistant = msg.role === "assistant";
+              const { cleaned, confidence } = isAssistant ? extractConfidence(msg.content) : { cleaned: msg.content, confidence: null };
+              const cleanedContent = isAssistant ? cleaned.replace(/\s*\[Document:\s*"[^"]*"\]/g, "") : msg.content;
+              const pageImages = isAssistant && msg.sources
+                ? [...new Map(msg.sources.filter((s) => s.pageImageUrl).map((s) => [s.pageImageUrl, s])).values()]
+                : [];
+              return (
               <div
                 key={i}
                 data-msg
@@ -836,21 +1006,118 @@ function CollapsibleChat({
                         }
                   }
                 >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-2">
-                      <ReactMarkdown>
-                        {msg.content.replace(
-                          /\s*\[Document:\s*"[^"]*"\]/g,
-                          ""
-                        )}
-                      </ReactMarkdown>
+                  {isAssistant ? (
+                    <div>
+                      <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-2">
+                        <ReactMarkdown>{cleanedContent}</ReactMarkdown>
+                      </div>
+                      {pageImages.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {pageImages.map((s, si) => {
+                            const typeEmoji = s.contentType === "table" ? "📊" : s.contentType === "chart" ? "📈" : s.contentType === "diagram" ? "🔀" : s.contentType === "image-with-text" ? "🖼️" : "";
+                            const typeLabel = s.contentType === "table" ? "Tabel" : s.contentType === "chart" ? "Grafiek" : s.contentType === "diagram" ? "Diagram" : s.contentType === "image-with-text" ? "Afbeelding" : "";
+                            const caption = [
+                              typeEmoji && typeLabel ? `${typeEmoji} ${typeLabel}` : null,
+                              s.section ? s.section : null,
+                              s.page ? `pagina ${s.page}` : null,
+                            ].filter(Boolean).join(" · ");
+                            return (
+                              <button
+                                key={si}
+                                onClick={() => setLightboxUrl(s.pageImageUrl!)}
+                                className="block w-full overflow-hidden rounded-lg shadow-sm transition-all text-left"
+                                style={{ border: `1px solid ${borderColor}` }}
+                                aria-label={`View page ${s.page || ""} image`}
+                              >
+                                <img
+                                  src={s.pageImageUrl}
+                                  alt={caption || `Page ${s.page || ""}`}
+                                  className="w-full max-h-[200px] object-contain"
+                                  style={{ backgroundColor: cardBg }}
+                                />
+                                {caption && (
+                                  <div className="px-2.5 py-1.5" style={{ backgroundColor: cardBg, borderTop: `1px solid ${borderColor}` }}>
+                                    <span className="text-[0.7rem] leading-snug" style={{ color: mutedColor }}>{caption}</span>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-2 space-y-1" style={{ borderTop: `1px solid ${borderColor}`, paddingTop: "0.5rem" }}>
+                          <div className="flex flex-wrap gap-1.5">
+                            {msg.sources
+                              .filter((s) => s.page || s.section)
+                              .slice(0, 4)
+                              .map((s, si) => {
+                                const quoteKey = `coll-${i}-${si}`;
+                                const isExpanded = expandedQuotes.has(quoteKey);
+                                const label = s.documentTitle
+                                  ? `${s.documentTitle}${s.page ? ` · p. ${s.page}` : ""}${s.section ? ` · ${s.section.length > 20 ? s.section.slice(0, 20) + "…" : s.section}` : ""}`
+                                  : `${s.page ? `p. ${s.page}` : ""}${s.page && s.section ? " · " : ""}${s.section ? (s.section.length > 30 ? s.section.slice(0, 30) + "…" : s.section) : ""}`;
+                                return (
+                                  <span key={si} className="inline-flex flex-col">
+                                    <span
+                                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.65rem]"
+                                      style={{ backgroundColor: cardBg, border: `1px solid ${borderColor}`, color: mutedColor }}
+                                    >
+                                      <EmbedContentTypeIcon type={s.contentType} className="h-2.5 w-2.5" />
+                                      {label}
+                                      {s.quote && (
+                                        <button
+                                          onClick={() => {
+                                            setExpandedQuotes((prev) => {
+                                              const next = new Set(prev);
+                                              if (next.has(quoteKey)) next.delete(quoteKey);
+                                              else next.add(quoteKey);
+                                              return next;
+                                            });
+                                          }}
+                                          className="ml-0.5 rounded p-0.5"
+                                          aria-label="Toggle quote"
+                                        >
+                                          <ChevronDown className={`h-2.5 w-2.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                                        </button>
+                                      )}
+                                    </span>
+                                    {s.quote && isExpanded && (
+                                      <span className="mt-0.5 ml-2 text-[0.6rem] italic leading-snug max-w-[260px]" style={{ color: mutedColor }}>
+                                        &ldquo;{s.quote.length > 150 ? s.quote.slice(0, 150) + "…" : s.quote}&rdquo;
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                          </div>
+                          {confidence && (
+                            <div className="mt-1">
+                              <span className={`inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-medium ${
+                                confidence === "HOOG" || confidence === "HIGH"
+                                  ? "bg-green-100 text-green-700"
+                                  : confidence === "MIDDEL" || confidence === "MEDIUM"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700"
+                              }`}>
+                                {confidence === "HOOG" || confidence === "HIGH"
+                                  ? "Hoge betrouwbaarheid"
+                                  : confidence === "MIDDEL" || confidence === "MEDIUM"
+                                    ? "Gemiddelde betrouwbaarheid"
+                                    : "Lage betrouwbaarheid"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     msg.content
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
             {chatLoading && (
               <div className="flex justify-start">
                 <div

@@ -84,6 +84,10 @@ Bepaal of het document gericht is op een EXTERN publiek (burgers, klanten, het a
   "isExternal": true of false
 }`,
 
+    // RAG
+    noRelevantContent: "Ik kon geen relevante informatie vinden in het document om je vraag te beantwoorden.",
+    noRelevantContentCollection: "Ik kon geen relevante informatie vinden in de documenten om je vraag te beantwoorden.",
+
     // chat
     chatSystemPrompt: (title: string) =>
       `Je bent een behulpzame AI-assistent die vragen beantwoordt over het document "${title}".
@@ -264,6 +268,9 @@ Determine whether the document is aimed at an EXTERNAL audience (citizens, custo
   "audience": "description of target audience, e.g. 'Internal employees / inspectors', 'Citizens and businesses', 'General public'",
   "isExternal": true or false
 }`,
+
+    noRelevantContent: "I couldn't find relevant information in the document to answer your question.",
+    noRelevantContentCollection: "I couldn't find relevant information in the documents to answer your question.",
 
     chatSystemPrompt: (title: string) =>
       `You are a helpful AI assistant that answers questions about the document "${title}".

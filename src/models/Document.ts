@@ -70,6 +70,14 @@ export interface IDocument extends MongoDocument {
   customSlug?: string;
   vectorized: boolean;
   chunkCount: number;
+  pageImages?: { pageNumber: number; url: string }[];
+  visualContentExtracted: boolean;
+  visualChunkCount: number;
+  visualContent?: {
+    pageNumber: number;
+    contentType: "table" | "chart" | "diagram" | "image-with-text";
+    description: string;
+  }[];
   coverImageUrl?: string;
   customCoverUrl?: string;
   coverDesign?: Record<string, unknown>;
@@ -205,6 +213,19 @@ const DocumentSchema = new Schema<IDocument>(
     customSlug: { type: String, sparse: true, unique: true },
     vectorized: { type: Boolean, default: false },
     chunkCount: { type: Number, default: 0 },
+    pageImages: [
+      {
+        pageNumber: { type: Number },
+        url: { type: String },
+      },
+    ],
+    visualContentExtracted: { type: Boolean, default: false },
+    visualChunkCount: { type: Number, default: 0 },
+    visualContent: [{
+      pageNumber: { type: Number },
+      contentType: { type: String, enum: ["table", "chart", "diagram", "image-with-text"] },
+      description: { type: String },
+    }],
     coverImageUrl: { type: String },
     customCoverUrl: { type: String },
     coverDesign: { type: Schema.Types.Mixed },

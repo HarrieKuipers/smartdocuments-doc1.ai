@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
-import { BookOpen, X, Send, Maximize2, Minimize2, ArrowLeft, FileText, ChevronRight } from "lucide-react";
+import { BookOpen, X, Send, Maximize2, Minimize2, ArrowLeft, FileText, ChevronRight, ChevronDown } from "lucide-react";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import ReactMarkdown from "react-markdown";
 
@@ -14,6 +14,11 @@ interface ChunkSource {
   page: number | null;
   section: string;
   score: number;
+  quote?: string;
+  documentTitle?: string;
+  documentShortId?: string;
+  contentType?: string;
+  pageImageUrl?: string;
 }
 
 interface Message {
@@ -45,6 +50,15 @@ interface ChatWidgetProps {
   }[];
   /** Display name of the document or collection (shown in header & greeting) */
   contextName?: string;
+  /** Key points from the document for welcome screen */
+  keyPoints?: { text: string; explanation?: string }[];
+  /** Page images with optional visual content metadata for welcome screen */
+  pageImages?: {
+    pageNumber: number;
+    url: string;
+    contentType?: "table" | "chart" | "diagram" | "image-with-text";
+    description?: string;
+  }[];
 }
 
 export interface ChatWidgetRef {
@@ -52,8 +66,18 @@ export interface ChatWidgetRef {
   showTermDefinition: (term: string, definition: string) => void;
 }
 
+function extractConfidence(text: string) {
+  const match = text.match(/\[(?:Betrouwbaarheid|Confidence):\s*(HOOG|MIDDEL|LAAG|HIGH|MEDIUM|LOW)\]/i);
+  return {
+    cleaned: match ? text.replace(match[0], "").trim() : text,
+    confidence: match ? match[1].toUpperCase() as "HOOG" | "MIDDEL" | "LAAG" | "HIGH" | "MEDIUM" | "LOW" : null,
+  };
+}
+
+/* ContentTypeIcon removed — sources now use minimal collapsible pattern */
+
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers, contextName },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers, contextName, keyPoints, pageImages },
   ref
 ) {
   const isCollectionMode = !!collectionSlug;
@@ -62,6 +86,9 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const skipAutoScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -246,7 +273,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             ? "inset-y-0 right-0 w-full sm:w-[480px] rounded-none border-l shadow-2xl"
             : messages.length > 0
               ? "bottom-[178px] right-8 h-[calc(100vh-220px)] max-h-[700px] w-[400px] rounded-xl shadow-[0_12px_32px_rgba(8,15,26,0.12)]"
-              : "bottom-[178px] right-8 h-[520px] w-[400px] rounded-xl shadow-[0_12px_32px_rgba(8,15,26,0.12)]"
+              : "bottom-[178px] right-8 h-[calc(100vh-220px)] max-h-[600px] w-[400px] rounded-xl shadow-[0_12px_32px_rgba(8,15,26,0.12)]"
         }`}
         style={{
           backgroundImage: messages.length > 0 ? "none" : "url('https://plus.unsplash.com/premium_photo-1663134377392-50c34664d632?q=80&w=3871&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')",
@@ -337,29 +364,94 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 </div>
 
                 {/* White content area — rounds up into the colored section */}
-                <div className="relative flex-1 rounded-t-2xl bg-white px-5 pt-5 pb-4">
+                <div className="relative flex-1 rounded-t-2xl bg-white px-5 pt-5 pb-4 space-y-4 overflow-y-auto">
+                  {/* Key points */}
+                  {keyPoints && keyPoints.length > 0 && (
+                    <div>
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                        {language === "en" ? "Key points" : "Hoofdpunten"}
+                      </p>
+                      <div className="space-y-2">
+                        {keyPoints.slice(0, 4).map((kp, i) => (
+                          <div key={i} className="flex items-start gap-2.5 rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5">
+                            <span
+                              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold text-white mt-0.5"
+                              style={{ backgroundColor: brandPrimary }}
+                            >
+                              {i + 1}
+                            </span>
+                            <p className="text-xs text-gray-700 leading-relaxed">{kp.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Visual content thumbnails */}
+                  {pageImages && pageImages.length > 0 && (
+                    <div>
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                        {language === "en" ? "Visual content" : "Visuele content"}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {pageImages.slice(0, 4).map((pi, i) => {
+                          const typeEmoji = pi.contentType === "table" ? "📊" : pi.contentType === "chart" ? "📈" : pi.contentType === "diagram" ? "🔀" : pi.contentType === "image-with-text" ? "🖼️" : "";
+                          const typeLabel = language === "en"
+                            ? (pi.contentType === "table" ? "Table" : pi.contentType === "chart" ? "Chart" : pi.contentType === "diagram" ? "Diagram" : pi.contentType === "image-with-text" ? "Image" : "")
+                            : (pi.contentType === "table" ? "Tabel" : pi.contentType === "chart" ? "Grafiek" : pi.contentType === "diagram" ? "Diagram" : pi.contentType === "image-with-text" ? "Afbeelding" : "");
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setLightboxUrl(pi.url)}
+                              className="overflow-hidden rounded-lg border border-gray-200 hover:border-gray-400 shadow-sm hover:shadow transition-all text-left"
+                            >
+                              <img
+                                src={pi.url}
+                                alt={pi.description || `Page ${pi.pageNumber}`}
+                                className="w-full aspect-[4/3] object-cover bg-gray-50"
+                                loading="lazy"
+                              />
+                              <div className="px-2 py-1.5 bg-gray-50 border-t border-gray-100">
+                                <span className="text-[0.65rem] text-gray-500 leading-snug">
+                                  {typeEmoji} {typeLabel} · {language === "en" ? "p." : "p."} {pi.pageNumber}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* terms-only: term starters */}
                   {chatMode === "terms-only" && terms.length > 0 && (
-                    <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
-                      {terms.map((t, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            setMessages((prev) => [
-                              ...prev,
-                              { role: "user", content: L.whatDoesItMean(t.term) },
-                              { role: "assistant", content: t.definition },
-                            ]);
-                          }}
-                          className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                            <span className="font-medium">{t.term}</span>
-                          </span>
-                          <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                        </button>
-                      ))}
+                    <div>
+                      {(keyPoints?.length || pageImages?.length) ? (
+                        <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                          {language === "en" ? "Terms" : "Begrippen"}
+                        </p>
+                      ) : null}
+                      <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+                        {terms.map((t, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setMessages((prev) => [
+                                ...prev,
+                                { role: "user", content: L.whatDoesItMean(t.term) },
+                                { role: "assistant", content: t.definition },
+                              ]);
+                            }}
+                            className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                              <span className="font-medium">{t.term}</span>
+                            </span>
+                            <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -367,29 +459,36 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   {chatMode === "terms-and-chat" && (
                     <>
                       {terms.length > 0 && (
-                        <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
-                          {terms.slice(0, 5).map((t, i) => (
-                            <button
-                              key={i}
-                              onClick={() => {
-                                setMessages((prev) => [
-                                  ...prev,
-                                  { role: "user", content: L.whatDoesItMean(t.term) },
-                                  { role: "assistant", content: t.definition },
-                                ]);
-                              }}
-                              className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                            >
-                              <span className="flex items-center gap-2.5">
-                                <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                                <span className="font-medium">{t.term}</span>
-                              </span>
-                              <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                            </button>
-                          ))}
+                        <div>
+                          {(keyPoints?.length || pageImages?.length) ? (
+                            <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                              {language === "en" ? "Terms" : "Begrippen"}
+                            </p>
+                          ) : null}
+                          <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+                            {terms.slice(0, 5).map((t, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  setMessages((prev) => [
+                                    ...prev,
+                                    { role: "user", content: L.whatDoesItMean(t.term) },
+                                    { role: "assistant", content: t.definition },
+                                  ]);
+                                }}
+                                className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                              >
+                                <span className="flex items-center gap-2.5">
+                                  <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                                  <span className="font-medium">{t.term}</span>
+                                </span>
+                                <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
-                      <div className={`divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 ${terms.length > 0 ? "mt-3" : ""}`}>
+                      <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
                         {suggestions.map((q, i) => (
                           <button
                             key={i}
@@ -422,7 +521,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
                   {/* CTA — "Chat with AI" button (only when input is available) */}
                   {hasInput && (
-                    <div className="mt-4">
+                    <div>
                       <button
                         onClick={() => inputRef.current?.focus()}
                         className="flex w-full items-center justify-between rounded-xl p-4 text-white transition-opacity hover:opacity-90"
@@ -448,7 +547,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
 
             {/* ── Messages ── */}
             {messages.length > 0 && (
-              <div className="bg-white p-5 space-y-4 min-h-full animate-[slideUp_0.3s_ease-out]">
+              <div className="bg-white px-4 py-5 space-y-5 min-h-full animate-[slideUp_0.3s_ease-out]">
                 {messages.map((msg, i) => (
                   <div
                     key={i}
@@ -457,13 +556,13 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {msg.role === "assistant" && (
-                      <img src="/chat_agent.png" alt="" className="h-6 w-6 rounded-lg object-cover flex-shrink-0 mt-1 mr-2" aria-hidden="true" />
+                      <img src="/chat_agent.png" alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5 mr-2.5" aria-hidden="true" />
                     )}
                     <div
-                      className={`max-w-[80%] text-sm ${
+                      className={`text-[0.8125rem] leading-relaxed ${
                         msg.role === "user"
-                          ? "rounded-2xl rounded-tr-md px-4 py-3 text-white"
-                          : "rounded-2xl rounded-tl-md bg-[#f5f7f9] px-4 py-3 text-gray-800"
+                          ? "max-w-[78%] rounded-2xl rounded-br-md px-4 py-2.5 text-white"
+                          : "max-w-[85%] rounded-2xl rounded-tl-md bg-[#f5f7f9] px-4 py-3 text-gray-800"
                       }`}
                       style={
                         msg.role === "user"
@@ -471,45 +570,142 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                           : undefined
                       }
                     >
-                      {msg.role === "assistant" ? (
-                        <div>
-                          <div className="prose prose-sm prose-gray max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_p]:my-2.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_strong]:font-semibold">
-                            <ReactMarkdown>{msg.content.replace(/\s*\[Document:\s*"[^"]*"\]/g, "")}</ReactMarkdown>
-                          </div>
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5 border-t pt-2 border-gray-200/60">
-                              {msg.sources
-                                .filter((s) => s.page || s.section)
-                                .slice(0, 4)
-                                .map((s, si) => (
-                                  <span
-                                    key={si}
-                                    className="inline-flex items-center gap-1 rounded-md bg-white/80 border border-gray-200 px-1.5 py-0.5 text-[0.65rem] text-gray-500"
-                                  >
-                                    <FileText className="h-2.5 w-2.5" aria-hidden="true" />
-                                    {s.page ? `p. ${s.page}` : ""}
-                                    {s.page && s.section ? " · " : ""}
-                                    {s.section ? (s.section.length > 30 ? s.section.slice(0, 30) + "…" : s.section) : ""}
-                                  </span>
-                                ))}
+                      {msg.role === "assistant" ? (() => {
+                        const { cleaned } = extractConfidence(msg.content);
+                        const cleanedContent = cleaned.replace(/\s*\[Document:\s*"[^"]*"\]/g, "");
+                        const filteredSources = msg.sources?.filter((s) => s.page || s.section) || [];
+                        const pageImages = msg.sources
+                          ? [...new Map(msg.sources.filter((s) => s.pageImageUrl).map((s) => [s.pageImageUrl, s])).values()]
+                          : [];
+                        const isSourcesOpen = expandedSources.has(i);
+                        return (
+                          <div>
+                            <div className="prose prose-sm max-w-none text-gray-800 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 [&_p]:my-1.5 [&_p]:leading-relaxed [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-[0.8125rem] [&_h3]:font-semibold [&_h3]:mt-2.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_a]:text-blue-600 [&_a]:no-underline hover:[&_a]:underline">
+                              <ReactMarkdown>{cleanedContent}</ReactMarkdown>
                             </div>
-                          )}
-                        </div>
-                      ) : (
+
+                            {/* Page images — always visible with captions */}
+                            {pageImages.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {pageImages.map((s, si) => {
+                                  const typeEmoji = s.contentType === "table" ? "📊" : s.contentType === "chart" ? "📈" : s.contentType === "diagram" ? "🔀" : s.contentType === "image-with-text" ? "🖼️" : "";
+                                  const typeLabel = language === "en"
+                                    ? (s.contentType === "table" ? "Table" : s.contentType === "chart" ? "Chart" : s.contentType === "diagram" ? "Diagram" : s.contentType === "image-with-text" ? "Image" : "")
+                                    : (s.contentType === "table" ? "Tabel" : s.contentType === "chart" ? "Grafiek" : s.contentType === "diagram" ? "Diagram" : s.contentType === "image-with-text" ? "Afbeelding" : "");
+                                  const caption = [
+                                    typeEmoji && typeLabel ? `${typeEmoji} ${typeLabel}` : null,
+                                    s.section ? s.section : null,
+                                    s.page ? `${language === "en" ? "page" : "pagina"} ${s.page}` : null,
+                                  ].filter(Boolean).join(" · ");
+                                  return (
+                                    <button
+                                      key={si}
+                                      onClick={() => setLightboxUrl(s.pageImageUrl!)}
+                                      className="block w-full overflow-hidden rounded-lg border border-gray-200 hover:border-gray-400 shadow-sm hover:shadow transition-all text-left"
+                                      aria-label={`View page ${s.page || ""} image`}
+                                    >
+                                      <img
+                                        src={s.pageImageUrl}
+                                        alt={caption || `Page ${s.page || ""}`}
+                                        className="w-full max-h-[200px] object-contain bg-gray-50"
+                                      />
+                                      {caption && (
+                                        <div className="px-2.5 py-1.5 bg-gray-50 border-t border-gray-100">
+                                          <span className="text-[0.7rem] text-gray-500 leading-snug">{caption}</span>
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Collapsible text sources */}
+                            {filteredSources.length > 0 && (
+                              <div className={pageImages.length > 0 ? "mt-2" : "mt-2.5"}>
+                                <button
+                                  onClick={() => {
+                                    setExpandedSources((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(i)) next.delete(i);
+                                      else next.add(i);
+                                      return next;
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                  <FileText className="h-3 w-3" aria-hidden="true" />
+                                  <span>
+                                    {filteredSources.length} {filteredSources.length === 1
+                                      ? (language === "en" ? "source" : "bron")
+                                      : (language === "en" ? "sources" : "bronnen")}
+                                  </span>
+                                  <ChevronDown
+                                    className={`h-3 w-3 transition-transform duration-200 ${isSourcesOpen ? "rotate-180" : ""}`}
+                                    aria-hidden="true"
+                                  />
+                                </button>
+
+                                {isSourcesOpen && (
+                                  <div className="mt-2 space-y-1 animate-[slideUp_0.15s_ease-out]">
+                                    {filteredSources.slice(0, 4).map((s, si) => {
+                                      const quoteKey = `${i}-${si}`;
+                                      const isQuoteOpen = expandedQuotes.has(quoteKey);
+                                      const label = s.documentTitle
+                                        ? `${s.documentTitle}${s.page ? `, p. ${s.page}` : ""}`
+                                        : `${s.page ? `p. ${s.page}` : ""}${s.page && s.section ? " — " : ""}${s.section ? (s.section.length > 40 ? s.section.slice(0, 40) + "…" : s.section) : ""}`;
+                                      return (
+                                        <div key={si}>
+                                          <button
+                                            onClick={() => {
+                                              if (!s.quote) return;
+                                              setExpandedQuotes((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(quoteKey)) next.delete(quoteKey);
+                                                else next.add(quoteKey);
+                                                return next;
+                                              });
+                                            }}
+                                            className={`flex items-center gap-1.5 text-[0.7rem] text-gray-500 ${s.quote ? "hover:text-gray-700 cursor-pointer" : "cursor-default"} transition-colors text-left`}
+                                          >
+                                            <span className="h-1 w-1 rounded-full bg-gray-300 flex-shrink-0" />
+                                            <span>{label}</span>
+                                            {s.quote && (
+                                              <ChevronDown
+                                                className={`h-2.5 w-2.5 flex-shrink-0 transition-transform duration-200 ${isQuoteOpen ? "rotate-180" : ""}`}
+                                                aria-hidden="true"
+                                              />
+                                            )}
+                                          </button>
+                                          {s.quote && isQuoteOpen && (
+                                            <p className="ml-3.5 mt-0.5 text-[0.65rem] italic text-gray-400 leading-relaxed border-l-2 border-gray-200 pl-2">
+                                              &ldquo;{s.quote.length > 180 ? s.quote.slice(0, 180) + "…" : s.quote}&rdquo;
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })() : (
                         msg.content
                       )}
                     </div>
                   </div>
                 ))}
 
-                {/* Typing indicator — bouncing dots */}
+                {/* Typing indicator */}
                 {loading && (
                   <div className="flex items-start">
-                    <img src="/chat_agent.png" alt="" className="h-6 w-6 rounded-lg object-cover flex-shrink-0 mt-1 mr-2" aria-hidden="true" />
+                    <img src="/chat_agent.png" alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5 mr-2.5" aria-hidden="true" />
                     <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md bg-[#f5f7f9] px-4 py-3">
-                      <span className="h-2 w-2 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_infinite]" />
-                      <span className="h-2 w-2 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_0.2s_infinite]" />
-                      <span className="h-2 w-2 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_0.4s_infinite]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_infinite]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_0.2s_infinite]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-[bounce-dot_1.4s_ease-in-out_0.4s_infinite]" />
                     </div>
                   </div>
                 )}
@@ -558,6 +754,32 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
             </div>
           )}
         </div>
+
+      {/* Lightbox overlay */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxUrl(null); }}
+          role="dialog"
+          aria-label="Image preview"
+          tabIndex={0}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Page preview"
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 });

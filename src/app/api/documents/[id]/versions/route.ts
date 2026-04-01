@@ -66,7 +66,7 @@ export async function POST(
     const doc = await DocumentModel.findOne({
       _id: id,
       organizationId: session.user.organizationId,
-    });
+    }).lean();
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
@@ -85,16 +85,18 @@ export async function POST(
       createdBy: session.user.id,
     });
 
-    // Update document version counters
-    doc.currentVersion = versionNumber + 1;
-    doc.totalVersions = (doc.totalVersions || 1) + 1;
-    await doc.save();
+    // Update document version counters atomically
+    const newVersion = versionNumber + 1;
+    const newTotal = (doc.totalVersions || 1) + 1;
+    await DocumentModel.findByIdAndUpdate(id, {
+      $set: { currentVersion: newVersion, totalVersions: newTotal },
+    });
 
     return NextResponse.json({
       data: {
         message: "Versie opgeslagen.",
-        currentVersion: doc.currentVersion,
-        totalVersions: doc.totalVersions,
+        currentVersion: newVersion,
+        totalVersions: newTotal,
       },
     });
   } catch (error) {

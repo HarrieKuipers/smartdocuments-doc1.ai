@@ -5,6 +5,9 @@ import DocumentModel from "@/models/Document";
 import { generateAndUploadCover } from "@/lib/ai/generate-cover";
 import { generateSlug } from "@/lib/slug";
 import { deleteDocumentVectors } from "@/lib/pinecone";
+import { deleteFile, deletePrefix, BUCKET } from "@/lib/storage";
+import ChatMessage from "@/models/ChatMessage";
+import ChatQuestion from "@/models/ChatQuestion";
 import bcrypt from "bcryptjs";
 
 export async function GET(
@@ -187,12 +190,71 @@ export async function DELETE(
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }
 
-    // Clean up Pinecone vectors
+    // Clean up all associated data in parallel (fire-and-forget, non-blocking)
+    const cleanupTasks: Promise<void>[] = [];
+
+    // Pinecone vectors
     if (doc.vectorized) {
-      deleteDocumentVectors(id).catch((err) =>
-        console.error("Pinecone cleanup failed:", err)
+      cleanupTasks.push(
+        deleteDocumentVectors(id).catch((err) =>
+          console.error("Pinecone cleanup failed:", err)
+        )
       );
     }
+
+    // S3: source file
+    if (doc.sourceFile?.url) {
+      try {
+        const urlPath = new URL(doc.sourceFile.url).pathname;
+        const storageKey = urlPath.startsWith(`/${BUCKET}/`)
+          ? urlPath.slice(`/${BUCKET}/`.length)
+          : urlPath.slice(1);
+        cleanupTasks.push(
+          deleteFile(storageKey).catch((err) =>
+            console.error("Source file cleanup failed:", err)
+          )
+        );
+      } catch {}
+    }
+
+    // S3: cover images (generated + custom)
+    for (const coverUrl of [doc.coverImageUrl, doc.customCoverUrl]) {
+      if (coverUrl) {
+        try {
+          const urlPath = new URL(coverUrl).pathname;
+          const key = urlPath.startsWith(`/${BUCKET}/`)
+            ? urlPath.slice(`/${BUCKET}/`.length)
+            : urlPath.slice(1);
+          cleanupTasks.push(
+            deleteFile(key).catch((err) =>
+              console.error("Cover image cleanup failed:", err)
+            )
+          );
+        } catch {}
+      }
+    }
+
+    // S3: page images (all files under documents/{id}/pages/)
+    cleanupTasks.push(
+      deletePrefix(`documents/${id}/pages/`).catch((err) =>
+        console.error("Page images cleanup failed:", err)
+      )
+    );
+
+    // Chat messages and questions
+    cleanupTasks.push(
+      ChatMessage.deleteMany({ documentId: id }).exec().catch((err) =>
+        console.error("Chat messages cleanup failed:", err)
+      ) as Promise<void>
+    );
+    cleanupTasks.push(
+      ChatQuestion.deleteMany({ documentId: id }).exec().catch((err) =>
+        console.error("Chat questions cleanup failed:", err)
+      ) as Promise<void>
+    );
+
+    // Run all cleanup in parallel, don't block the response
+    Promise.all(cleanupTasks).catch(() => {});
 
     return NextResponse.json({ message: "Document verwijderd." });
   } catch (error) {

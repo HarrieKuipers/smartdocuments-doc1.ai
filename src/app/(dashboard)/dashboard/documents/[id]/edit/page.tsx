@@ -92,6 +92,14 @@ interface DocumentData {
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   pageCount?: number;
+  pageImages?: { pageNumber: number; url: string }[];
+  visualContentExtracted?: boolean;
+  visualChunkCount?: number;
+  visualContent?: {
+    pageNumber: number;
+    contentType: "table" | "chart" | "diagram" | "image-with-text";
+    description: string;
+  }[];
   isDraft?: boolean;
   scheduledPublishAt?: string;
   publishedAt?: string;
@@ -214,6 +222,8 @@ export default function DocumentEditPage() {
   const [isDraft, setIsDraft] = useState(false);
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
   const [discussionsEnabled, setDiscussionsEnabled] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showAllPages, setShowAllPages] = useState(false);
 
   // Cover image
   const [coverUploading, setCoverUploading] = useState(false);
@@ -391,10 +401,12 @@ export default function DocumentEditPage() {
 
   const STEP_LABELS: Record<string, string> = {
     "text-extraction": "Tekst extraheren...",
+    "visual-extraction": "Visuele content extraheren...",
     "vectorization": "Document vectoriseren...",
     "audience-analysis": "Doelgroep analyseren...",
     "content-analysis": "Inhoud analyseren...",
     "summary-generation": "Samenvatting genereren...",
+    "language-levels": "Taalniveaus genereren...",
     "term-extraction": "Begrippen extraheren...",
     "cover-generation": "Cover genereren...",
     "finalizing": "Afronden...",
@@ -930,6 +942,68 @@ export default function DocumentEditPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Visuele Content */}
+            {doc.pageImages && doc.pageImages.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <ImageIcon className="h-4 w-4" />
+                    Visuele Content
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {doc.pageImages.length} pagina&apos;s
+                    {doc.visualChunkCount ? ` · ${doc.visualChunkCount} visuele elementen gedetecteerd` : ""}
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-2">
+                    {(showAllPages ? doc.pageImages : doc.pageImages.slice(0, 24)).map((pi) => {
+                      const visual = doc.visualContent?.find((vc) => vc.pageNumber === pi.pageNumber);
+                      const typeEmoji = visual?.contentType === "table" ? "📊" : visual?.contentType === "chart" ? "📈" : visual?.contentType === "diagram" ? "🔀" : visual?.contentType === "image-with-text" ? "🖼️" : "";
+                      const typeLabel = visual?.contentType === "table" ? "Tabel" : visual?.contentType === "chart" ? "Grafiek" : visual?.contentType === "diagram" ? "Diagram" : visual?.contentType === "image-with-text" ? "Afbeelding" : "";
+                      return (
+                        <button
+                          key={pi.pageNumber}
+                          onClick={() => setLightboxUrl(pi.url)}
+                          className={`group relative overflow-hidden rounded-lg border transition-all hover:shadow-md ${
+                            visual ? "border-primary/40 ring-1 ring-primary/20" : "border-gray-200 hover:border-gray-400"
+                          }`}
+                          title={visual ? `${typeLabel}: ${visual.description}` : `Pagina ${pi.pageNumber}`}
+                        >
+                          <img
+                            src={pi.url}
+                            alt={`Pagina ${pi.pageNumber}`}
+                            className="w-full aspect-[3/4] object-cover bg-gray-50"
+                            loading="lazy"
+                          />
+                          {/* Page number badge */}
+                          <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            {pi.pageNumber}
+                          </span>
+                          {/* Content type badge for visual pages */}
+                          {visual && (
+                            <span className="absolute top-1 right-1 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] text-white whitespace-nowrap">
+                              {typeEmoji} {typeLabel}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!showAllPages && doc.pageImages.length > 24 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => setShowAllPages(true)}
+                    >
+                      Toon alle {doc.pageImages.length} pagina&apos;s
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
@@ -1449,6 +1523,32 @@ export default function DocumentEditPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Lightbox overlay */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxUrl(null); }}
+          role="dialog"
+          aria-label="Afbeelding voorbeeld"
+          tabIndex={0}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+            aria-label="Sluiten"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Pagina voorbeeld"
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

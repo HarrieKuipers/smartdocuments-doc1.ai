@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -75,6 +75,12 @@ interface ReaderDocument {
   currentVersion?: number;
   totalVersions?: number;
   brandOverride?: { primary?: string };
+  pageImages?: { pageNumber: number; url: string }[];
+  visualContent?: {
+    pageNumber: number;
+    contentType: "table" | "chart" | "diagram" | "image-with-text";
+    description: string;
+  }[];
   organization: {
     name: string;
     slug: string;
@@ -326,6 +332,17 @@ export default function ReaderPage() {
   // Determine which content to display (current or a specific version)
   const displayContent = versionContent || doc?.content;
 
+  // Memoize chat page images (must be before any early returns to keep hook order stable)
+  const chatPageImages = useMemo(() => {
+    if (!doc?.pageImages) return undefined;
+    return doc.pageImages
+      .map((pi) => {
+        const visual = doc.visualContent?.find((vc) => vc.pageNumber === pi.pageNumber);
+        return { ...pi, contentType: visual?.contentType, description: visual?.description };
+      })
+      .filter((pi) => pi.contentType);
+  }, [doc?.pageImages, doc?.visualContent]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA]">
@@ -406,6 +423,7 @@ export default function ReaderPage() {
 
   const summaryKey = displayLevel !== "original" && displayLevel !== "C2" ? displayLevel : null;
   const activeContent = displayContent || doc.content;
+
   const currentSummary = summaryKey
     ? activeContent.summary[summaryKey] || activeContent.summary.original
     : activeContent.summary.original;
@@ -1055,6 +1073,8 @@ export default function ReaderPage() {
         terms={activeContent.terms}
         language={doc.language || "nl"}
         contextName={doc.displayTitle || doc.title}
+        keyPoints={activeContent.keyPoints}
+        pageImages={chatPageImages}
       />
     </div>
   );

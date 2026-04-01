@@ -7,7 +7,14 @@ import anthropic, { MODELS } from "@/lib/ai/client";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import { nanoid } from "nanoid";
 import { searchChunks } from "@/lib/pinecone";
+import { rerankChunks } from "@/lib/ai/rerank";
+import { orderChunksForLLM } from "@/lib/ai/chunk-ordering";
+import { buildRAGSystemPrompt } from "@/lib/ai/prompts";
+import { verifyCitations } from "@/lib/ai/verify-citations";
+import { rewriteQuery } from "@/lib/ai/rewrite-query";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
+
+const SCORE_THRESHOLD = 0.3;
 
 export async function POST(
   req: NextRequest,
@@ -26,9 +33,9 @@ export async function POST(
       );
     }
 
-    // Get document for context
+    // Get document — first without originalText, only load it if not vectorized
     const doc = await DocumentModel.findById(id)
-      .select("title chatMode language targetCEFRLevel organizationId vectorized content.summary.original content.originalText")
+      .select("title shortId chatMode language targetCEFRLevel organizationId vectorized content.summary.original content.keyPoints pageImages")
       .lean();
 
     if (!doc) {
@@ -44,84 +51,136 @@ export async function POST(
       );
     }
 
+    const lang: DocumentLanguage = (doc.language as DocumentLanguage) || "nl";
+    const L = getLangStrings(lang);
+    const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
+
     // Build context using RAG (Pinecone semantic search) or fallback to original text
     let docContext: string;
-    let sources: { page: number | null; section: string; score: number }[] = [];
-    if (doc.vectorized) {
-      try {
-        const relevantChunks = await searchChunks(id, message, 8);
-        // Build context with source annotations for the AI
-        docContext = relevantChunks
-          .map((c) => {
-            const label = [
-              c.page ? `Pagina ${c.page}` : null,
-              c.sectionHeading || null,
-            ]
-              .filter(Boolean)
-              .join(" - ");
-            return label
-              ? `[Bron: ${label}]\n${c.text}`
-              : c.text;
-          })
-          .join("\n\n---\n\n");
-        // Collect unique sources for frontend
-        const seen = new Set<string>();
-        for (const c of relevantChunks) {
-          const key = `${c.page ?? 0}|${c.sectionHeading}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            sources.push({
-              page: c.page,
-              section: c.sectionHeading,
-              score: c.score,
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Pinecone search failed, falling back to text:", err);
-        docContext =
-          doc.content?.originalText?.slice(0, 50000) ||
-          doc.content?.summary?.original ||
-          "";
+    // Build page image lookup map
+    const pageImageMap = new Map<number, string>();
+    if (doc.pageImages) {
+      for (const pi of doc.pageImages as { pageNumber: number; url: string }[]) {
+        pageImageMap.set(pi.pageNumber, pi.url);
       }
-    } else {
-      docContext =
-        doc.content?.originalText?.slice(0, 50000) ||
-        doc.content?.summary?.original ||
-        "";
     }
 
-    const conversationHistory = (history || []).map(
+    let sources: { page: number | null; section: string; score: number; quote?: string; contentType?: string; documentTitle?: string; documentShortId?: string; pageImageUrl?: string }[] = [];
+    let useRAGPrompt = false;
+    let ragChunks: Awaited<ReturnType<typeof searchChunks>> = [];
+
+    // Rewrite query for better semantic search (resolves history context + expands terms)
+    const conversationHistory = (history || []).slice(-10).map(
       (m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })
     );
+    const searchQuery = await rewriteQuery(message, conversationHistory, lang);
 
-    const lang: DocumentLanguage = (doc.language as DocumentLanguage) || "nl";
-    const L = getLangStrings(lang);
+    if (doc.vectorized) {
+      try {
+        // Retrieve top 20, rerank to top 8, filter by score, apply LitM ordering
+        const retrieved = await searchChunks(id, searchQuery, 20);
+        const reranked = await rerankChunks(message, retrieved, 8);
+        const filtered = reranked.filter((c) => c.score > SCORE_THRESHOLD);
 
-    const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
-    const levelInstruction = targetLevel
-      ? lang === "nl"
-        ? `\n\nBELANGRIJK: Schrijf je antwoord op CEFR taalniveau ${targetLevel}. ${targetLevel === "B1" ? "Gebruik korte zinnen, dagelijkse woorden, geen vakjargon." : targetLevel === "B2" ? "Gebruik duidelijke zinnen, beperkt vakjargon met uitleg." : targetLevel === "C1" ? "Complexere zinsstructuren en vakjargon zijn toegestaan." : "Academisch niveau met volledige vakjargon."}`
-        : `\n\nIMPORTANT: Write your response at CEFR level ${targetLevel}. ${targetLevel === "B1" ? "Use short sentences, everyday words, no jargon." : targetLevel === "B2" ? "Use clear sentences, limited jargon with explanations." : targetLevel === "C1" ? "More complex sentence structures and jargon are allowed." : "Academic level with full technical jargon."}`
-      : "";
+        if (filtered.length === 0) {
+          return NextResponse.json({
+            data: {
+              response: L.noRelevantContent,
+              sources: [],
+            },
+          });
+        }
 
-    const sourceInstruction = sources.length > 0
-      ? lang === "nl"
-        ? "\n\nAls je informatie uit de documentfragmenten gebruikt, verwijs dan naar de bron (bijv. 'Op pagina X...' of 'In de sectie over Y...'). Baseer je antwoord alleen op de aangeleverde fragmenten."
-        : "\n\nWhen using information from the document fragments, reference the source (e.g. 'On page X...' or 'In the section about Y...'). Base your answer only on the provided fragments."
-      : "";
+        const ordered = orderChunksForLLM(filtered);
+
+        // Build context with source annotations (mark visual content)
+        const contentTypeLabels: Record<string, string> = {
+          table: "📊 Tabel",
+          chart: "📈 Grafiek",
+          diagram: "🔀 Diagram",
+          "image-with-text": "🖼️ Afbeelding",
+        };
+        docContext = ordered
+          .map((c) => {
+            const parts = [
+              c.page ? `Pagina ${c.page}` : null,
+              c.sectionHeading || null,
+              c.contentType && c.contentType !== "text"
+                ? contentTypeLabels[c.contentType] || c.contentType
+                : null,
+            ].filter(Boolean);
+            const label = parts.join(" - ");
+            return label
+              ? `[Bron: ${label}]\n${c.text}`
+              : c.text;
+          })
+          .join("\n\n---\n\n");
+
+        // For broad questions (summaries, overviews), prepend the document summary
+        // so the LLM has high-level context alongside the specific fragments
+        const broadQueryPattern = /samenvat|hoofdpunt|overzicht|overview|summary|main point|key point|samengevat|kernpunt|belangrijk/i;
+        if (broadQueryPattern.test(message) && doc.content?.summary?.original) {
+          const keyPointsText = (doc.content?.keyPoints as { text: string }[] | undefined)
+            ?.map((kp) => `- ${kp.text}`)
+            .join("\n") || "";
+          const summaryBlock = [
+            `[Bron: Samenvatting van het hele document]\n${doc.content.summary.original}`,
+            keyPointsText ? `[Bron: Kernpunten]\n${keyPointsText}` : "",
+          ].filter(Boolean).join("\n\n---\n\n");
+          docContext = `${summaryBlock}\n\n---\n\n${docContext}`;
+        }
+
+        useRAGPrompt = true;
+        ragChunks = filtered;
+      } catch (err) {
+        console.error("Pinecone search failed, falling back to text:", err);
+        const fullDoc = await DocumentModel.findById(id)
+          .select("content.originalText")
+          .lean();
+        docContext =
+          fullDoc?.content?.originalText?.slice(0, 50000) ||
+          doc.content?.summary?.original ||
+          "";
+      }
+    } else {
+      const fullDoc = await DocumentModel.findById(id)
+        .select("content.originalText")
+        .lean();
+      docContext =
+        fullDoc?.content?.originalText?.slice(0, 50000) ||
+        doc.content?.summary?.original ||
+        "";
+    }
+
+    // Build system prompt
+    const systemPrompt = useRAGPrompt
+      ? `${buildRAGSystemPrompt({
+          documentTitle: doc.title,
+          language: lang,
+          targetLevel,
+        })}
+
+${lang === "nl" ? "Documentfragmenten" : "Document fragments"}:
+${docContext}`
+      : `${L.chatSystemPrompt(doc.title)}${
+          targetLevel
+            ? lang === "nl"
+              ? `\n\nBELANGRIJK: Schrijf je antwoord op CEFR taalniveau ${targetLevel}.`
+              : `\n\nIMPORTANT: Write your response at CEFR level ${targetLevel}.`
+            : ""
+        }
+
+${lang === "nl" ? "Documentinhoud" : "Document content"}:
+${docContext}`;
 
     const chatStartTime = Date.now();
     const response = await anthropic.messages.create({
       model: MODELS.chat,
-      max_tokens: 1024,
-      system: `${L.chatSystemPrompt(doc.title)}${levelInstruction}${sourceInstruction}
-
-${lang === "nl" ? "Documentinhoud" : "Document content"}:
-${docContext}`,
+      max_tokens: 2048,
+      system: systemPrompt,
       messages: [
         ...conversationHistory,
         { role: "user", content: message },
@@ -130,6 +189,23 @@ ${docContext}`,
 
     const assistantResponse =
       response.content[0].type === "text" ? response.content[0].text : "";
+
+    // Post-generation citation verification
+    if (useRAGPrompt && ragChunks.length > 0) {
+      // Pinecone now returns pageImageUrl directly (150 DPI for visual pages, 72 DPI for text)
+      // Fall back to Document.pageImages only if not in Pinecone (old indexes)
+      const chunksWithMeta = ragChunks.map((c) => ({
+        ...c,
+        pageImageUrl: c.pageImageUrl || (c.page ? pageImageMap.get(c.page) : undefined),
+      }));
+      const { verifiedSources } = verifyCitations(assistantResponse, chunksWithMeta);
+      sources = verifiedSources.map((s) => ({
+        ...s,
+        documentTitle: doc.title,
+        documentShortId: doc.shortId,
+        pageImageUrl: s.pageImageUrl || (s.page ? pageImageMap.get(s.page) : undefined),
+      }));
+    }
 
     // Store chat message
     const sessionId =

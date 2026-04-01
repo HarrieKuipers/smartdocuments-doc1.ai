@@ -36,10 +36,36 @@ export async function upsertChunks(
   }));
 
   // Upsert in batches of 96 (Pinecone recommended limit for integrated indexes)
+  // Includes retry with exponential backoff for rate limits (429)
   const batchSize = 96;
   for (let i = 0; i < records.length; i += batchSize) {
     const batch = records.slice(i, i + batchSize);
-    await namespace.upsertRecords({ records: batch });
+
+    let attempt = 0;
+    const maxRetries = 5;
+    while (true) {
+      try {
+        await namespace.upsertRecords({ records: batch });
+        break;
+      } catch (err: unknown) {
+        const isRateLimit =
+          err instanceof Error &&
+          (err.message.includes("429") || err.message.includes("RESOURCE_EXHAUSTED"));
+        if (isRateLimit && attempt < maxRetries) {
+          attempt++;
+          const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
+          console.warn(`Pinecone rate limit hit, retrying batch in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise((r) => setTimeout(r, delay));
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Throttle between batches to stay under embedding TPM limits
+    if (i + batchSize < records.length) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
   }
 }
 
@@ -51,6 +77,9 @@ export interface ChunkSearchResult {
   sectionHeading: string;
   paragraphIndex: number;
   charOffset: number;
+  contentType?: string;
+  /** S3 URL to page image (150 DPI for visual pages, 72 DPI for text pages) */
+  pageImageUrl?: string;
 }
 
 /**
@@ -74,6 +103,8 @@ export async function searchChunks(
       "section_heading",
       "paragraph_index",
       "char_offset",
+      "content_type",
+      "page_image_url",
     ],
   });
 
@@ -88,6 +119,8 @@ export async function searchChunks(
       sectionHeading: (fields?.section_heading as string) || "",
       paragraphIndex: (fields?.paragraph_index as number) || 0,
       charOffset: (fields?.char_offset as number) || 0,
+      contentType: (fields?.content_type as string) || undefined,
+      pageImageUrl: (fields?.page_image_url as string) || undefined,
     };
   });
 }
@@ -135,6 +168,34 @@ export async function ensureIndex() {
       throw new Error("Pinecone index creation timed out");
     }
   }
+}
+
+/**
+ * Search for relevant chunks across multiple documents in parallel.
+ * Fans out queries to each document's namespace and merges results by score.
+ */
+export async function searchMultipleDocuments(
+  documentIds: string[],
+  query: string,
+  topKPerDoc: number = 5,
+  globalTopK: number = 20
+): Promise<(ChunkSearchResult & { documentId: string })[]> {
+  const results = await Promise.all(
+    documentIds.map(async (docId) => {
+      try {
+        const chunks = await searchChunks(docId, query, topKPerDoc);
+        return chunks.map((chunk) => ({ ...chunk, documentId: docId }));
+      } catch (err) {
+        console.warn(`Pinecone search failed for document ${docId}:`, err);
+        return [];
+      }
+    })
+  );
+
+  return results
+    .flat()
+    .sort((a, b) => b.score - a.score)
+    .slice(0, globalTopK);
 }
 
 export default getPineconeClient;

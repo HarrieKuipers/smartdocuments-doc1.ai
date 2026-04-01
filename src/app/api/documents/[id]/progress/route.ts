@@ -18,16 +18,37 @@ export async function GET(
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
+      let interval: ReturnType<typeof setInterval>;
+      let timeout: ReturnType<typeof setTimeout>;
+
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(interval);
+        clearTimeout(timeout);
+        try {
+          controller.close();
+        } catch {
+          // already closed by client disconnect
+        }
+      };
+
       const sendEvent = (data: object) => {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-        );
+        if (closed) return;
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+          );
+        } catch {
+          cleanup();
+        }
       };
 
       let lastStep = "";
       let lastPercentage = 0;
 
-      const interval = setInterval(async () => {
+      interval = setInterval(async () => {
         try {
           const doc = await DocumentModel.findOne({
             _id: id,
@@ -38,8 +59,7 @@ export async function GET(
 
           if (!doc) {
             sendEvent({ error: "Document niet gevonden." });
-            clearInterval(interval);
-            controller.close();
+            cleanup();
             return;
           }
 
@@ -62,20 +82,17 @@ export async function GET(
               step,
               percentage: doc.status === "ready" ? 100 : percentage,
             });
-            clearInterval(interval);
-            controller.close();
+            cleanup();
           }
         } catch (error) {
           console.error("Progress SSE error:", error);
-          clearInterval(interval);
-          controller.close();
+          cleanup();
         }
       }, 1000);
 
       // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(interval);
-        controller.close();
+      timeout = setTimeout(() => {
+        cleanup();
       }, 5 * 60 * 1000);
     },
   });
