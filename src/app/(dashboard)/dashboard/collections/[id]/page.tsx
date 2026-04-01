@@ -42,6 +42,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Monitor,
   Palette,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -469,6 +470,14 @@ export default function CollectionDetailPage() {
               Analytics
             </Button>
           </Link>
+          {collection?.slug && (
+            <Link href={`/dashboard/demo?collection=${collection.slug}`}>
+              <Button variant="outline" size="sm">
+                <Monitor className="mr-1 h-4 w-4" />
+                Widget Demo
+              </Button>
+            </Link>
+          )}
           {collection?.slug && (
             <Link href={`/c/${collection.slug}`} target="_blank">
               <Button variant="outline" size="sm">

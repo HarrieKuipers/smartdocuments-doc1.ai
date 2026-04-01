@@ -17,6 +17,7 @@ import {
   Key,
   Webhook,
   Plug,
+  Monitor,
   X,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
@@ -51,6 +52,11 @@ const navItems = [
     icon: FolderOpen,
     tourTitle: "Collecties",
     tourDesc: "Groepeer documenten in collecties en deel ze als geheel met je lezers.",
+  },
+  {
+    label: "Widget Demo",
+    href: "/dashboard/demo",
+    icon: Monitor,
   },
   {
     label: "Analytics",

@@ -1054,6 +1054,7 @@ export default function ReaderPage() {
         chatMode={doc.chatMode || "terms-only"}
         terms={activeContent.terms}
         language={doc.language || "nl"}
+        contextName={doc.displayTitle || doc.title}
       />
     </div>
   );

@@ -528,6 +528,7 @@ export default function PublicCollectionPage() {
           customPlaceholder={collection.chatPlaceholder}
           customSuggestions={collection.chatSuggestions}
           cachedAnswers={collection.chatSuggestionsCache}
+          contextName={collection.name}
         />
       )}
     </div>
