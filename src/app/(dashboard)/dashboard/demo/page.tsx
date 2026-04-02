@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,14 @@ interface CollectionConfig {
 }
 
 export default function WidgetDemoPage() {
+  return (
+    <Suspense fallback={null}>
+      <WidgetDemoContent />
+    </Suspense>
+  );
+}
+
+function WidgetDemoContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const preselectedSlug = searchParams.get("collection");
