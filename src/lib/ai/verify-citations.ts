@@ -12,10 +12,14 @@ export interface VerifiedSource {
 }
 
 /**
- * Verify quoted passages in an AI response against retrieved chunks.
- * Uses n-gram matching (industry standard) for robust citation verification
- * that handles paraphrasing better than bag-of-words while avoiding
- * false positives from common short words.
+ * Build sources list from retrieved chunks, showing only pages that are
+ * explicitly cited by the LLM in its response.
+ *
+ * Strategy:
+ * 1. Extract all page numbers the LLM mentions (e.g. "Pagina 83", "p. 12")
+ * 2. For each cited page, pick the best chunk as the source
+ * 3. If the response contains quoted passages, attach them to the matching source
+ * 4. Fallback: if the LLM didn't cite any page, use the top-scored chunk
  */
 export function verifyCitations(
   response: string,
@@ -26,16 +30,46 @@ export function verifyCitations(
     pageImageUrl?: string;
   })[]
 ): { verifiedSources: VerifiedSource[] } {
-  const verifiedSources: VerifiedSource[] = [];
+  if (retrievedChunks.length === 0) return { verifiedSources: [] };
 
-  // Extract all quoted passages (text between "..." or "...")
+  // --- Step 1: Find all page numbers explicitly cited in the response ---
+  const pageRegex = /\b(?:Pagina|pagina|Page|page|p\.)\s*(\d+)\b/g;
+  const citedPages = new Set<number>();
+  let pageMatch;
+  while ((pageMatch = pageRegex.exec(response)) !== null) {
+    citedPages.add(parseInt(pageMatch[1], 10));
+  }
+
+  // --- Step 2: For each cited page, find the best chunk ---
+  const sourceMap = new Map<string, VerifiedSource>();
+
+  for (const page of citedPages) {
+    // Find chunks matching this page
+    const pageChunks = retrievedChunks.filter((c) => c.page === page);
+    if (pageChunks.length === 0) continue;
+
+    // Pick the highest-scored chunk for this page
+    const best = pageChunks.reduce((a, b) => (a.score > b.score ? a : b));
+    const key = `${best.documentId || best.documentTitle || ""}|${page}`;
+
+    sourceMap.set(key, {
+      page: best.page,
+      section: best.sectionHeading,
+      score: best.score,
+      documentTitle: best.documentTitle,
+      documentShortId: best.documentShortId,
+      contentType: best.contentType,
+      pageImageUrl: best.pageImageUrl,
+    });
+  }
+
+  // --- Step 3: Extract quotes and attach to existing sources ---
   const quoteRegex = /["""]([^"""]{10,})["""]/g;
-  let match;
+  let quoteMatch;
 
-  while ((match = quoteRegex.exec(response)) !== null) {
-    const quotedText = match[1];
+  while ((quoteMatch = quoteRegex.exec(response)) !== null) {
+    const quotedText = quoteMatch[1];
     const quotedTokens = tokenize(quotedText);
-
     if (quotedTokens.length < 3) continue;
 
     let bestScore = 0;
@@ -43,79 +77,40 @@ export function verifyCitations(
 
     for (const chunk of retrievedChunks) {
       const chunkTokens = tokenize(chunk.text);
-      // Use n-gram overlap for sequence-aware matching (better than bag-of-words)
       const ngramScore = ngramOverlap(quotedTokens, chunkTokens, 3);
-      // Also check word overlap as fallback for short quotes
       const wordScore = wordOverlap(quotedTokens, chunkTokens);
       const score = Math.max(ngramScore, wordScore * 0.9);
-
       if (score > bestScore) {
         bestScore = score;
         bestChunk = chunk;
       }
     }
 
-    // 60% n-gram overlap = verified (lower than 80% bag-of-words to allow paraphrasing)
-    if (bestScore >= 0.6 && bestChunk) {
-      verifiedSources.push({
-        page: bestChunk.page,
-        section: bestChunk.sectionHeading,
-        score: bestChunk.score,
-        quote: quotedText,
-        documentTitle: bestChunk.documentTitle,
-        documentShortId: bestChunk.documentShortId,
-        contentType: bestChunk.contentType,
-        pageImageUrl: bestChunk.pageImageUrl,
-      });
+    if (bestScore >= 0.6 && bestChunk && bestChunk.page != null) {
+      const key = `${bestChunk.documentId || bestChunk.documentTitle || ""}|${bestChunk.page}`;
+      const existing = sourceMap.get(key);
+      if (existing && !existing.quote) {
+        existing.quote = quotedText;
+      } else if (!existing && citedPages.size === 0) {
+        // Only add quote-matched sources when the LLM didn't cite ANY page numbers
+        sourceMap.set(key, {
+          page: bestChunk.page,
+          section: bestChunk.sectionHeading,
+          score: bestChunk.score,
+          quote: quotedText,
+          documentTitle: bestChunk.documentTitle,
+          documentShortId: bestChunk.documentShortId,
+          contentType: bestChunk.contentType,
+          pageImageUrl: bestChunk.pageImageUrl,
+        });
+      }
     }
   }
 
-  // Add chunk-level sources only if their page or section is referenced in the response
-  const seen = new Set<string>();
-  for (const chunk of retrievedChunks) {
-    const key = `${chunk.documentId || ""}|${chunk.page ?? 0}|${chunk.sectionHeading}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const alreadyVerified = verifiedSources.some(
-      (s) => s.page === chunk.page && s.section === chunk.sectionHeading
-    );
-    if (alreadyVerified) continue;
-
-    // Use word-boundary regex to prevent "Page 3" matching "Page 30"
-    const pageReferenced =
-      chunk.page != null &&
-      new RegExp(
-        `\\b(?:Pagina|pagina|Page|page|p\\.)\\s*${chunk.page}\\b`
-      ).test(response);
-    const sectionReferenced =
-      chunk.sectionHeading &&
-      response
-        .toLowerCase()
-        .includes(chunk.sectionHeading.toLowerCase().slice(0, 30));
-    const docReferenced =
-      chunk.documentTitle &&
-      response
-        .toLowerCase()
-        .includes(chunk.documentTitle.toLowerCase().slice(0, 40));
-
-    if (pageReferenced || sectionReferenced || docReferenced) {
-      verifiedSources.push({
-        page: chunk.page,
-        section: chunk.sectionHeading,
-        score: chunk.score,
-        documentTitle: chunk.documentTitle,
-        documentShortId: chunk.documentShortId,
-        contentType: chunk.contentType,
-        pageImageUrl: chunk.pageImageUrl,
-      });
-    }
-  }
-
-  // Fallback: add top-scored chunk if LLM didn't cite properly
-  if (verifiedSources.length === 0 && retrievedChunks.length > 0) {
+  // --- Step 4: Fallback — if no sources found, use the top-scored chunk ---
+  if (sourceMap.size === 0) {
     const top = retrievedChunks[0];
-    verifiedSources.push({
+    sourceMap.set("fallback", {
       page: top.page,
       section: top.sectionHeading,
       score: top.score,
@@ -126,7 +121,7 @@ export function verifyCitations(
     });
   }
 
-  return { verifiedSources };
+  return { verifiedSources: Array.from(sourceMap.values()) };
 }
 
 /**

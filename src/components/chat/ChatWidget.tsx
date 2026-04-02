@@ -575,7 +575,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                         const cleanedContent = cleaned.replace(/\s*\[Document:\s*"[^"]*"\]/g, "");
                         const filteredSources = msg.sources?.filter((s) => s.page || s.section) || [];
                         const pageImages = msg.sources
-                          ? [...new Map(msg.sources.filter((s) => s.pageImageUrl).map((s) => [s.pageImageUrl, s])).values()]
+                          ? [...new Map(msg.sources.filter((s) => s.pageImageUrl).map((s) => [s.page ?? s.pageImageUrl, s])).values()]
                           : [];
                         const isSourcesOpen = expandedSources.has(i);
                         return (
