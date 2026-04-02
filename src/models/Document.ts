@@ -14,6 +14,7 @@ export interface IDocument extends MongoDocument {
   tags: string[];
   description?: string;
   pageCount?: number;
+  pageLabelOffset?: number;
   sourceFile: {
     url: string;
     filename: string;
@@ -70,7 +71,6 @@ export interface IDocument extends MongoDocument {
   customSlug?: string;
   vectorized: boolean;
   chunkCount: number;
-  pageImages?: { pageNumber: number; url: string }[];
   visualContentExtracted: boolean;
   visualChunkCount: number;
   visualContent?: {
@@ -114,6 +114,7 @@ const DocumentSchema = new Schema<IDocument>(
     tags: [{ type: String }],
     description: { type: String },
     pageCount: { type: Number },
+    pageLabelOffset: { type: Number, default: 0 },
     sourceFile: {
       url: { type: String },
       filename: { type: String },
@@ -213,12 +214,6 @@ const DocumentSchema = new Schema<IDocument>(
     customSlug: { type: String, sparse: true, unique: true },
     vectorized: { type: Boolean, default: false },
     chunkCount: { type: Number, default: 0 },
-    pageImages: [
-      {
-        pageNumber: { type: Number },
-        url: { type: String },
-      },
-    ],
     visualContentExtracted: { type: Boolean, default: false },
     visualChunkCount: { type: Number, default: 0 },
     visualContent: [{

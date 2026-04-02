@@ -13,8 +13,9 @@ export interface VerifiedSource {
 
 /**
  * Verify quoted passages in an AI response against retrieved chunks.
- * Extracts all quoted text and checks for word overlap with source chunks.
- * Pure string matching — no API calls.
+ * Uses n-gram matching (industry standard) for robust citation verification
+ * that handles paraphrasing better than bag-of-words while avoiding
+ * false positives from common short words.
  */
 export function verifyCitations(
   response: string,
@@ -33,25 +34,29 @@ export function verifyCitations(
 
   while ((match = quoteRegex.exec(response)) !== null) {
     const quotedText = match[1];
-    const quotedWords = tokenize(quotedText);
+    const quotedTokens = tokenize(quotedText);
 
-    if (quotedWords.length < 3) continue;
+    if (quotedTokens.length < 3) continue;
 
-    // Check overlap with each chunk
-    let bestOverlap = 0;
+    let bestScore = 0;
     let bestChunk: (typeof retrievedChunks)[0] | null = null;
 
     for (const chunk of retrievedChunks) {
-      const chunkWords = tokenize(chunk.text);
-      const overlap = wordOverlap(quotedWords, chunkWords);
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
+      const chunkTokens = tokenize(chunk.text);
+      // Use n-gram overlap for sequence-aware matching (better than bag-of-words)
+      const ngramScore = ngramOverlap(quotedTokens, chunkTokens, 3);
+      // Also check word overlap as fallback for short quotes
+      const wordScore = wordOverlap(quotedTokens, chunkTokens);
+      const score = Math.max(ngramScore, wordScore * 0.9);
+
+      if (score > bestScore) {
+        bestScore = score;
         bestChunk = chunk;
       }
     }
 
-    // 80%+ word overlap = verified
-    if (bestOverlap >= 0.8 && bestChunk) {
+    // 60% n-gram overlap = verified (lower than 80% bag-of-words to allow paraphrasing)
+    if (bestScore >= 0.6 && bestChunk) {
       verifiedSources.push({
         page: bestChunk.page,
         section: bestChunk.sectionHeading,
@@ -72,24 +77,27 @@ export function verifyCitations(
     if (seen.has(key)) continue;
     seen.add(key);
 
-    // Skip if already added via quote verification
     const alreadyVerified = verifiedSources.some(
       (s) => s.page === chunk.page && s.section === chunk.sectionHeading
     );
     if (alreadyVerified) continue;
 
-    // Only add if the response actually references this chunk's page or section
-    const pageReferenced = chunk.page && (
-      response.includes(`Pagina ${chunk.page}`) ||
-      response.includes(`pagina ${chunk.page}`) ||
-      response.includes(`Page ${chunk.page}`) ||
-      response.includes(`page ${chunk.page}`) ||
-      response.includes(`p. ${chunk.page}`)
-    );
-    const sectionReferenced = chunk.sectionHeading &&
-      response.toLowerCase().includes(chunk.sectionHeading.toLowerCase().slice(0, 30));
-    const docReferenced = chunk.documentTitle &&
-      response.toLowerCase().includes(chunk.documentTitle.toLowerCase().slice(0, 40));
+    // Use word-boundary regex to prevent "Page 3" matching "Page 30"
+    const pageReferenced =
+      chunk.page != null &&
+      new RegExp(
+        `\\b(?:Pagina|pagina|Page|page|p\\.)\\s*${chunk.page}\\b`
+      ).test(response);
+    const sectionReferenced =
+      chunk.sectionHeading &&
+      response
+        .toLowerCase()
+        .includes(chunk.sectionHeading.toLowerCase().slice(0, 30));
+    const docReferenced =
+      chunk.documentTitle &&
+      response
+        .toLowerCase()
+        .includes(chunk.documentTitle.toLowerCase().slice(0, 40));
 
     if (pageReferenced || sectionReferenced || docReferenced) {
       verifiedSources.push({
@@ -104,7 +112,7 @@ export function verifyCitations(
     }
   }
 
-  // If no sources at all (LLM didn't cite properly), add the top-scored chunk as fallback
+  // Fallback: add top-scored chunk if LLM didn't cite properly
   if (verifiedSources.length === 0 && retrievedChunks.length > 0) {
     const top = retrievedChunks[0];
     verifiedSources.push({
@@ -121,12 +129,42 @@ export function verifyCitations(
   return { verifiedSources };
 }
 
+/**
+ * Tokenize text for matching. Keeps Dutch function words >= 3 chars
+ * (het, een, van, dat, etc.) which are important for Dutch text matching.
+ */
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, "")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length >= 2);
+}
+
+/**
+ * N-gram overlap: checks what fraction of n-grams from `a` appear in `b`.
+ * More robust than bag-of-words because it preserves word order,
+ * reducing false positives from common words appearing in different contexts.
+ */
+function ngramOverlap(a: string[], b: string[], n: number): number {
+  if (a.length < n) return wordOverlap(a, b);
+
+  const aNgrams = buildNgrams(a, n);
+  const bNgrams = new Set(buildNgrams(b, n));
+
+  let matches = 0;
+  for (const gram of aNgrams) {
+    if (bNgrams.has(gram)) matches++;
+  }
+  return aNgrams.length > 0 ? matches / aNgrams.length : 0;
+}
+
+function buildNgrams(tokens: string[], n: number): string[] {
+  const ngrams: string[] = [];
+  for (let i = 0; i <= tokens.length - n; i++) {
+    ngrams.push(tokens.slice(i, i + n).join(" "));
+  }
+  return ngrams;
 }
 
 function wordOverlap(a: string[], b: string[]): number {

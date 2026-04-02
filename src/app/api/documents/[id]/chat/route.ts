@@ -13,8 +13,13 @@ import { buildRAGSystemPrompt } from "@/lib/ai/prompts";
 import { verifyCitations } from "@/lib/ai/verify-citations";
 import { rewriteQuery } from "@/lib/ai/rewrite-query";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
-
-const SCORE_THRESHOLD = 0.3;
+import {
+  BROAD_QUERY_PATTERN,
+  CONTENT_TYPE_LABELS,
+  SCORE_THRESHOLD,
+  validateChatMessage,
+} from "@/lib/ai/rag-utils";
+import { buildPageImageMap } from "@/lib/page-images";
 
 export async function POST(
   req: NextRequest,
@@ -24,26 +29,24 @@ export async function POST(
     await connectDB();
     const { id } = await params;
 
-    const { message, history, isExplanation } = await req.json();
+    const { message: rawMessage, history, isExplanation } = await req.json();
 
-    if (!message || typeof message !== "string") {
+    const message = validateChatMessage(rawMessage);
+    if (!message) {
       return NextResponse.json(
-        { error: "Bericht is verplicht." },
+        { error: "Bericht is verplicht (max 2000 tekens)." },
         { status: 400 }
       );
     }
 
-    // Get document — first without originalText, only load it if not vectorized
     const doc = await DocumentModel.findById(id)
-      .select("title shortId chatMode language targetCEFRLevel organizationId vectorized content.summary.original content.keyPoints pageImages")
+      .select("title shortId chatMode language targetCEFRLevel organizationId vectorized content.summary.original content.keyPoints pageCount pageLabelOffset")
       .lean();
 
     if (!doc) {
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }
 
-    // Block AI chat requests for terms-only documents (no free questions allowed)
-    // Allow internal explanation requests (keypoint/finding expand) regardless of chatMode
     if (doc.chatMode === "terms-only" && !isExplanation) {
       return NextResponse.json(
         { error: "Dit document heeft alleen voorgedefinieerde begrippen." },
@@ -55,33 +58,47 @@ export async function POST(
     const L = getLangStrings(lang);
     const targetLevel = doc.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
 
-    // Build context using RAG (Pinecone semantic search) or fallback to original text
     let docContext: string;
-    // Build page image lookup map
-    const pageImageMap = new Map<number, string>();
-    if (doc.pageImages) {
-      for (const pi of doc.pageImages as { pageNumber: number; url: string }[]) {
-        pageImageMap.set(pi.pageNumber, pi.url);
-      }
-    }
+    const pageImageMap = doc.pageCount
+      ? buildPageImageMap(doc._id.toString(), doc.pageCount, doc.pageLabelOffset || 0)
+      : new Map<number, string>();
 
     let sources: { page: number | null; section: string; score: number; quote?: string; contentType?: string; documentTitle?: string; documentShortId?: string; pageImageUrl?: string }[] = [];
     let useRAGPrompt = false;
     let ragChunks: Awaited<ReturnType<typeof searchChunks>> = [];
 
-    // Rewrite query for better semantic search (resolves history context + expands terms)
     const conversationHistory = (history || []).slice(-10).map(
       (m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })
     );
-    const searchQuery = await rewriteQuery(message, conversationHistory, lang);
 
     if (doc.vectorized) {
       try {
-        // Retrieve top 20, rerank to top 8, filter by score, apply LitM ordering
-        const retrieved = await searchChunks(id, searchQuery, 20);
+        // Parallelize query rewrite and initial search for latency optimization
+        // The rewritten query gets a second search only if it differs significantly
+        const [searchQuery, initialResults] = await Promise.all([
+          rewriteQuery(message, conversationHistory, lang),
+          searchChunks(id, message, 20),
+        ]);
+
+        // If the rewritten query differs, do a second search and merge results
+        let retrieved = initialResults;
+        if (searchQuery !== message) {
+          const rewrittenResults = await searchChunks(id, searchQuery, 20);
+          // Merge: deduplicate by chunk ID, keep highest score
+          const merged = new Map<string, (typeof initialResults)[0]>();
+          for (const chunk of [...initialResults, ...rewrittenResults]) {
+            const key = `${chunk.page}|${chunk.sectionHeading}|${chunk.text.slice(0, 50)}`;
+            const existing = merged.get(key);
+            if (!existing || chunk.score > existing.score) {
+              merged.set(key, chunk);
+            }
+          }
+          retrieved = Array.from(merged.values()).sort((a, b) => b.score - a.score);
+        }
+
         const reranked = await rerankChunks(message, retrieved, 8);
         const filtered = reranked.filter((c) => c.score > SCORE_THRESHOLD);
 
@@ -96,20 +113,13 @@ export async function POST(
 
         const ordered = orderChunksForLLM(filtered);
 
-        // Build context with source annotations (mark visual content)
-        const contentTypeLabels: Record<string, string> = {
-          table: "📊 Tabel",
-          chart: "📈 Grafiek",
-          diagram: "🔀 Diagram",
-          "image-with-text": "🖼️ Afbeelding",
-        };
         docContext = ordered
           .map((c) => {
             const parts = [
               c.page ? `Pagina ${c.page}` : null,
               c.sectionHeading || null,
               c.contentType && c.contentType !== "text"
-                ? contentTypeLabels[c.contentType] || c.contentType
+                ? CONTENT_TYPE_LABELS[c.contentType] || c.contentType
                 : null,
             ].filter(Boolean);
             const label = parts.join(" - ");
@@ -119,10 +129,7 @@ export async function POST(
           })
           .join("\n\n---\n\n");
 
-        // For broad questions (summaries, overviews), prepend the document summary
-        // so the LLM has high-level context alongside the specific fragments
-        const broadQueryPattern = /samenvat|hoofdpunt|overzicht|overview|summary|main point|key point|samengevat|kernpunt|belangrijk/i;
-        if (broadQueryPattern.test(message) && doc.content?.summary?.original) {
+        if (BROAD_QUERY_PATTERN.test(message) && doc.content?.summary?.original) {
           const keyPointsText = (doc.content?.keyPoints as { text: string }[] | undefined)
             ?.map((kp) => `- ${kp.text}`)
             .join("\n") || "";
@@ -155,7 +162,6 @@ export async function POST(
         "";
     }
 
-    // Build system prompt
     const systemPrompt = useRAGPrompt
       ? `${buildRAGSystemPrompt({
           documentTitle: doc.title,
@@ -190,10 +196,7 @@ ${docContext}`;
     const assistantResponse =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Post-generation citation verification
     if (useRAGPrompt && ragChunks.length > 0) {
-      // Pinecone now returns pageImageUrl directly (150 DPI for visual pages, 72 DPI for text)
-      // Fall back to Document.pageImages only if not in Pinecone (old indexes)
       const chunksWithMeta = ragChunks.map((c) => ({
         ...c,
         pageImageUrl: c.pageImageUrl || (c.page ? pageImageMap.get(c.page) : undefined),
@@ -207,7 +210,6 @@ ${docContext}`;
       }));
     }
 
-    // Store chat message
     const sessionId =
       req.cookies.get("chat_session")?.value || nanoid();
 
@@ -228,12 +230,10 @@ ${docContext}`;
       { upsert: true }
     );
 
-    // Increment chat interactions
     await DocumentModel.findByIdAndUpdate(id, {
       $inc: { "analytics.chatInteractions": 1 },
     });
 
-    // Log question for analytics
     ChatQuestion.create({
       documentId: id,
       sessionId,
@@ -242,9 +242,8 @@ ${docContext}`;
       responseTimeMs: Date.now() - chatStartTime,
       tokensUsed: response.usage?.output_tokens,
       aiModel: MODELS.chat,
-    }).catch(() => {}); // fire-and-forget
+    }).catch(() => {});
 
-    // Dispatch webhook for chat message
     if (doc.organizationId) {
       dispatchWebhookEvent(
         doc.organizationId.toString(),
@@ -265,13 +264,12 @@ ${docContext}`;
       },
     });
 
-    // Set session cookie if new
     if (!req.cookies.get("chat_session")) {
       res.cookies.set("chat_session", sessionId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
+        maxAge: 60 * 60 * 24 * 7,
       });
     }
 

@@ -22,7 +22,7 @@ export function buildRAGSystemPrompt(opts: {
 
 function buildDutchPrompt(
   titles: string[],
-  targetLevel?: string,
+  targetLevel?: "B1" | "B2" | "C1" | "C2",
   isCollection?: boolean
 ): string {
   const docRef = isCollection
@@ -76,7 +76,7 @@ BETROUWBAARHEID:
 
 function buildEnglishPrompt(
   titles: string[],
-  targetLevel?: string,
+  targetLevel?: "B1" | "B2" | "C1" | "C2",
   isCollection?: boolean
 ): string {
   const docRef = isCollection

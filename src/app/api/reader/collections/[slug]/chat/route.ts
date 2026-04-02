@@ -17,10 +17,14 @@ import { buildRAGSystemPrompt } from "@/lib/ai/prompts";
 import { verifyCitations } from "@/lib/ai/verify-citations";
 import { rewriteQuery } from "@/lib/ai/rewrite-query";
 import { getLangStrings } from "@/lib/ai/language";
+import {
+  BROAD_QUERY_PATTERN,
+  SCORE_THRESHOLD,
+  validateChatMessage,
+} from "@/lib/ai/rag-utils";
+import { buildPageImageMap } from "@/lib/page-images";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
-
-const SCORE_THRESHOLD = 0.3;
 
 export async function POST(
   req: NextRequest,
@@ -29,16 +33,16 @@ export async function POST(
   try {
     await connectDB();
     const { slug } = await params;
-    const { message, history } = await req.json();
+    const { message: rawMessage, history } = await req.json();
 
-    if (!message || typeof message !== "string") {
+    const message = validateChatMessage(rawMessage);
+    if (!message) {
       return NextResponse.json(
-        { error: "Bericht is verplicht." },
+        { error: "Bericht is verplicht (max 2000 tekens)." },
         { status: 400 }
       );
     }
 
-    // Find collection
     const collection = await Collection.findOne({ slug }).lean();
     if (!collection) {
       return NextResponse.json(
@@ -47,7 +51,6 @@ export async function POST(
       );
     }
 
-    // Check password if needed
     if (collection.access?.type === "password") {
       const password = req.headers.get("x-collection-password");
       if (!password) {
@@ -68,13 +71,12 @@ export async function POST(
       }
     }
 
-    // Get all published documents in collection
     const docs = await DocumentModel.find({
       collectionId: collection._id,
       status: "ready",
     })
       .select(
-        "title shortId vectorized language targetCEFRLevel content.summary.original content.keyPoints content.terms pageImages"
+        "title shortId vectorized language targetCEFRLevel content.summary.original content.keyPoints content.terms pageCount pageLabelOffset"
       )
       .lean();
 
@@ -87,14 +89,11 @@ export async function POST(
 
     const lang = (docs[0]?.language as "nl" | "en") || "nl";
     const L = getLangStrings(lang);
-    // Use the first document's CEFR level as the collection target
     const targetLevel = docs.find((d) => d.targetCEFRLevel)?.targetCEFRLevel as "B1" | "B2" | "C1" | "C2" | undefined;
 
-    // Separate vectorized and non-vectorized documents
     const vectorizedDocs = docs.filter((d) => d.vectorized);
     const nonVectorizedDocs = docs.filter((d) => !d.vectorized);
 
-    // Build document ID → title map
     const docTitleMap = new Map<string, string>();
     const docShortIdMap = new Map<string, string>();
     const docPageImageMap = new Map<string, Map<number, string>>();
@@ -102,14 +101,8 @@ export async function POST(
       const docId = doc._id.toString();
       docTitleMap.set(docId, doc.title);
       docShortIdMap.set(docId, doc.shortId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pageImages = (doc as any).pageImages as { pageNumber: number; url: string }[] | undefined;
-      if (pageImages && pageImages.length > 0) {
-        const pageMap = new Map<number, string>();
-        for (const pi of pageImages) {
-          pageMap.set(pi.pageNumber, pi.url);
-        }
-        docPageImageMap.set(docId, pageMap);
+      if (doc.pageCount && doc.pageCount > 0) {
+        docPageImageMap.set(docId, buildPageImageMap(docId, doc.pageCount, doc.pageLabelOffset || 0));
       }
     }
 
@@ -117,25 +110,43 @@ export async function POST(
     let useRAGPrompt = false;
     let ragChunks: Awaited<ReturnType<typeof searchMultipleDocuments>> = [];
 
-    // Rewrite query for better semantic search (resolves history context + expands terms)
     const conversationHistory = (history || []).slice(-10).map(
       (m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })
     );
-    const searchQuery = await rewriteQuery(message, conversationHistory, lang);
 
     if (vectorizedDocs.length > 0) {
-      // Cross-document RAG: search all vectorized docs
       try {
         const vectorizedIds = vectorizedDocs.map((d) => d._id.toString());
-        const retrieved = await searchMultipleDocuments(
-          vectorizedIds,
-          searchQuery,
-          5,
-          20
-        );
+
+        // Parallelize query rewrite and initial search
+        const [searchQuery, initialResults] = await Promise.all([
+          rewriteQuery(message, conversationHistory, lang),
+          searchMultipleDocuments(vectorizedIds, message, 5, 20),
+        ]);
+
+        // Merge with rewritten query results if different
+        let retrieved = initialResults;
+        if (searchQuery !== message) {
+          const rewrittenResults = await searchMultipleDocuments(
+            vectorizedIds,
+            searchQuery,
+            5,
+            20
+          );
+          const merged = new Map<string, (typeof initialResults)[0]>();
+          for (const chunk of [...initialResults, ...rewrittenResults]) {
+            const key = `${chunk.documentId}|${chunk.page}|${chunk.text.slice(0, 50)}`;
+            const existing = merged.get(key);
+            if (!existing || chunk.score > existing.score) {
+              merged.set(key, chunk);
+            }
+          }
+          retrieved = Array.from(merged.values()).sort((a, b) => b.score - a.score);
+        }
+
         const reranked = await rerankChunks(message, retrieved, 8);
         const filtered = reranked.filter((c) => c.score > SCORE_THRESHOLD);
 
@@ -154,23 +165,19 @@ export async function POST(
           ragChunks = filtered;
           useRAGPrompt = true;
 
-          // For broad questions, prepend document summaries for high-level context
-          const broadQueryPattern = /samenvat|hoofdpunt|overzicht|overview|summary|main point|key point|samengevat|kernpunt|belangrijk/i;
-          if (broadQueryPattern.test(message)) {
+          if (BROAD_QUERY_PATTERN.test(message)) {
             const summaryLines = docs
               .filter((d) => d.content?.summary?.original)
               .map((d) => `[${d.title}]\n${d.content!.summary!.original}`)
               .join("\n\n");
             if (summaryLines) {
-              context = `--- Samenvattingen ---\n${summaryLines}\n\n--- Fragmenten ---\n${context}`;
+              context = `--- ${lang === "nl" ? "Samenvattingen" : "Summaries"} ---\n${summaryLines}\n\n--- ${lang === "nl" ? "Fragmenten" : "Fragments"} ---\n${context}`;
             }
           }
         } else {
-          // No RAG results but we have non-vectorized docs
           context = "";
         }
 
-        // Append fallback summaries for non-vectorized docs
         if (nonVectorizedDocs.length > 0) {
           const fallback = buildFallbackContext(
             nonVectorizedDocs.map((d) => ({
@@ -179,11 +186,10 @@ export async function POST(
               summary: d.content?.summary?.original || "",
             }))
           );
-          context += `\n\n--- Samenvattingen (niet-geïndexeerde documenten) ---${fallback}`;
+          context += `\n\n--- ${lang === "nl" ? "Samenvattingen (niet-geïndexeerde documenten)" : "Summaries (non-indexed documents)"} ---${fallback}`;
         }
       } catch (err) {
         console.error("Cross-document RAG failed, falling back to summaries:", err);
-        // Fall back to summary-based context
         const docContexts = docs.map((doc) => ({
           title: doc.title,
           shortId: doc.shortId,
@@ -198,7 +204,6 @@ export async function POST(
         context = buildCollectionContext(docContexts);
       }
     } else {
-      // No vectorized docs — use legacy summary-based context
       const docContexts = docs.map((doc) => ({
         title: doc.title,
         shortId: doc.shortId,
@@ -213,7 +218,7 @@ export async function POST(
       context = buildCollectionContext(docContexts);
     }
 
-    // Build system prompt
+    // Use language-aware system prompt (fixes hardcoded Dutch for non-RAG path)
     const docTitles = docs.map((d) => d.title);
     const systemPrompt = useRAGPrompt
       ? `${buildRAGSystemPrompt({
@@ -223,21 +228,20 @@ export async function POST(
           isCollection: true,
         })}
 
-Documentfragmenten:
+${lang === "nl" ? "Documentfragmenten" : "Document fragments"}:
 ${context}`
-      : `Je bent een behulpzame AI-assistent die vragen beantwoordt over de collectie "${collection.name}".
-Deze collectie bevat ${docs.length} documenten. Beantwoord vragen op basis van de inhoud van alle documenten.
+      : `${L.chatSystemPrompt(collection.name)}
+${lang === "nl"
+  ? `Deze collectie bevat ${docs.length} documenten. Beantwoord vragen op basis van de inhoud van alle documenten.
 
 BELANGRIJK: Noem altijd de titel of naam van het brondocument (vetgedrukt) wanneer je informatie eruit citeert, zodat de lezer weet waar het vandaan komt. Bijvoorbeeld: Volgens **Titel van het document** is...
-Als het antwoord niet in de documenten staat, zeg dat dan eerlijk.
-Antwoord altijd in het Nederlands. Wees beknopt maar informatief.
+Als het antwoord niet in de documenten staat, zeg dat dan eerlijk.`
+  : `This collection contains ${docs.length} documents. Answer questions based on the content of all documents.
 
-Opmaakregels:
-- Gebruik markdown voor structuur: **vetgedrukt** voor kopjes en documentnamen, opsommingstekens (- of •) voor lijsten.
-- Zet altijd een witregel tussen alinea's en voor/na een lijst.
-- Begin elk punt met de bronnaam vetgedrukt.
+IMPORTANT: Always mention the title of the source document (in bold) when citing information from it, so the reader knows where it comes from. For example: According to **Document Title**...
+If the answer is not in the documents, say so honestly.`}
 
-Documentinhoud:
+${lang === "nl" ? "Documentinhoud" : "Document content"}:
 ${context}`;
 
     const chatStartTime = Date.now();
@@ -251,13 +255,10 @@ ${context}`;
     const assistantResponse =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Post-generation citation verification + source document parsing
     let sourceDocuments: { documentId?: string; shortId: string; title: string }[];
     let sources: { page: number | null; section: string; score: number; quote?: string; documentTitle?: string; documentShortId?: string; contentType?: string; pageImageUrl?: string }[] = [];
 
     if (useRAGPrompt && ragChunks.length > 0) {
-      // Pinecone now returns pageImageUrl directly (150 DPI for visual pages, 72 DPI for text)
-      // Fall back to Document.pageImages only if not in Pinecone (old indexes)
       const chunksWithMeta = ragChunks.map((c) => ({
         ...c,
         documentTitle: docTitleMap.get(c.documentId),
@@ -281,7 +282,6 @@ ${context}`;
         })(),
       }));
 
-      // Derive sourceDocuments from verified sources
       const docRefs = new Map<string, { shortId: string; title: string }>();
       for (const s of verifiedSources) {
         if (s.documentShortId && !docRefs.has(s.documentShortId)) {
@@ -299,7 +299,6 @@ ${context}`;
       );
     }
 
-    // Store chat history
     const sessionId = req.cookies.get("chat_session")?.value || nanoid();
 
     await CollectionChatMessage.findOneAndUpdate(

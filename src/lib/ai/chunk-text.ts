@@ -98,18 +98,27 @@ function detectHeading(line: string): string | null {
  * @param chunkSize - Target characters per chunk (~500 tokens = 2000 chars)
  * @param overlap - Characters of overlap between chunks
  * @param pageCount - Optional known page count (for estimation if no page breaks found)
+ * @param pageLabelOffset - Number of physical pages before the first labeled "1" (cover pages)
  */
 export function chunkText(
   text: string,
   documentId: string,
   chunkSize: number = 2000,
   overlap: number = 200,
-  pageCount?: number
+  pageCount?: number,
+  pageLabelOffset: number = 0
 ): TextChunk[] {
   if (!text || text.trim().length === 0) return [];
 
   const pageBoundaries = detectPageBoundaries(text);
   const hasRealPageBreaks = pageBoundaries.length > 1;
+
+  /** Apply page label offset: convert physical page to display page */
+  const toDisplayPage = (physicalPage: number | null): number | null => {
+    if (physicalPage === null) return null;
+    const display = physicalPage - pageLabelOffset;
+    return display >= 1 ? display : null;
+  };
 
   // If no real page breaks but we know page count, estimate evenly
   const charsPerPage =
@@ -153,7 +162,7 @@ export function chunkText(
       currentChunk.length + trimmed.length > chunkSize &&
       currentChunk.length > 0
     ) {
-      const page = hasRealPageBreaks
+      const rawPage = hasRealPageBreaks
         ? getPageForOffset(chunkStartOffset, pageBoundaries)
         : charsPerPage > 0
           ? Math.ceil((chunkStartOffset + 1) / charsPerPage)
@@ -163,7 +172,7 @@ export function chunkText(
         id: `${documentId}_chunk_${chunkIndex}`,
         text: currentChunk.trim(),
         chunkIndex,
-        page,
+        page: toDisplayPage(rawPage),
         paragraphIndex: chunkStartParagraph,
         sectionHeading: currentHeading,
         charOffset: chunkStartOffset,
@@ -191,7 +200,7 @@ export function chunkText(
 
   // Last chunk
   if (currentChunk.trim().length > 0) {
-    const page = hasRealPageBreaks
+    const rawPage = hasRealPageBreaks
       ? getPageForOffset(chunkStartOffset, pageBoundaries)
       : charsPerPage > 0
         ? Math.ceil((chunkStartOffset + 1) / charsPerPage)
@@ -201,7 +210,7 @@ export function chunkText(
       id: `${documentId}_chunk_${chunkIndex}`,
       text: currentChunk.trim(),
       chunkIndex,
-      page,
+      page: toDisplayPage(rawPage),
       paragraphIndex: chunkStartParagraph,
       sectionHeading: currentHeading,
       charOffset: chunkStartOffset,

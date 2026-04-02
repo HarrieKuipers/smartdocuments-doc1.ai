@@ -81,20 +81,30 @@ export async function deleteFile(key: string): Promise<void> {
 }
 
 export async function deletePrefix(prefix: string): Promise<void> {
-  const listCommand = new ListObjectsV2Command({
-    Bucket: BUCKET,
-    Prefix: prefix,
-  });
-  const listed = await s3Client.send(listCommand);
-  if (listed.Contents && listed.Contents.length > 0) {
-    await Promise.all(
-      listed.Contents.map((obj) =>
-        obj.Key
-          ? s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
-          : Promise.resolve()
-      )
-    );
-  }
+  let continuationToken: string | undefined;
+
+  do {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: BUCKET,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    });
+    const listed = await s3Client.send(listCommand);
+
+    if (listed.Contents && listed.Contents.length > 0) {
+      await Promise.all(
+        listed.Contents.map((obj) =>
+          obj.Key
+            ? s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }))
+            : Promise.resolve()
+        )
+      );
+    }
+
+    continuationToken = listed.IsTruncated
+      ? listed.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
 }
 
 export function getFileUrl(key: string): string {

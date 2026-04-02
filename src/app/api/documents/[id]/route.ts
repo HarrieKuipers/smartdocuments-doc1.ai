@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
+import { buildPageImageUrls } from "@/lib/page-images";
 import { generateAndUploadCover } from "@/lib/ai/generate-cover";
 import { generateSlug } from "@/lib/slug";
 import { deleteDocumentVectors } from "@/lib/pinecone";
@@ -31,7 +32,11 @@ export async function GET(
       return NextResponse.json({ error: "Document niet gevonden." }, { status: 404 });
     }
 
-    return NextResponse.json({ data: doc });
+    const pageImages = doc.pageCount
+      ? buildPageImageUrls(doc._id.toString(), doc.pageCount, doc.pageLabelOffset || 0)
+      : [];
+
+    return NextResponse.json({ data: { ...doc, pageImages } });
   } catch (error) {
     console.error("Document GET error:", error);
     return NextResponse.json(

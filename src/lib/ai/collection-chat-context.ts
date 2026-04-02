@@ -1,4 +1,5 @@
 import type { ChunkSearchResult } from "@/lib/pinecone";
+import { CONTENT_TYPE_LABELS } from "./rag-utils";
 
 interface DocContext {
   title: string;
@@ -57,12 +58,6 @@ export function buildRAGCollectionContext(
   chunks: (ChunkSearchResult & { documentId: string })[],
   documentTitles: Map<string, string>
 ): string {
-  const contentTypeLabels: Record<string, string> = {
-    table: "📊 Tabel",
-    chart: "📈 Grafiek",
-    diagram: "🔀 Diagram",
-    "image-with-text": "🖼️ Afbeelding",
-  };
   return chunks
     .map((c) => {
       const docTitle = documentTitles.get(c.documentId) || "Onbekend document";
@@ -71,7 +66,7 @@ export function buildRAGCollectionContext(
         c.page ? `Pagina ${c.page}` : null,
         c.sectionHeading || null,
         c.contentType && c.contentType !== "text"
-          ? contentTypeLabels[c.contentType] || c.contentType
+          ? CONTENT_TYPE_LABELS[c.contentType] || c.contentType
           : null,
       ]
         .filter(Boolean)

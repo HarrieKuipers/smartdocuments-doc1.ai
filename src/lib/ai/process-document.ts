@@ -57,11 +57,12 @@ export async function processDocument(
     const downloadUrl = await getPresignedDownloadUrl(storageKey);
     const fileResponse = await fetch(downloadUrl);
     const buffer = Buffer.from(await fileResponse.arrayBuffer());
-    const { text, pageCount } = await extractText(buffer, doc.sourceFile.mimeType);
+    const { text, pageCount, pageLabelOffset } = await extractText(buffer, doc.sourceFile.mimeType);
 
     await updateDoc(documentId, {
       "content.originalText": text,
       ...(pageCount ? { pageCount } : {}),
+      ...(pageLabelOffset !== undefined ? { pageLabelOffset } : {}),
     });
 
     // Step 1b: Visual content extraction (PDF only)
@@ -81,17 +82,13 @@ export async function processDocument(
         // Render ALL pages as thumbnails (72 DPI) and upload to S3
         // This enables page image previews in chat for every source reference
         const allPageBuffers = await renderAllPages(buffer, 72);
-        const pageImages: { pageNumber: number; url: string }[] = [];
 
         for (let i = 0; i < allPageBuffers.length; i++) {
-          const pageNum = i + 1; // 1-based
+          const pageNum = i + 1; // 1-based physical
           const key = `documents/${documentId}/pages/page-${pageNum}.png`;
           const url = await uploadPublicFile(key, allPageBuffers[i], "image/png");
-          pageImages.push({ pageNumber: pageNum, url });
           pageImageUrls.set(pageNum, url);
         }
-
-        await updateDoc(documentId, { pageImages });
 
         // Detect pages with visual content (tables, charts, diagrams)
         const visualPageIndices = await detectVisualPages(buffer, pageCount);
@@ -114,7 +111,7 @@ export async function processDocument(
             visualContentExtracted: true,
             visualChunkCount: visualContent.length,
             visualContent: visualContent.map((vc) => ({
-              pageNumber: vc.pageIndex + 1,
+              pageNumber: vc.pageIndex + 1, // Store as physical page (1-based), apply offset at display time
               contentType: vc.contentType,
               description: vc.description,
             })),
@@ -143,7 +140,8 @@ export async function processDocument(
         pageCount,
         visualContent.length > 0 ? visualContent : undefined,
         pageImageUrls.size > 0 ? pageImageUrls : undefined,
-        highResPageImageUrls.size > 0 ? highResPageImageUrls : undefined
+        highResPageImageUrls.size > 0 ? highResPageImageUrls : undefined,
+        pageLabelOffset || 0
       );
       await updateDoc(documentId, { vectorized: true, chunkCount });
     } catch (err) {

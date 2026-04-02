@@ -25,6 +25,7 @@ import type { VisualContent } from "./extract-visual-content";
  * @param visualContent - Optional extracted visual content to interleave
  * @param pageImageUrls - Optional map of page number → 72 DPI S3 image URL
  * @param highResPageImageUrls - Optional map of page number → 150 DPI S3 image URL (for visual pages)
+ * @param pageLabelOffset - Number of physical pages before the first labeled "1" (cover pages)
  */
 export async function vectorizeDocument(
   documentId: string,
@@ -33,7 +34,8 @@ export async function vectorizeDocument(
   pageCount?: number,
   visualContent?: VisualContent[],
   pageImageUrls?: Map<number, string>,
-  highResPageImageUrls?: Map<number, string>
+  highResPageImageUrls?: Map<number, string>,
+  pageLabelOffset: number = 0
 ): Promise<number> {
   // Ensure index exists
   await ensureIndex();
@@ -46,19 +48,20 @@ export async function vectorizeDocument(
   }
 
   // Chunk the text with metadata
-  const textChunks = chunkText(text, documentId, 2000, 200, pageCount);
+  const textChunks = chunkText(text, documentId, 2000, 200, pageCount, pageLabelOffset);
 
   // Create visual content chunks
   const visualChunks: TextChunk[] = [];
   if (visualContent && visualContent.length > 0) {
     for (const vc of visualContent) {
-      const pageNum = vc.pageIndex + 1; // Convert 0-based to 1-based
+      const physicalPage = vc.pageIndex + 1; // 0-based to 1-based physical
+      const displayPage = Math.max(1, physicalPage - pageLabelOffset);
       const prefix =
         vc.contentType === "table"
-          ? `[Tabel op Pagina ${pageNum}]`
+          ? `[Tabel op Pagina ${displayPage}]`
           : vc.contentType === "chart"
-            ? `[Grafiek op Pagina ${pageNum}]`
-            : `[Diagram op Pagina ${pageNum}]`;
+            ? `[Grafiek op Pagina ${displayPage}]`
+            : `[Diagram op Pagina ${displayPage}]`;
 
       // Build chunk text from description + table markdown
       const chunkTextContent = [
@@ -74,7 +77,7 @@ export async function vectorizeDocument(
         id: "", // Will be assigned below
         text: chunkTextContent,
         chunkIndex: 0, // Will be assigned below
-        page: pageNum,
+        page: displayPage,
         paragraphIndex: 0,
         sectionHeading: prefix,
         charOffset: 0,
@@ -82,7 +85,8 @@ export async function vectorizeDocument(
         contentType: vc.contentType === "image-with-text" ? "diagram" : vc.contentType,
         visualDescription: vc.description,
         tableMarkdown: vc.tableMarkdown,
-        pageImageUrl: highResPageImageUrls?.get(pageNum) || pageImageUrls?.get(pageNum),
+        // Maps are keyed by PHYSICAL page number
+        pageImageUrl: highResPageImageUrls?.get(physicalPage) || pageImageUrls?.get(physicalPage),
       });
     }
   }
@@ -125,10 +129,12 @@ export async function vectorizeDocument(
   // Prepare chunks with rich metadata for Pinecone
   const pineconeChunks = allChunks.map((chunk) => {
     // For visual chunks, prefer high-res URL; for text chunks, use 72 DPI thumbnail
-    const pageNum = chunk.page ?? 0;
+    // Maps are keyed by PHYSICAL page number, so add offset back for lookup
+    const displayPage = chunk.page ?? 0;
+    const physicalPage = displayPage > 0 ? displayPage + pageLabelOffset : 0;
     const imageUrl =
       chunk.pageImageUrl || // Visual chunk already has high-res URL set
-      (pageNum > 0 ? (highResPageImageUrls?.get(pageNum) || pageImageUrls?.get(pageNum)) : undefined);
+      (physicalPage > 0 ? (highResPageImageUrls?.get(physicalPage) || pageImageUrls?.get(physicalPage)) : undefined);
 
     return {
       id: chunk.id,
@@ -136,7 +142,7 @@ export async function vectorizeDocument(
       metadata: {
         document_id: documentId,
         chunk_index: chunk.chunkIndex,
-        page: pageNum,
+        page: displayPage,
         paragraph_index: chunk.paragraphIndex,
         section_heading: chunk.sectionHeading || "",
         char_offset: chunk.charOffset,

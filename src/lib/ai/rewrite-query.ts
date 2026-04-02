@@ -9,28 +9,32 @@ import anthropic, { MODELS } from "./client";
  *    "costs and expenses for next year in the annual report").
  *
  * 2. **Query expansion** — adds synonyms and related terms to improve
- *    embedding recall (especially helpful for Dutch ↔ formal/informal).
+ *    embedding recall (especially helpful for Dutch formal/informal).
  *
- * Returns the rewritten query string optimized for vector search,
- * or falls back to the original message on any failure.
+ * Always rewrites when history exists (pronoun resolution needed) or
+ * when the query is short/vague. Also rewrites longer first-time queries
+ * for synonym expansion to improve Dutch legal/government document recall.
+ *
+ * Returns the rewritten query string, or falls back to the original on failure.
  */
 export async function rewriteQuery(
   message: string,
-  history: { role: string; content: string }[],
+  history: { role: "user" | "assistant"; content: string }[],
   language: "nl" | "en" = "nl"
 ): Promise<string> {
-  // No rewrite needed for first message with no history
   const hasHistory = history.length > 0;
-  const isShortVague = message.split(/\s+/).length <= 3;
+  const wordCount = message.split(/\s+/).length;
 
-  if (!hasHistory && !isShortVague) {
+  // Skip rewriting only for long, specific first-time queries (>8 words)
+  // that are likely already well-formed search terms
+  if (!hasHistory && wordCount > 8) {
     return message;
   }
 
   try {
     const historyContext = hasHistory
       ? history
-          .slice(-6) // Only recent turns
+          .slice(-6)
           .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
           .join("\n")
       : "";
@@ -72,7 +76,6 @@ Rewritten search query:`;
         ? response.content[0].text.trim()
         : "";
 
-    // Sanity check: don't return empty or absurdly long rewrites
     if (rewritten.length < 3 || rewritten.length > 500) {
       return message;
     }

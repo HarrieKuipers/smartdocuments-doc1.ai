@@ -92,6 +92,7 @@ interface DocumentData {
   languageLevel?: "B1" | "B2" | "C1" | "C2";
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   pageCount?: number;
+  pageLabelOffset?: number;
   pageImages?: { pageNumber: number; url: string }[];
   visualContentExtracted?: boolean;
   visualChunkCount?: number;
@@ -328,6 +329,7 @@ export default function DocumentEditPage() {
           scheduledPublishAt: scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null,
           infoBoxLabel: infoBoxLabel || null,
           infoBoxText: infoBoxText || null,
+          pageLabelOffset: doc?.pageLabelOffset ?? 0,
           brandOverride: {
             primary:
               templateOptions.find((t) => t.templateId === templateId)?.primary ??
@@ -952,55 +954,95 @@ export default function DocumentEditPage() {
                     Visuele Content
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {doc.pageImages.length} pagina&apos;s
-                    {doc.visualChunkCount ? ` · ${doc.visualChunkCount} visuele elementen gedetecteerd` : ""}
+                    {doc.visualContent && doc.visualContent.length > 0
+                      ? `${doc.visualContent.length} visuele elementen gedetecteerd op ${new Set(doc.visualContent.map((vc) => vc.pageNumber)).size} pagina's`
+                      : `${doc.pageImages.length} pagina's`}
                   </p>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-2">
-                    {(showAllPages ? doc.pageImages : doc.pageImages.slice(0, 24)).map((pi) => {
-                      const visual = doc.visualContent?.find((vc) => vc.pageNumber === pi.pageNumber);
-                      const typeEmoji = visual?.contentType === "table" ? "📊" : visual?.contentType === "chart" ? "📈" : visual?.contentType === "diagram" ? "🔀" : visual?.contentType === "image-with-text" ? "🖼️" : "";
-                      const typeLabel = visual?.contentType === "table" ? "Tabel" : visual?.contentType === "chart" ? "Grafiek" : visual?.contentType === "diagram" ? "Diagram" : visual?.contentType === "image-with-text" ? "Afbeelding" : "";
-                      return (
-                        <button
-                          key={pi.pageNumber}
-                          onClick={() => setLightboxUrl(pi.url)}
-                          className={`group relative overflow-hidden rounded-lg border transition-all hover:shadow-md ${
-                            visual ? "border-primary/40 ring-1 ring-primary/20" : "border-gray-200 hover:border-gray-400"
-                          }`}
-                          title={visual ? `${typeLabel}: ${visual.description}` : `Pagina ${pi.pageNumber}`}
-                        >
-                          <img
-                            src={pi.url}
-                            alt={`Pagina ${pi.pageNumber}`}
-                            className="w-full aspect-[3/4] object-cover bg-gray-50"
-                            loading="lazy"
-                          />
-                          {/* Page number badge */}
-                          <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                            {pi.pageNumber}
-                          </span>
-                          {/* Content type badge for visual pages */}
-                          {visual && (
-                            <span className="absolute top-1 right-1 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] text-white whitespace-nowrap">
-                              {typeEmoji} {typeLabel}
-                            </span>
-                          )}
-                        </button>
+                  <div className={`grid gap-3 ${doc.visualContent && doc.visualContent.length > 0 ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5" : "grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-2"}`}>
+                    {(() => {
+                      const hasVisualContent = doc.visualContent && doc.visualContent.length > 0;
+                      // pageImages[i].url contains the physical page number in the filename.
+                      // visualContent.pageNumber = physical page (1-based, stored without offset).
+                      // We match by extracting the physical page from the URL.
+                      const getPhysicalPage = (url: string) => {
+                        const m = url.match(/page-(\d+)\.png/);
+                        return m ? parseInt(m[1], 10) : 0;
+                      };
+                      const visualPhysicalPages = new Set(
+                        doc.visualContent?.map((vc) => vc.pageNumber) || []
                       );
-                    })}
+                      const pagesToShow = hasVisualContent
+                        ? doc.pageImages!.filter((pi) => {
+                            const physical = getPhysicalPage(pi.url);
+                            return visualPhysicalPages.has(physical);
+                          })
+                        : doc.pageImages!;
+                      const displayPages = showAllPages ? pagesToShow : pagesToShow.slice(0, hasVisualContent ? 20 : 24);
+                      return displayPages.map((pi) => {
+                        const physical = getPhysicalPage(pi.url);
+                        const visuals = doc.visualContent?.filter((vc) =>
+                          vc.pageNumber === physical
+                        );
+                        const hasVisual = visuals && visuals.length > 0;
+                        const typeEmoji = visuals?.[0]?.contentType === "table" ? "📊" : visuals?.[0]?.contentType === "chart" ? "📈" : visuals?.[0]?.contentType === "diagram" ? "🔀" : visuals?.[0]?.contentType === "image-with-text" ? "🖼️" : "";
+                        const typeLabel = visuals?.[0]?.contentType === "table" ? "Tabel" : visuals?.[0]?.contentType === "chart" ? "Grafiek" : visuals?.[0]?.contentType === "diagram" ? "Diagram" : visuals?.[0]?.contentType === "image-with-text" ? "Afbeelding" : "";
+                        return (
+                          <button
+                            key={pi.pageNumber}
+                            onClick={() => setLightboxUrl(pi.url)}
+                            className={`group relative overflow-hidden rounded-lg border transition-all hover:shadow-md ${
+                              hasVisual ? "border-primary/40 ring-1 ring-primary/20" : "border-gray-200 hover:border-gray-400"
+                            }`}
+                            title={hasVisual ? visuals!.map((v) => v.description).join("\n") : `Pagina ${pi.pageNumber}`}
+                          >
+                            <img
+                              src={pi.url}
+                              alt={`Pagina ${pi.pageNumber}`}
+                              className="w-full aspect-[3/4] object-cover bg-gray-50"
+                              loading="lazy"
+                            />
+                            {/* Page number badge */}
+                            <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                              {pi.pageNumber}
+                            </span>
+                            {/* Content type badge for visual pages */}
+                            {hasVisual && (
+                              <span className="absolute top-1 right-1 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] text-white whitespace-nowrap">
+                                {typeEmoji} {typeLabel}{visuals!.length > 1 ? ` +${visuals!.length - 1}` : ""}
+                              </span>
+                            )}
+                            {/* Description overlay on hover */}
+                            {hasVisual && (
+                              <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform bg-black/75 px-2 py-1.5">
+                                <p className="text-[10px] leading-tight text-white line-clamp-3">
+                                  {visuals!.map((v) => v.description).join("; ")}
+                                </p>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
-                  {!showAllPages && doc.pageImages.length > 24 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      onClick={() => setShowAllPages(true)}
-                    >
-                      Toon alle {doc.pageImages.length} pagina&apos;s
-                    </Button>
-                  )}
+                  {!showAllPages && (() => {
+                    const hasVisualContent = doc.visualContent && doc.visualContent.length > 0;
+                    const totalPages = hasVisualContent
+                      ? new Set(doc.visualContent!.map((vc) => vc.pageNumber)).size
+                      : doc.pageImages!.length;
+                    const limit = hasVisualContent ? 20 : 24;
+                    return totalPages > limit ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => setShowAllPages(true)}
+                      >
+                        Toon alle {totalPages} pagina&apos;s
+                      </Button>
+                    ) : null;
+                  })()}
                 </CardContent>
               </Card>
             )}
@@ -1304,6 +1346,32 @@ export default function DocumentEditPage() {
                         Op welk taalniveau moeten de samenvatting, begrippen en bevindingen worden geschreven? Herindexeer na wijziging.
                       </p>
                     </div>
+                    {doc.pageCount && doc.pageCount > 0 && (
+                      <div className="space-y-2">
+                        <Label>Paginanummering start</Label>
+                        <Select
+                          value={String(doc.pageLabelOffset ?? 0)}
+                          onValueChange={(v) => {
+                            const offset = parseInt(v, 10);
+                            setDoc({ ...doc, pageLabelOffset: offset });
+                            setSaved(false);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">Pagina 1 = eerste pagina</SelectItem>
+                            <SelectItem value="1">Pagina 1 = tweede pagina (voorblad)</SelectItem>
+                            <SelectItem value="2">Pagina 1 = derde pagina</SelectItem>
+                            <SelectItem value="3">Pagina 1 = vierde pagina</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground">
+                          Heeft het PDF een voorblad? Stel in op welke fysieke pagina de nummering begint. Herindexeer na wijziging.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">

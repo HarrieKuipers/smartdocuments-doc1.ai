@@ -5,12 +5,17 @@ import type { ChunkSearchResult } from "@/lib/pinecone";
  * Rerank retrieved chunks using Claude Haiku as a lightweight reranker.
  * Asks the model to order chunks by relevance to the query.
  * Falls back to original score-based ordering on failure.
+ *
+ * Only triggers reranking when there are enough chunks to justify the
+ * additional LLM call — skips for small result sets where the vector
+ * search ordering is already reliable.
  */
 export async function rerankChunks<T extends ChunkSearchResult>(
   query: string,
   chunks: T[],
   topN: number = 8
 ): Promise<T[]> {
+  // Skip reranking for small sets — vector search ordering is sufficient
   if (chunks.length <= topN) return chunks;
 
   try {
@@ -33,10 +38,15 @@ export async function rerankChunks<T extends ChunkSearchResult>(
 
     const text =
       response.content[0].type === "text" ? response.content[0].text : "";
-    const match = text.match(/\[[\d,\s]+\]/);
+    // Allow empty arrays [] and populated arrays [1,2,3]
+    const match = text.match(/\[[\d,\s]*\]/);
     if (!match) return chunks.slice(0, topN);
 
     const indices: number[] = JSON.parse(match[0]);
+
+    // Empty array = model found nothing relevant
+    if (indices.length === 0) return chunks.slice(0, topN);
+
     const reranked: T[] = [];
     const seen = new Set<number>();
 
@@ -52,8 +62,9 @@ export async function rerankChunks<T extends ChunkSearchResult>(
     if (reranked.length < topN) {
       for (const chunk of chunks) {
         if (reranked.length >= topN) break;
-        if (!reranked.includes(chunk)) {
+        if (!seen.has(chunks.indexOf(chunk))) {
           reranked.push(chunk);
+          seen.add(chunks.indexOf(chunk));
         }
       }
     }

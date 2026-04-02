@@ -246,7 +246,7 @@ If no visual content, return [].`,
               ? response.content[0].text
               : "";
           // Extract JSON from response
-          const jsonMatch = text.match(/\[[\s\S]*\]/);
+          const jsonMatch = text.match(/\[[\s\S]*?\]/);
           if (jsonMatch) {
             const items = JSON.parse(jsonMatch[0]) as Array<{
               contentType: string;

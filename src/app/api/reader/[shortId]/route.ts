@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
 import { getTemplateAsync } from "@/lib/templates.server";
+import { buildPageImageUrls } from "@/lib/page-images";
 
 export async function GET(
   req: NextRequest,
@@ -72,10 +73,15 @@ export async function GET(
     // Resolve full template config (DB custom templates + static fallback)
     const templateConfig = await getTemplateAsync(doc.template);
 
+    const pageImages = doc.pageCount
+      ? buildPageImageUrls(doc._id.toString(), doc.pageCount, doc.pageLabelOffset || 0)
+      : [];
+
     return NextResponse.json(
       {
         data: {
           ...docData,
+          pageImages,
           content: publicContent,
           organization: org,
           templateConfig,
