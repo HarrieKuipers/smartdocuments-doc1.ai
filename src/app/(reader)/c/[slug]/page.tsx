@@ -37,6 +37,19 @@ interface CollectionDocument {
   publicationDate?: string;
   tags: string[];
   pageCount?: number;
+  chatSuggestions?: string[];
+  chatSuggestionsCache?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+  }[];
+  keyPoints?: { text: string; explanation?: string }[];
+  pageImages?: {
+    pageNumber: number;
+    url: string;
+    contentType?: "table" | "chart" | "diagram" | "image-with-text";
+    description?: string;
+  }[];
   createdAt: string;
 }
 
@@ -529,6 +542,17 @@ export default function PublicCollectionPage() {
           customSuggestions={collection.chatSuggestions}
           cachedAnswers={collection.chatSuggestionsCache}
           contextName={collection.name}
+          collectionDocuments={collection.documents.map(d => ({
+            title: d.title,
+            shortId: d.shortId,
+            coverImageUrl: d.coverImageUrl,
+            customCoverUrl: d.customCoverUrl,
+            pageCount: d.pageCount,
+            chatSuggestions: d.chatSuggestions,
+            chatSuggestionsCache: d.chatSuggestionsCache,
+            keyPoints: d.keyPoints,
+            pageImages: d.pageImages,
+          }))}
         />
       )}
     </div>

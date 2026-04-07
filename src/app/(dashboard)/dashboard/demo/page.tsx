@@ -23,6 +23,7 @@ interface Collection {
 }
 
 interface CollectionConfig {
+  name: string;
   chatIntro?: string;
   chatPlaceholder?: string;
   chatSuggestions?: string[];
@@ -37,6 +38,27 @@ interface CollectionConfig {
   organization?: {
     brandColors?: { primary?: string };
   };
+  documents?: {
+    _id: string;
+    title: string;
+    shortId: string;
+    coverImageUrl?: string;
+    customCoverUrl?: string;
+    pageCount?: number;
+    chatSuggestions?: string[];
+    chatSuggestionsCache?: {
+      question: string;
+      answer: string;
+      sourceDocuments?: { shortId: string; title: string }[];
+    }[];
+    keyPoints?: { text: string; explanation?: string }[];
+    pageImages?: {
+      pageNumber: number;
+      url: string;
+      contentType?: "table" | "chart" | "diagram" | "image-with-text";
+      description?: string;
+    }[];
+  }[];
 }
 
 export default function WidgetDemoPage() {
@@ -293,7 +315,18 @@ function WidgetDemoContent() {
                   customPlaceholder={config.chatPlaceholder}
                   customSuggestions={config.chatSuggestions}
                   cachedAnswers={config.chatSuggestionsCache}
-                  contextName={collections.find((c) => c.slug === selectedSlug)?.name}
+                  contextName={config.name || collections.find((c) => c.slug === selectedSlug)?.name}
+                  collectionDocuments={config.documents?.map(d => ({
+                    title: d.title,
+                    shortId: d.shortId,
+                    coverImageUrl: d.coverImageUrl,
+                    customCoverUrl: d.customCoverUrl,
+                    pageCount: d.pageCount,
+                    chatSuggestions: d.chatSuggestions,
+                    chatSuggestionsCache: d.chatSuggestionsCache,
+                    keyPoints: d.keyPoints,
+                    pageImages: d.pageImages,
+                  }))}
                 />
               )}
             </>

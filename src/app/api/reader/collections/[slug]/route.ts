@@ -5,6 +5,7 @@ import Collection from "@/models/Collection";
 import DocumentModel from "@/models/Document";
 import Organization from "@/models/Organization";
 import Template from "@/models/Template";
+import { buildPageImageUrls } from "@/lib/page-images";
 
 export async function GET(
   req: NextRequest,
@@ -73,7 +74,7 @@ export async function GET(
       status: "ready",
     })
       .select(
-        "title shortId slug authors description coverImageUrl customCoverUrl publicationDate tags pageCount createdAt"
+        "title shortId slug authors description coverImageUrl customCoverUrl publicationDate tags pageCount pageLabelOffset chatSuggestions chatSuggestionsCache content.keyPoints visualContent createdAt"
       )
       .sort({ createdAt: -1 })
       .lean();
@@ -98,6 +99,39 @@ export async function GET(
       }
     }
 
+    // Enrich documents with derived pageImages and flattened keyPoints
+    const enrichedDocs = docs.map((doc) => {
+      const allPageImages = doc.pageCount
+        ? buildPageImageUrls(doc._id.toString(), doc.pageCount, doc.pageLabelOffset || 0)
+        : [];
+      // Only include pages that have visual content (tables, charts, etc.)
+      const pageImages = allPageImages
+        .map((pi) => {
+          const vc = doc.visualContent?.find((v) => v.pageNumber === pi.pageNumber);
+          return vc ? { ...pi, contentType: vc.contentType, description: vc.description } : null;
+        })
+        .filter(Boolean);
+
+      return {
+        _id: doc._id,
+        title: doc.title,
+        shortId: doc.shortId,
+        slug: doc.slug,
+        authors: doc.authors,
+        description: doc.description,
+        coverImageUrl: doc.coverImageUrl,
+        customCoverUrl: doc.customCoverUrl,
+        publicationDate: doc.publicationDate,
+        tags: doc.tags,
+        pageCount: doc.pageCount,
+        chatSuggestions: doc.chatSuggestions,
+        chatSuggestionsCache: doc.chatSuggestionsCache,
+        keyPoints: doc.content?.keyPoints,
+        pageImages,
+        createdAt: doc.createdAt,
+      };
+    });
+
     return NextResponse.json({
       data: {
         _id: collection._id,
@@ -112,7 +146,7 @@ export async function GET(
         chatSuggestions: collection.chatSuggestions,
         chatSuggestionsCache: collection.chatSuggestionsCache,
         organization: org,
-        documents: docs,
+        documents: enrichedDocs,
       },
     });
   } catch (error) {

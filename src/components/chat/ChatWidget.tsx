@@ -48,6 +48,27 @@ interface ChatWidgetProps {
     answer: string;
     sourceDocuments?: { shortId: string; title: string }[];
   }[];
+  /** Documents in the collection (collection mode only) */
+  collectionDocuments?: {
+    title: string;
+    shortId: string;
+    coverImageUrl?: string;
+    customCoverUrl?: string;
+    pageCount?: number;
+    chatSuggestions?: string[];
+    chatSuggestionsCache?: {
+      question: string;
+      answer: string;
+      sourceDocuments?: { shortId: string; title: string }[];
+    }[];
+    keyPoints?: { text: string; explanation?: string }[];
+    pageImages?: {
+      pageNumber: number;
+      url: string;
+      contentType?: "table" | "chart" | "diagram" | "image-with-text";
+      description?: string;
+    }[];
+  }[];
   /** Display name of the document or collection (shown in header & greeting) */
   contextName?: string;
   /** Key points from the document for welcome screen */
@@ -77,7 +98,7 @@ function extractConfidence(text: string) {
 /* ContentTypeIcon removed — sources now use minimal collapsible pattern */
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
-  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers, contextName, keyPoints, pageImages },
+  { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers, collectionDocuments, contextName, keyPoints, pageImages },
   ref
 ) {
   const isCollectionMode = !!collectionSlug;
@@ -89,6 +110,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+  const [selectedDocIndex, setSelectedDocIndex] = useState<number | null>(null);
   const skipAutoScrollRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,10 +118,14 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
   const L = getLangStrings(language).chat;
   const introText = customIntro || L.emptyFull;
   const placeholderText = customPlaceholder || L.inputPlaceholder;
-  const suggestions = customSuggestions && customSuggestions.length > 0 ? customSuggestions : L.suggestedQuestions;
+  const hasDocSuggestions = isCollectionMode && collectionDocuments?.some(d => d.chatSuggestions?.length);
+  const hasCustomSuggestions = customSuggestions && customSuggestions.length > 0;
+  const suggestions = hasCustomSuggestions ? customSuggestions : L.suggestedQuestions;
+  // Hide static fallback questions when per-document suggestions exist
+  const showSuggestions = hasCustomSuggestions || !hasDocSuggestions;
   const hasInput = isCollectionMode || chatMode !== "terms-only";
 
-  // Build a lookup map for cached answers
+  // Build a lookup map for cached answers (collection-level + per-document)
   const cacheMap = useMemo(() => {
     const map = new Map<string, { answer: string; sourceDocuments?: { shortId: string; title: string }[] }>();
     if (cachedAnswers) {
@@ -107,8 +133,20 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
         map.set(c.question, { answer: c.answer, sourceDocuments: c.sourceDocuments });
       }
     }
+    // Merge per-document caches so clicking any per-document suggestion is instant
+    if (collectionDocuments) {
+      for (const doc of collectionDocuments) {
+        if (doc.chatSuggestionsCache) {
+          for (const c of doc.chatSuggestionsCache) {
+            if (!map.has(c.question)) {
+              map.set(c.question, { answer: c.answer, sourceDocuments: c.sourceDocuments });
+            }
+          }
+        }
+      }
+    }
     return map;
-  }, [cachedAnswers]);
+  }, [cachedAnswers, collectionDocuments]);
 
   function handleSuggestionClick(question: string) {
     const cached = cacheMap.get(question);
@@ -312,9 +350,16 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                 />
               </div>
               {messages.length > 0 && (
-                <p className="text-sm font-semibold truncate max-w-[180px]">
-                  {contextName || (isCollectionMode ? "Collectie Chat" : chatMode === "terms-only" ? L.headerTitleTermsOnly : L.headerTitle)}
-                </p>
+                <div className="flex flex-col min-w-0">
+                  <p className="text-sm font-semibold truncate max-w-[180px]">
+                    {contextName || (isCollectionMode ? "Collectie Chat" : chatMode === "terms-only" ? L.headerTitleTermsOnly : L.headerTitle)}
+                  </p>
+                  {isCollectionMode && collectionDocuments && (
+                    <p className="text-[0.6rem] text-white/70 truncate">
+                      {collectionDocuments.length} documenten
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             <div className="flex items-center gap-1">
@@ -353,18 +398,158 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                   <p className="mt-1.5 text-sm text-white/90">
                     {customIntro
                       ? customIntro
-                      : contextName
-                        ? (language === "en" ? `Ask questions about ${contextName}` : `Stel vragen over ${contextName}`)
-                        : chatMode === "terms-only"
-                          ? L.emptyTermsOnly
-                          : chatMode === "terms-and-chat"
-                            ? L.emptyTermsAndChat
-                            : introText}
+                      : isCollectionMode && collectionDocuments
+                        ? (language === "en"
+                          ? `Ask questions across ${collectionDocuments.length} documents in this collection`
+                          : `Stel vragen over ${collectionDocuments.length} documenten in deze collectie`)
+                        : contextName
+                          ? (language === "en" ? `Ask questions about ${contextName}` : `Stel vragen over ${contextName}`)
+                          : chatMode === "terms-only"
+                            ? L.emptyTermsOnly
+                            : chatMode === "terms-and-chat"
+                              ? L.emptyTermsAndChat
+                              : introText}
                   </p>
                 </div>
 
                 {/* White content area — rounds up into the colored section */}
                 <div className="relative flex-1 rounded-t-2xl bg-white px-5 pt-5 pb-4 space-y-4 overflow-y-auto">
+                  {/* Collection document cards — horizontal scroll + tap to explore */}
+                  {isCollectionMode && collectionDocuments && collectionDocuments.length > 0 && (
+                    <div>
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                        {collectionDocuments.length} {language === "en" ? "documents" : "documenten"}
+                      </p>
+                      <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
+                        {collectionDocuments.map((doc, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedDocIndex(selectedDocIndex === i ? null : i)}
+                            className={`flex-shrink-0 w-[100px] rounded-xl border text-left transition-all ${
+                              selectedDocIndex === i
+                                ? "border-2 shadow-md"
+                                : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                            }`}
+                            style={selectedDocIndex === i ? { borderColor: brandPrimary } : undefined}
+                          >
+                            {(doc.customCoverUrl || doc.coverImageUrl) ? (
+                              <img
+                                src={doc.customCoverUrl || doc.coverImageUrl}
+                                alt=""
+                                className="w-full aspect-[3/4] rounded-t-xl object-cover bg-gray-100"
+                              />
+                            ) : (
+                              <div
+                                className="flex w-full aspect-[3/4] items-center justify-center rounded-t-xl"
+                                style={{ backgroundColor: `${brandPrimary}08` }}
+                              >
+                                <FileText className="h-6 w-6" style={{ color: `${brandPrimary}40` }} aria-hidden="true" />
+                              </div>
+                            )}
+                            <div className="px-2 py-1.5">
+                              <p className="text-[0.6rem] font-medium text-gray-700 line-clamp-2 leading-tight">{doc.title}</p>
+                              {doc.pageCount && (
+                                <p className="text-[0.55rem] text-gray-400 mt-0.5">{doc.pageCount} p.</p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Selected document details */}
+                      {selectedDocIndex !== null && collectionDocuments[selectedDocIndex] && (() => {
+                        const doc = collectionDocuments[selectedDocIndex];
+                        const hasContent = doc.keyPoints?.length || doc.pageImages?.length || doc.chatSuggestions?.length;
+                        return hasContent ? (
+                          <div className="mt-3 space-y-3 animate-[slideUp_0.15s_ease-out]">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-gray-700 truncate max-w-[250px]">{doc.title}</p>
+                              <a
+                                href={`/${doc.shortId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[0.6rem] font-medium hover:underline flex-shrink-0"
+                                style={{ color: brandPrimary }}
+                              >
+                                {language === "en" ? "Open" : "Openen"} ↗
+                              </a>
+                            </div>
+
+                            {/* Key points */}
+                            {doc.keyPoints && doc.keyPoints.length > 0 && (
+                              <div className="space-y-1.5">
+                                {doc.keyPoints.slice(0, 3).map((kp, ki) => (
+                                  <div key={ki} className="flex items-start gap-2 rounded-lg border border-gray-100 bg-gray-50/50 px-2.5 py-2">
+                                    <span
+                                      className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[0.6rem] font-bold text-white mt-0.5"
+                                      style={{ backgroundColor: brandPrimary }}
+                                    >
+                                      {ki + 1}
+                                    </span>
+                                    <p className="text-[0.7rem] text-gray-700 leading-relaxed">{kp.text}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Visual content */}
+                            {doc.pageImages && doc.pageImages.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {doc.pageImages.slice(0, 4).map((pi, pii) => {
+                                  const typeEmoji = pi.contentType === "table" ? "📊" : pi.contentType === "chart" ? "📈" : pi.contentType === "diagram" ? "🔀" : pi.contentType === "image-with-text" ? "🖼️" : "";
+                                  const typeLabel = language === "en"
+                                    ? (pi.contentType === "table" ? "Table" : pi.contentType === "chart" ? "Chart" : pi.contentType === "diagram" ? "Diagram" : pi.contentType === "image-with-text" ? "Image" : "")
+                                    : (pi.contentType === "table" ? "Tabel" : pi.contentType === "chart" ? "Grafiek" : pi.contentType === "diagram" ? "Diagram" : pi.contentType === "image-with-text" ? "Afbeelding" : "");
+                                  return (
+                                    <button
+                                      key={pii}
+                                      onClick={() => setLightboxUrl(pi.url)}
+                                      className="overflow-hidden rounded-lg border border-gray-200 hover:border-gray-400 shadow-sm hover:shadow transition-all text-left"
+                                    >
+                                      <img src={pi.url} alt={pi.description || `Page ${pi.pageNumber}`} className="w-full aspect-[4/3] object-cover bg-gray-50" loading="lazy" />
+                                      <div className="px-2 py-1 bg-gray-50 border-t border-gray-100">
+                                        <span className="text-[0.6rem] text-gray-500">{typeEmoji} {typeLabel} · p. {pi.pageNumber}</span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Suggestions */}
+                            {doc.chatSuggestions && doc.chatSuggestions.length > 0 && (
+                              <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+                                {doc.chatSuggestions.map((q, qi) => (
+                                  <button
+                                    key={qi}
+                                    onClick={() => handleSuggestionClick(q)}
+                                    className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                                  >
+                                    <span>{q}</span>
+                                    <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5 animate-[slideUp_0.15s_ease-out]">
+                            <p className="text-xs text-gray-500 truncate">{doc.title}</p>
+                            <a
+                              href={`/${doc.shortId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[0.6rem] font-medium hover:underline flex-shrink-0"
+                              style={{ color: brandPrimary }}
+                            >
+                              {language === "en" ? "Open" : "Openen"} ↗
+                            </a>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {/* Key points */}
                   {keyPoints && keyPoints.length > 0 && (
                     <div>
@@ -488,23 +673,25 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                           </div>
                         </div>
                       )}
-                      <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
-                        {suggestions.map((q, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleSuggestionClick(q)}
-                            className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                          >
-                            <span>{q}</span>
-                            <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                          </button>
-                        ))}
-                      </div>
+                      {showSuggestions && (
+                        <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+                          {suggestions.map((q, i) => (
+                            <button
+                              key={i}
+                              onClick={() => handleSuggestionClick(q)}
+                              className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                            >
+                              <span>{q}</span>
+                              <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
 
                   {/* full: question starters */}
-                  {chatMode === "full" && (
+                  {chatMode === "full" && showSuggestions && (
                     <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
                       {suggestions.map((q, i) => (
                         <button
