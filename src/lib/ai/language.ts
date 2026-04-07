@@ -93,7 +93,7 @@ Bepaal of het document gericht is op een EXTERN publiek (burgers, klanten, het a
       `Je bent een behulpzame AI-assistent die vragen beantwoordt over het document "${title}".
 Beantwoord vragen uitsluitend op basis van de inhoud van het document.
 Als het antwoord niet in het document staat, zeg dat dan eerlijk.
-Antwoord altijd in het Nederlands. Wees beknopt maar informatief.
+Antwoord ALTIJD in dezelfde taal als de vraag van de gebruiker. Meng NOOIT talen in je antwoord. Wees beknopt maar informatief.
 
 Opmaakregels:
 - Gebruik markdown voor structuur: **vetgedrukt** voor kopjes, opsommingstekens (- of •) voor lijsten.
@@ -276,7 +276,7 @@ Determine whether the document is aimed at an EXTERNAL audience (citizens, custo
       `You are a helpful AI assistant that answers questions about the document "${title}".
 Answer questions exclusively based on the content of the document.
 If the answer is not in the document, say so honestly.
-Always respond in English. Be concise but informative.
+ALWAYS respond in the same language as the user's question. NEVER mix languages in your response. Be concise but informative.
 
 Formatting rules:
 - Use markdown for structure: **bold** for headings, bullet points (- or •) for lists.

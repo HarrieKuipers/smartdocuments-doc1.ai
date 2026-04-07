@@ -97,6 +97,29 @@ function extractConfidence(text: string) {
 
 /* ContentTypeIcon removed — sources now use minimal collapsible pattern */
 
+/** Splits text to render citation brackets like [Pagina 74] as small muted tags */
+const CITATION_RE = /(\[(?:Pagina|Page)\s+\d+(?:\s*[-–,]\s*(?:Sectie|Section)\s+[^\]]+)?\])/g;
+function renderWithCitations(children: React.ReactNode): React.ReactNode {
+  if (typeof children === "string") {
+    const parts = children.split(CITATION_RE);
+    if (parts.length === 1) return children;
+    return parts.map((part, i) =>
+      CITATION_RE.test(part)
+        ? <span key={i} className="ml-0.5 text-[0.6rem] text-gray-400 font-normal align-super">{part}</span>
+        : part
+    );
+  }
+  if (Array.isArray(children)) {
+    return children.map((child, i) => <span key={i}>{renderWithCitations(child)}</span>);
+  }
+  return children;
+}
+
+const citationComponents = {
+  p: ({ children }: { children?: React.ReactNode }) => <p>{renderWithCitations(children)}</p>,
+  li: ({ children }: { children?: React.ReactNode }) => <li>{renderWithCitations(children)}</li>,
+};
+
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
   { documentId, brandPrimary = "#0062EB", chatMode = "terms-only", terms = [], language = "nl", collectionSlug, customIntro, customPlaceholder, customSuggestions, cachedAnswers, collectionDocuments, contextName, keyPoints, pageImages },
   ref
@@ -768,7 +791,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                         return (
                           <div>
                             <div className="prose prose-sm max-w-none text-gray-800 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 [&_p]:my-1.5 [&_p]:leading-relaxed [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-[0.8125rem] [&_h3]:font-semibold [&_h3]:mt-2.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_a]:text-blue-600 [&_a]:no-underline hover:[&_a]:underline">
-                              <ReactMarkdown>{cleanedContent}</ReactMarkdown>
+                              <ReactMarkdown components={citationComponents}>{cleanedContent}</ReactMarkdown>
                             </div>
 
                             {/* Page images — always visible with captions */}
