@@ -64,6 +64,12 @@ interface ReaderDocument {
   template?: string;
   templateConfig?: TemplateConfig;
   chatMode?: "terms-only" | "terms-and-chat" | "full";
+  chatSuggestions?: string[];
+  chatSuggestionsCache?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+  }[];
   discussionsEnabled?: boolean;
   infoBoxLabel?: string;
   infoBoxText?: string;
@@ -1075,6 +1081,8 @@ export default function ReaderPage() {
         contextName={doc.displayTitle || doc.title}
         keyPoints={activeContent.keyPoints}
         pageImages={chatPageImages}
+        customSuggestions={doc.chatSuggestions}
+        cachedAnswers={doc.chatSuggestionsCache}
       />
     </div>
   );

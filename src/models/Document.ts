@@ -48,6 +48,13 @@ export interface IDocument extends MongoDocument {
   targetCEFRLevel?: "B1" | "B2" | "C1" | "C2";
   template?: "doc1" | "rijksoverheid" | "amsterdam";
   chatMode?: "terms-only" | "terms-and-chat" | "full";
+  chatSuggestions?: string[];
+  chatSuggestionsCache?: {
+    question: string;
+    answer: string;
+    sourceDocuments?: { shortId: string; title: string }[];
+    generatedAt: Date;
+  }[];
   discussionsEnabled: boolean;
   brandOverride?: {
     primary?: string;
@@ -187,6 +194,20 @@ const DocumentSchema = new Schema<IDocument>(
       enum: ["terms-only", "terms-and-chat", "full"],
       default: "terms-only",
     },
+    chatSuggestions: [{ type: String }],
+    chatSuggestionsCache: [
+      {
+        question: { type: String, required: true },
+        answer: { type: String, required: true },
+        sourceDocuments: [
+          {
+            shortId: { type: String },
+            title: { type: String },
+          },
+        ],
+        generatedAt: { type: Date, default: Date.now },
+      },
+    ],
     discussionsEnabled: { type: Boolean, default: false },
     brandOverride: {
       primary: { type: String },

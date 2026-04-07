@@ -223,6 +223,9 @@ export default function DocumentEditPage() {
   const [isDraft, setIsDraft] = useState(false);
   const [scheduledPublishAt, setScheduledPublishAt] = useState("");
   const [discussionsEnabled, setDiscussionsEnabled] = useState(false);
+  const [chatSuggestions, setChatSuggestions] = useState<string[]>([]);
+  const [chatSuggestionInput, setChatSuggestionInput] = useState("");
+  const [precaching, setPrecaching] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showAllPages, setShowAllPages] = useState(false);
 
@@ -289,6 +292,7 @@ export default function DocumentEditPage() {
         setIsDraft(data.isDraft || false);
         setScheduledPublishAt(data.scheduledPublishAt ? new Date(data.scheduledPublishAt).toISOString().slice(0, 16) : "");
         setDiscussionsEnabled(data.discussionsEnabled || false);
+        setChatSuggestions(data.chatSuggestions || []);
       } catch {
         toast.error("Kon document niet laden.");
       } finally {
@@ -323,6 +327,7 @@ export default function DocumentEditPage() {
           targetCEFRLevel: targetCEFRLevel || null,
           template: templateId || "doc1",
           chatMode,
+          chatSuggestions,
           discussionsEnabled,
           customSlug: customSlug || null,
           isDraft,
@@ -352,7 +357,7 @@ export default function DocumentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt]);
+  }, [params.id, doc, title, displayTitle, description, accessType, accessPassword, summary, language, templateId, templateOptions, chatMode, chatSuggestions, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, keyPoints, findings, terms, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt]);
 
   useEffect(() => {
     if (!doc) return;
@@ -364,7 +369,7 @@ export default function DocumentEditPage() {
     setSaved(false);
     const timer = setTimeout(saveChanges, 2000);
     return () => clearTimeout(timer);
-  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt, saveChanges, doc]);
+  }, [title, displayTitle, description, accessType, accessPassword, summary, language, templateId, chatMode, chatSuggestions, discussionsEnabled, customSlug, infoBoxLabel, infoBoxText, contentVersion, authors, tags, targetCEFRLevel, isDraft, scheduledPublishAt, saveChanges, doc]);
 
   // Warn user if they try to leave with unsaved changes
   useEffect(() => {
@@ -1406,6 +1411,79 @@ export default function DocumentEditPage() {
                             : "AI genereert antwoorden voor begrippen en vragen"}
                       </p>
                     </div>
+                    {(chatMode === "terms-and-chat" || chatMode === "full") && (
+                      <div className="space-y-2">
+                        <Label>Startvragen voor chat</Label>
+                        <p className="text-[10px] text-muted-foreground">
+                          Klikbare suggesties die bezoekers zien in de chat widget
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {chatSuggestions.map((q, i) => (
+                            <Badge key={i} variant="secondary" className="gap-1 text-xs">
+                              {q}
+                              <button
+                                type="button"
+                                onClick={() => setChatSuggestions(chatSuggestions.filter((_, j) => j !== i))}
+                                className="ml-0.5 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={chatSuggestionInput}
+                            onChange={(e) => setChatSuggestionInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && chatSuggestionInput.trim()) {
+                                e.preventDefault();
+                                setChatSuggestions([...chatSuggestions, chatSuggestionInput.trim()]);
+                                setChatSuggestionInput("");
+                              }
+                            }}
+                            placeholder="Typ een suggestievraag…"
+                            className="text-xs"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={!chatSuggestionInput.trim()}
+                            onClick={() => {
+                              setChatSuggestions([...chatSuggestions, chatSuggestionInput.trim()]);
+                              setChatSuggestionInput("");
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Toevoegen
+                          </Button>
+                        </div>
+                        {chatSuggestions.length > 0 && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={precaching}
+                            onClick={async () => {
+                              setPrecaching(true);
+                              try {
+                                const res = await fetch(`/api/documents/${params.id}/precache-chat`, { method: "POST" });
+                                const { data, error } = await res.json();
+                                if (error) { toast.error(error); return; }
+                                toast.success(`${data.cached} antwoorden vooraf gegenereerd`);
+                              } catch {
+                                toast.error("Pre-analyse mislukt.");
+                              } finally {
+                                setPrecaching(false);
+                              }
+                            }}
+                          >
+                            {precaching ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                            Pre-analyse
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div>
