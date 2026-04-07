@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo, isValidElement, cloneElement, type ReactNode } from "react";
 import { BookOpen, X, Send, Maximize2, Minimize2, ArrowLeft, FileText, ChevronRight, ChevronDown } from "lucide-react";
 import { getLangStrings, type DocumentLanguage } from "@/lib/ai/language";
 import ReactMarkdown from "react-markdown";
@@ -97,27 +97,47 @@ function extractConfidence(text: string) {
 
 /* ContentTypeIcon removed — sources now use minimal collapsible pattern */
 
-/** Splits text to render citation brackets like [Pagina 74] as small muted tags */
-const CITATION_RE = /(\[(?:Pagina|Page)\s+\d+(?:\s*[-–,]\s*(?:Sectie|Section)\s+[^\]]+)?\])/g;
-function renderWithCitations(children: React.ReactNode): React.ReactNode {
+/** Escape citation brackets so ReactMarkdown treats them as plain text,
+ *  then style them in custom p/li components. */
+function escapeCitations(text: string): string {
+  // First: merge **DocName** [Pagina X] into a single escaped citation
+  let result = text.replace(/\*\*([^*]+)\*\*\s*\[([^\]]+)\]/g, "\\[$1, $2\\]");
+  // Then: escape any remaining standalone [brackets] (not preceded by \, not followed by ()
+  result = result.replace(/(?<!\\)\[([^\]]+)\](?!\()/g, "\\[$1\\]");
+  return result;
+}
+
+const CITATION_SPLIT = /(\[[^\]]+\])/g;
+const CITATION_TEST = /^\[/;
+function renderWithCitations(children: ReactNode): ReactNode {
   if (typeof children === "string") {
-    const parts = children.split(CITATION_RE);
+    const parts = children.split(CITATION_SPLIT);
     if (parts.length === 1) return children;
     return parts.map((part, i) =>
-      CITATION_RE.test(part)
-        ? <span key={i} className="ml-0.5 text-[0.6rem] text-gray-400 font-normal align-super">{part}</span>
+      CITATION_TEST.test(part)
+        ? <span key={i} className="ml-0.5 text-[0.6rem] text-gray-400 font-normal">{part}</span>
         : part
     );
   }
   if (Array.isArray(children)) {
-    return children.map((child, i) => <span key={i}>{renderWithCitations(child)}</span>);
+    return children.map((child, i) =>
+      typeof child === "string"
+        ? <span key={i}>{renderWithCitations(child)}</span>
+        : isValidElement(child)
+          ? cloneElement(child, { key: i } as Record<string, unknown>, renderWithCitations((child.props as { children?: ReactNode }).children))
+          : child
+    );
+  }
+  // Recurse into React elements (e.g. <strong>, <em>) so citations inside bold/italic get styled
+  if (isValidElement(children)) {
+    return cloneElement(children, {} as Record<string, unknown>, renderWithCitations((children.props as { children?: ReactNode }).children));
   }
   return children;
 }
 
 const citationComponents = {
-  p: ({ children }: { children?: React.ReactNode }) => <p>{renderWithCitations(children)}</p>,
-  li: ({ children }: { children?: React.ReactNode }) => <li>{renderWithCitations(children)}</li>,
+  p: ({ children }: { children?: ReactNode }) => <p>{renderWithCitations(children)}</p>,
+  li: ({ children }: { children?: ReactNode }) => <li>{renderWithCitations(children)}</li>,
 };
 
 const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidget(
@@ -791,7 +811,7 @@ const ChatWidget = forwardRef<ChatWidgetRef, ChatWidgetProps>(function ChatWidge
                         return (
                           <div>
                             <div className="prose prose-sm max-w-none text-gray-800 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 [&_p]:my-1.5 [&_p]:leading-relaxed [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-[0.8125rem] [&_h3]:font-semibold [&_h3]:mt-2.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_a]:text-blue-600 [&_a]:no-underline hover:[&_a]:underline">
-                              <ReactMarkdown components={citationComponents}>{cleanedContent}</ReactMarkdown>
+                              <ReactMarkdown components={citationComponents}>{escapeCitations(cleanedContent)}</ReactMarkdown>
                             </div>
 
                             {/* Page images — always visible with captions */}

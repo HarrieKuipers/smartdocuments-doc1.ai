@@ -57,7 +57,7 @@ CITAATREGELS - STRIKT VOLGEN:
 4. Voeg NOOIT informatie toe die niet in de fragmenten staat.
 5. Als meerdere fragmenten relevant zijn, citeer elk apart.${
     isCollection
-      ? "\n6. Vermeld altijd de documentnaam vetgedrukt bij elke bron: **Documenttitel** [Pagina X]"
+      ? `\n6. VERPLICHT: Vermeld ALTIJD de documentnaam vetgedrukt vóór elke paginaverwijzing. Formaat: **Documenttitel** [Pagina X]. Gebruik NOOIT alleen [Pagina X] zonder documentnaam — de lezer moet weten uit welk document de informatie komt.`
       : ""
   }
 
@@ -111,7 +111,7 @@ CITATION RULES - FOLLOW STRICTLY:
 4. NEVER add information that isn't in the fragments.
 5. If multiple fragments are relevant, cite each separately.${
     isCollection
-      ? "\n6. Always mention the document name in bold for each source: **Document Title** [Page X]"
+      ? `\n6. MANDATORY: ALWAYS include the document name in bold before every page reference. Format: **Document Title** [Page X]. NEVER use [Page X] alone without the document name — the reader must know which document the information comes from.`
       : ""
   }
 
